@@ -5,6 +5,7 @@ import json
 from contextlib import asynccontextmanager
 from urllib.parse import unquote
 
+import config
 from fastapi import FastAPI, Request, Header, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,15 +22,20 @@ from database import (
     delete_client, add_appointment, get_inactive_clients,
     get_reminder_days, update_reminder_days,
     get_reminder_days_by_master, update_reminder_days_by_master,
+    get_master_info, get_available_slots, get_master_schedule,
+    update_appointment_status,
 )
 from scheduler import setup_scheduler
 from handlers import start, clients, appointments, settings, stats
+from handlers import booking, schedule
 
 
-# ── Dispatcher ────────────────────────────────────────────────────
+# ── Dispatcher ────────────────────────────────────────────────────────
 def build_dispatcher() -> Dispatcher:
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(start.router)
+    dp.include_router(booking.router)
+    dp.include_router(schedule.router)
     dp.include_router(clients.router)
     dp.include_router(appointments.router)
     dp.include_router(settings.router)
@@ -41,11 +47,19 @@ bot = Bot(token=BOT_TOKEN)
 dp = build_dispatcher()
 
 
-# ── Lifespan ──────────────────────────────────────────────────────
+# ── Lifespan ──────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
     setup_scheduler(bot)
+
+    # Сохраняем username бота для ссылок самозаписи
+    try:
+        me = await bot.get_me()
+        config.BOT_USERNAME = me.username
+    except Exception:
+        config.BOT_USERNAME = ""
+
     if WEBHOOK_URL:
         await bot.delete_webhook(drop_pending_updates=True)
         await bot.set_webhook(
@@ -62,7 +76,7 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
-# ── Telegram Webhook ──────────────────────────────────────────────
+# ── Telegram Webhook ──────────────────────────────────────────────────
 @app.post("/webhook")
 async def webhook(request: Request):
     if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
@@ -72,24 +86,21 @@ async def webhook(request: Request):
     return {"ok": True}
 
 
-# ── Auth ──────────────────────────────────────────────────────────
+# ── Auth ──────────────────────────────────────────────────────────────
 def _extract_user_from_init_data(init_data: str) -> dict | None:
-    """Извлекает user из initData. Проверяет HMAC, но при ошибке пробует достать user напрямую."""
     try:
         from urllib.parse import parse_qs
         params = parse_qs(init_data, keep_blank_values=True)
-        # parse_qs возвращает списки — берём первый элемент
         flat = {k: v[0] for k, v in params.items()}
         received_hash = flat.pop("hash", None)
 
-        # Пытаемся проверить HMAC
         if received_hash:
             data_check = "\n".join(f"{k}={v}" for k, v in sorted(flat.items()))
             secret = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
             computed = hmac.new(secret, data_check.encode(), hashlib.sha256).hexdigest()
             if not hmac.compare_digest(computed, received_hash):
                 import logging
-                logging.warning("initData HMAC mismatch — пробуем извлечь user без проверки")
+                logging.warning("initData HMAC mismatch")
 
         user_str = flat.get("user")
         if user_str:
@@ -120,7 +131,7 @@ async def get_master_id(
     return await get_or_create_master(telegram_id, name)
 
 
-# ── Pydantic models ───────────────────────────────────────────────
+# ── Pydantic models ───────────────────────────────────────────────────
 class ClientCreate(BaseModel):
     name: str
     phone: str
@@ -135,14 +146,18 @@ class AppointmentCreate(BaseModel):
     client_id: int
     procedure: str
     appointment_date: str
+    time: str = ""
     price: int = 0
     notes: str = ""
 
 class ReminderUpdate(BaseModel):
     days: int
 
+class StatusUpdate(BaseModel):
+    status: str
 
-# ── API: Клиенты ──────────────────────────────────────────────────
+
+# ── API: Клиенты ──────────────────────────────────────────────────────
 @app.get("/api/clients")
 async def api_clients(master_id: int = Depends(get_master_id)):
     rows = await get_clients(master_id)
@@ -181,17 +196,48 @@ async def api_delete_client(client_id: int, master_id: int = Depends(get_master_
     return {"ok": True}
 
 
-# ── API: Записи ───────────────────────────────────────────────────
+# ── API: Записи ───────────────────────────────────────────────────────
 @app.post("/api/appointments", status_code=201)
 async def api_add_appointment(body: AppointmentCreate, master_id: int = Depends(get_master_id)):
     appt_id = await add_appointment(
         body.client_id, master_id, body.procedure,
         body.appointment_date, body.price, body.notes,
+        time=body.time,
     )
     return {"id": appt_id}
 
 
-# ── API: Статистика и прочее ──────────────────────────────────────
+@app.patch("/api/appointments/{appt_id}/status")
+async def api_update_status(appt_id: int, body: StatusUpdate, master_id: int = Depends(get_master_id)):
+    if body.status not in ("confirmed", "cancelled", "pending"):
+        raise HTTPException(status_code=400, detail="Неверный статус")
+    await update_appointment_status(appt_id, body.status)
+    return {"ok": True}
+
+
+# ── API: Расписание и слоты ───────────────────────────────────────────
+@app.get("/api/schedule")
+async def api_schedule(date: str, master_id: int = Depends(get_master_id)):
+    rows = await get_master_schedule(master_id, date)
+    return [
+        {"id": r[0], "client_name": r[1], "procedure": r[2], "time": r[3], "status": r[4], "phone": r[5]}
+        for r in rows
+    ]
+
+
+@app.get("/api/slots")
+async def api_slots(date: str, master_id: int = Depends(get_master_id)):
+    master = await get_master_info(master_id)
+    if not master:
+        raise HTTPException(status_code=404)
+    slots = await get_available_slots(
+        master_id, date,
+        master["work_start"], master["work_end"], master["slot_duration"]
+    )
+    return {"slots": slots, "work_start": master["work_start"], "work_end": master["work_end"]}
+
+
+# ── API: Статистика и прочее ──────────────────────────────────────────
 @app.get("/api/stats")
 async def api_stats(master_id: int = Depends(get_master_id)):
     return await get_statistics(master_id)
@@ -210,5 +256,5 @@ async def api_set_reminder(body: ReminderUpdate, master_id: int = Depends(get_ma
     return {"ok": True}
 
 
-# ── WebApp static ─────────────────────────────────────────────────
+# ── WebApp static ─────────────────────────────────────────────────────
 app.mount("/app", StaticFiles(directory="webapp", html=True), name="webapp")

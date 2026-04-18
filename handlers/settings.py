@@ -1,8 +1,12 @@
+import config
 from aiogram import Router, F
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
 
-from database import get_or_create_master, get_reminder_days, update_reminder_days
-from keyboards import settings_keyboard
+from database import (
+    get_or_create_master, get_reminder_days, update_reminder_days,
+    get_master_info, update_master_work_hours,
+)
+from keyboards import settings_keyboard, work_hours_keyboard, back_to_menu
 
 router = Router()
 
@@ -34,3 +38,123 @@ async def cb_set_reminder(callback: CallbackQuery):
     )
     await callback.message.edit_text(text, reply_markup=settings_keyboard(days), parse_mode="Markdown")
     await callback.answer(f"Установлено: {days} дней")
+
+
+@router.callback_query(F.data == "settings_work_hours")
+async def cb_work_hours(callback: CallbackQuery):
+    master_id = await get_or_create_master(callback.from_user.id, callback.from_user.full_name)
+    master = await get_master_info(master_id)
+
+    text = (
+        f"🕐 *Рабочее время*\n\n"
+        f"Начало: *{master['work_start']}:00*\n"
+        f"Конец: *{master['work_end']}:00*\n"
+        f"Длительность слота: *{master['slot_duration']} мин*\n\n"
+        f"Клиенты будут видеть только эти часы при самозаписи."
+    )
+    await callback.message.edit_text(
+        text,
+        reply_markup=work_hours_keyboard(master["work_start"], master["work_end"], master["slot_duration"]),
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("wh_start:"))
+async def cb_wh_start(callback: CallbackQuery):
+    new_start = int(callback.data.split(":")[1])
+    master_id = await get_or_create_master(callback.from_user.id, callback.from_user.full_name)
+    master = await get_master_info(master_id)
+
+    if new_start >= master["work_end"]:
+        await callback.answer("Начало должно быть раньше конца рабочего дня", show_alert=True)
+        return
+
+    await update_master_work_hours(master_id, new_start, master["work_end"], master["slot_duration"])
+    master["work_start"] = new_start
+
+    text = (
+        f"🕐 *Рабочее время*\n\n"
+        f"Начало: *{new_start}:00*\n"
+        f"Конец: *{master['work_end']}:00*\n"
+        f"Длительность слота: *{master['slot_duration']} мин*"
+    )
+    await callback.message.edit_text(
+        text,
+        reply_markup=work_hours_keyboard(new_start, master["work_end"], master["slot_duration"]),
+        parse_mode="Markdown"
+    )
+    await callback.answer(f"Начало: {new_start}:00")
+
+
+@router.callback_query(F.data.startswith("wh_end:"))
+async def cb_wh_end(callback: CallbackQuery):
+    new_end = int(callback.data.split(":")[1])
+    master_id = await get_or_create_master(callback.from_user.id, callback.from_user.full_name)
+    master = await get_master_info(master_id)
+
+    if new_end <= master["work_start"]:
+        await callback.answer("Конец должен быть позже начала рабочего дня", show_alert=True)
+        return
+
+    await update_master_work_hours(master_id, master["work_start"], new_end, master["slot_duration"])
+    master["work_end"] = new_end
+
+    text = (
+        f"🕐 *Рабочее время*\n\n"
+        f"Начало: *{master['work_start']}:00*\n"
+        f"Конец: *{new_end}:00*\n"
+        f"Длительность слота: *{master['slot_duration']} мин*"
+    )
+    await callback.message.edit_text(
+        text,
+        reply_markup=work_hours_keyboard(master["work_start"], new_end, master["slot_duration"]),
+        parse_mode="Markdown"
+    )
+    await callback.answer(f"Конец: {new_end}:00")
+
+
+@router.callback_query(F.data.startswith("wh_dur:"))
+async def cb_wh_duration(callback: CallbackQuery):
+    new_dur = int(callback.data.split(":")[1])
+    master_id = await get_or_create_master(callback.from_user.id, callback.from_user.full_name)
+    master = await get_master_info(master_id)
+
+    await update_master_work_hours(master_id, master["work_start"], master["work_end"], new_dur)
+    master["slot_duration"] = new_dur
+
+    text = (
+        f"🕐 *Рабочее время*\n\n"
+        f"Начало: *{master['work_start']}:00*\n"
+        f"Конец: *{master['work_end']}:00*\n"
+        f"Длительность слота: *{new_dur} мин*"
+    )
+    await callback.message.edit_text(
+        text,
+        reply_markup=work_hours_keyboard(master["work_start"], master["work_end"], new_dur),
+        parse_mode="Markdown"
+    )
+    await callback.answer(f"Слот: {new_dur} мин")
+
+
+@router.callback_query(F.data == "settings_booking_link")
+async def cb_booking_link(callback: CallbackQuery):
+    bot_username = getattr(config, "BOT_USERNAME", "")
+    telegram_id = callback.from_user.id
+
+    if bot_username:
+        link = f"https://t.me/{bot_username}?start=book_{telegram_id}"
+        text = (
+            f"🔗 *Ваша ссылка для записи*\n\n"
+            f"`{link}`\n\n"
+            f"Поделитесь этой ссылкой с клиентами — они смогут записаться в любое время."
+        )
+    else:
+        text = (
+            f"🔗 *Ваша ссылка для записи*\n\n"
+            f"Ваш ID: `book_{telegram_id}`\n\n"
+            f"Для получения полной ссылки добавьте `BOT_USERNAME` в переменные окружения Render."
+        )
+
+    await callback.message.edit_text(text, reply_markup=back_to_menu(), parse_mode="Markdown")
+    await callback.answer()

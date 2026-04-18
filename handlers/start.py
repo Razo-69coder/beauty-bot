@@ -1,6 +1,7 @@
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart
+from aiogram.filters.command import CommandObject
 from aiogram.fsm.context import FSMContext
 
 from database import get_or_create_master
@@ -35,11 +36,21 @@ HELP_TEXT = """
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message):
-    master_id = await get_or_create_master(
-        message.from_user.id,
-        message.from_user.full_name
-    )
+async def cmd_start(message: Message, state: FSMContext, command: CommandObject):
+    # Обрабатываем deep link для онлайн-записи
+    if command.args and command.args.startswith("book_"):
+        try:
+            master_telegram_id = int(command.args.split("_", 1)[1])
+        except (ValueError, IndexError):
+            await message.answer("Неверная ссылка для записи.")
+            return
+
+        from handlers.booking import start_booking_flow
+        await start_booking_flow(message, state, master_telegram_id)
+        return
+
+    # Обычный старт для мастера
+    await get_or_create_master(message.from_user.id, message.from_user.full_name)
     await message.answer(WELCOME_TEXT, reply_markup=main_menu(), parse_mode="Markdown")
 
 
@@ -62,8 +73,7 @@ async def cb_cancel(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "help")
 async def cb_help(callback: CallbackQuery):
-    from keyboards import back_to_menu
     await callback.message.edit_text(
-        HELP_TEXT, reply_markup=back_to_menu(), parse_mode="Markdown"
+        HELP_TEXT, reply_markup=main_menu(), parse_mode="Markdown"
     )
     await callback.answer()

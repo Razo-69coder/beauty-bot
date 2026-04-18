@@ -16,3 +16,6 @@ REMINDER_DAYS = 40
 
 # Количество клиентов на одной странице списка
 PAGE_SIZE = 10
+
+# Username бота (заполняется автоматически при старте через bot.get_me())
+BOT_USERNAME = os.getenv("BOT_USERNAME", "")
