@@ -45,13 +45,24 @@ body {
   padding-bottom: 72px;
 }
 
-/* ── Фоновые декоры ───────────────────────────────────────────── */
+/* ── Фоновые beauty-фото (размытые) ──────────────────────────── */
 body::before {
   content: '';
-  position: fixed; top: 0; left: 0; right: 0;
-  height: 280px;
-  background: var(--primary-grad);
-  opacity: 0.08;
+  position: fixed; inset: 0;
+  background-image:
+    url('https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&q=60'),
+    url('https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=800&q=60');
+  background-size: cover;
+  background-position: center top;
+  filter: blur(18px) brightness(0.55) saturate(1.4);
+  transform: scale(1.05);
+  z-index: 0;
+  pointer-events: none;
+}
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: linear-gradient(160deg, rgba(201,101,122,0.45) 0%, rgba(250,240,244,0.92) 55%);
   z-index: 0;
   pointer-events: none;
 }
