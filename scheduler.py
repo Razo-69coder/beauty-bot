@@ -6,6 +6,7 @@ from database import (
     get_all_masters, get_inactive_clients, get_reminder_days,
     get_appointments_for_reminder_24h, get_appointments_for_reminder_2h,
     mark_reminder_sent,
+    get_appointments_for_correction_reminder, mark_correction_reminder_sent,
 )
 
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
@@ -89,6 +90,25 @@ async def send_client_reminders_2h(bot: Bot):
             pass
 
 
+async def send_correction_reminders(bot: Bot):
+    """Ежедневно в 12:00 — напоминает клиентам о коррекции через 3 недели после визита"""
+    three_weeks_ago = (now_msk() - timedelta(days=21)).strftime("%Y-%m-%d")
+    appointments = await get_appointments_for_correction_reminder(three_weeks_ago)
+
+    for appt_id, client_tg_id, client_name, master_name, procedure in appointments:
+        try:
+            await bot.send_message(
+                client_tg_id,
+                f"💅 *Привет, {client_name}!*\n\n"
+                f"Прошло 3 недели после визита — самое время на коррекцию!\n\n"
+                f"Запишитесь к мастеру {master_name} заранее 🗓",
+                parse_mode="Markdown"
+            )
+            await mark_correction_reminder_sent(appt_id)
+        except Exception:
+            pass
+
+
 def setup_scheduler(bot: Bot):
     # Напоминание мастеру о неактивных клиентах
     scheduler.add_job(send_inactive_reminders, "cron", hour=10, minute=0, args=[bot])
@@ -98,5 +118,8 @@ def setup_scheduler(bot: Bot):
 
     # Напоминание клиентам за 2 часа (каждые 30 минут)
     scheduler.add_job(send_client_reminders_2h, "interval", minutes=30, args=[bot])
+
+    # Напоминание о коррекции через 3 недели
+    scheduler.add_job(send_correction_reminders, "cron", hour=12, minute=0, args=[bot])
 
     scheduler.start()

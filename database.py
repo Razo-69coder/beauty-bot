@@ -48,6 +48,20 @@ async def init_db():
                 FOREIGN KEY (client_id) REFERENCES clients(id)
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                master_id INTEGER,
+                client_id INTEGER,
+                name TEXT,
+                total_sessions INTEGER,
+                used_sessions INTEGER DEFAULT 0,
+                price INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (master_id) REFERENCES masters(id),
+                FOREIGN KEY (client_id) REFERENCES clients(id)
+            )
+        """)
         await db.commit()
 
         # Миграции для существующих баз
@@ -61,6 +75,7 @@ async def init_db():
             "ALTER TABLE appointments ADD COLUMN status TEXT DEFAULT 'confirmed'",
             "ALTER TABLE appointments ADD COLUMN reminder_24h_sent INTEGER DEFAULT 0",
             "ALTER TABLE appointments ADD COLUMN reminder_2h_sent INTEGER DEFAULT 0",
+            "ALTER TABLE appointments ADD COLUMN correction_reminder_sent INTEGER DEFAULT 0",
         ]
         for sql in migrations:
             try:
@@ -425,6 +440,71 @@ async def mark_reminder_sent(appointment_id: int, reminder_type: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(f"UPDATE appointments SET {col}=1 WHERE id=?", (appointment_id,))
         await db.commit()
+
+
+async def get_appointments_for_correction_reminder(three_weeks_ago: str) -> list:
+    """Визиты ровно 3 недели назад, статус confirmed, без отправленного напоминания"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("""
+            SELECT a.id, c.telegram_id, c.name, m.name, a.procedure
+            FROM appointments a
+            JOIN clients c ON c.id = a.client_id
+            JOIN masters m ON m.id = a.master_id
+            WHERE a.appointment_date = ?
+              AND a.status = 'confirmed'
+              AND a.correction_reminder_sent = 0
+              AND c.telegram_id IS NOT NULL
+        """, (three_weeks_ago,)) as cur:
+            return await cur.fetchall()
+
+
+async def mark_correction_reminder_sent(appointment_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE appointments SET correction_reminder_sent=1 WHERE id=?", (appointment_id,)
+        )
+        await db.commit()
+
+
+# ── Абонементы ────────────────────────────────────────────────────────
+
+async def add_subscription(master_id: int, client_id: int, name: str, total: int, price: int) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO subscriptions (master_id, client_id, name, total_sessions, price) VALUES (?,?,?,?,?)",
+            (master_id, client_id, name, total, price)
+        )
+        await db.commit()
+        async with db.execute("SELECT last_insert_rowid()") as cur:
+            return (await cur.fetchone())[0]
+
+
+async def get_client_subscriptions(client_id: int, master_id: int) -> list:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("""
+            SELECT id, name, total_sessions, used_sessions, price
+            FROM subscriptions
+            WHERE client_id=? AND master_id=?
+            ORDER BY created_at DESC
+        """, (client_id, master_id)) as cur:
+            return await cur.fetchall()
+
+
+async def use_subscription_session(sub_id: int, master_id: int) -> bool:
+    """Списывает один сеанс. Возвращает False если сеансы исчерпаны."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT used_sessions, total_sessions FROM subscriptions WHERE id=? AND master_id=?",
+            (sub_id, master_id)
+        ) as cur:
+            row = await cur.fetchone()
+        if not row or row[0] >= row[1]:
+            return False
+        await db.execute(
+            "UPDATE subscriptions SET used_sessions=used_sessions+1 WHERE id=?", (sub_id,)
+        )
+        await db.commit()
+        return True
 
 
 # ── Статистика ────────────────────────────────────────────────────────

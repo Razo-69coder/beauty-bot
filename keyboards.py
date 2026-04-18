@@ -192,6 +192,7 @@ def client_card_keyboard(client_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"client_edit:{client_id}"),
         ],
         [InlineKeyboardButton(text="📅 Записать на процедуру", callback_data=f"appointment_for:{client_id}")],
+        [InlineKeyboardButton(text="📦 Абонементы", callback_data=f"sub_menu:{client_id}")],
         [
             InlineKeyboardButton(text="🗑 Удалить клиента", callback_data=f"client_delete:{client_id}"),
             InlineKeyboardButton(text="◀️ Назад", callback_data="clients_list"),
@@ -248,6 +249,32 @@ def stats_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📥 Выгрузить базу в Excel", callback_data="export_excel")],
         [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")],
+    ])
+
+
+# ─── Абонементы ──────────────────────────────────────────────────────
+def subscriptions_keyboard(subs: list, client_id: int) -> InlineKeyboardMarkup:
+    buttons = []
+    for sub_id, name, total, used, price in subs:
+        if used < total:
+            buttons.append([
+                InlineKeyboardButton(
+                    text=f"➖ Списать сеанс: {name}",
+                    callback_data=f"sub_use:{sub_id}:{client_id}"
+                )
+            ])
+    buttons.append([
+        InlineKeyboardButton(text="➕ Новый абонемент", callback_data=f"sub_create:{client_id}")
+    ])
+    buttons.append([
+        InlineKeyboardButton(text="◀️ К клиенту", callback_data=f"client_view:{client_id}")
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def back_to_client(client_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ К клиенту", callback_data=f"client_view:{client_id}")]
     ])
 
 

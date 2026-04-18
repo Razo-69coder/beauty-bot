@@ -1,5 +1,6 @@
+import config
 from aiogram import Router, F
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime, timedelta
 
 from database import (
@@ -74,6 +75,17 @@ async def cb_booking_confirm(callback: CallbackQuery):
                 f"Ждём вас!",
                 parse_mode="Markdown"
             )
+            # Предлагаем записаться ещё раз
+            bot_username = getattr(config, "BOT_USERNAME", None)
+            if bot_username:
+                booking_link = f"https://t.me/{bot_username}?start=book_{callback.from_user.id}"
+                await callback.bot.send_message(
+                    client_tg_id,
+                    "✨ Хотите записаться на следующий визит заранее?",
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                        InlineKeyboardButton(text="📅 Записаться снова", url=booking_link)
+                    ]])
+                )
         except Exception:
             pass
 
