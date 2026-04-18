@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Онлайн-запись</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #FFF0F5;
+  color: #3D2B2B;
+  min-height: 100vh;
+}
+
+.header {
+  background: linear-gradient(135deg, #E8A0BF, #C9657A);
+  padding: 20px 16px 18px;
+  color: white;
+}
+.header h1 { font-size: 20px; font-weight: 700; }
+.header p  { font-size: 13px; opacity: 0.88; margin-top: 3px; }
+
+.content { padding: 16px; }
+
+/* Шаги */
+.step { display: none; }
+.step.active { display: block; }
+
+.step-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+  text-transform: uppercase; color: #C9657A; margin-bottom: 14px;
+}
+
+/* Карточки дат */
+.dates-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;
+}
+.date-card {
+  background: white; border-radius: 14px; padding: 14px 8px;
+  text-align: center; cursor: pointer; border: 2px solid transparent;
+  box-shadow: 0 2px 8px rgba(200,100,120,0.1); transition: all 0.15s;
+}
+.date-card:active { transform: scale(0.96); }
+.date-card.selected { border-color: #C9657A; background: #FFF0F5; }
+.date-card .day-name { font-size: 11px; font-weight: 600; color: #C9657A; margin-bottom: 4px; }
+.date-card .day-num  { font-size: 22px; font-weight: 800; color: #3D2B2B; }
+.date-card .month    { font-size: 11px; color: #999; margin-top: 2px; }
+
+/* Слоты */
+.slots-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;
+}
+.slot-btn {
+  background: white; border: 2px solid transparent; border-radius: 12px;
+  padding: 13px 6px; text-align: center; cursor: pointer;
+  font-size: 15px; font-weight: 700; color: #3D2B2B;
+  box-shadow: 0 2px 8px rgba(200,100,120,0.1); transition: all 0.15s;
+}
+.slot-btn:active { transform: scale(0.96); }
+.slot-btn.selected { background: linear-gradient(135deg, #E8A0BF, #C9657A); color: white; border-color: transparent; }
+
+/* Форма */
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block; color: #555; }
+.form-input {
+  width: 100%; padding: 13px 14px; border-radius: 12px;
+  border: 1.5px solid #f0d0e0; background: white; font-size: 15px;
+  outline: none; transition: border-color 0.2s;
+}
+.form-input:focus { border-color: #C9657A; }
+
+/* Кнопки */
+.btn-primary {
+  width: 100%; padding: 15px; border-radius: 14px; border: none;
+  background: linear-gradient(135deg, #E8A0BF, #C9657A); color: white;
+  font-size: 15px; font-weight: 700; cursor: pointer; transition: opacity 0.15s;
+}
+.btn-primary:active { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.5; cursor: default; }
+
+.btn-back {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: #C9657A; font-size: 14px; font-weight: 600;
+  cursor: pointer; margin-bottom: 16px; background: none; border: none; padding: 0;
+}
+
+/* Итог-карточка */
+.summary-card {
+  background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px;
+  box-shadow: 0 2px 10px rgba(200,100,120,0.1);
+}
+.summary-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; }
+.summary-row:not(:last-child) { border-bottom: 1px solid #F8E8F0; }
+.summary-key  { font-size: 13px; color: #999; }
+.summary-val  { font-size: 14px; font-weight: 600; }
+
+/* Успех */
+.success-wrap { text-align: center; padding: 30px 0; }
+.success-icon { font-size: 64px; margin-bottom: 16px; }
+.success-title{ font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+.success-sub  { font-size: 14px; color: #888; line-height: 1.5; }
+
+/* Ошибка/загрузка */
+.loading { text-align: center; padding: 40px 20px; color: #aaa; font-size: 14px; }
+.error-msg { background: #fff0f0; border-radius: 12px; padding: 14px; color: #c05050; font-size: 14px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>💅 Онлайн-запись</h1>
+  <p id="master-name-header">Загрузка...</p>
+</div>
+
+<div class="content">
+
+  <!-- Загрузка -->
+  <div class="step active" id="step-loading">
+    <div class="loading">Загружаем расписание...</div>
+  </div>
+
+  <!-- Ошибка -->
+  <div class="step" id="step-error">
+    <div class="error-msg" id="error-text">Произошла ошибка</div>
+  </div>
+
+  <!-- Шаг 1: Выбор даты -->
+  <div class="step" id="step-date">
+    <div class="step-label">Шаг 1 из 3 — выберите дату</div>
+    <div class="dates-grid" id="dates-grid"></div>
+    <button class="btn-primary" id="btn-date-next" disabled onclick="goToTime()">Далее →</button>
+  </div>
+
+  <!-- Шаг 2: Выбор времени -->
+  <div class="step" id="step-time">
+    <button class="btn-back" onclick="goBack('date')">← Назад</button>
+    <div class="step-label">Шаг 2 из 3 — выберите время</div>
+    <div class="slots-grid" id="slots-grid">
+      <div class="loading">Загрузка слотов...</div>
+    </div>
+    <button class="btn-primary" id="btn-time-next" disabled onclick="goToForm()">Далее →</button>
+  </div>
+
+  <!-- Шаг 3: Данные клиента -->
+  <div class="step" id="step-form">
+    <button class="btn-back" onclick="goBack('time')">← Назад</button>
+    <div class="step-label">Шаг 3 из 3 — ваши данные</div>
+
+    <div class="summary-card">
+      <div class="summary-row">
+        <span class="summary-key">Мастер</span>
+        <span class="summary-val" id="sum-master">—</span>
+      </div>
+      <div class="summary-row">
+        <span class="summary-key">Дата</span>
+        <span class="summary-val" id="sum-date">—</span>
+      </div>
+      <div class="summary-row">
+        <span class="summary-key">Время</span>
+        <span class="summary-val" id="sum-time">—</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Ваше имя</label>
+      <input class="form-input" id="client-name" type="text" placeholder="Например: Маша" autocomplete="name" oninput="checkForm()">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Телефон</label>
+      <input class="form-input" id="client-phone" type="tel" placeholder="+79001234567" autocomplete="tel" oninput="checkForm()">
+    </div>
+    <div id="form-error" class="error-msg" style="display:none"></div>
+    <button class="btn-primary" id="btn-submit" disabled onclick="submitBooking()">Записаться</button>
+  </div>
+
+  <!-- Успех -->
+  <div class="step" id="step-success">
+    <div class="success-wrap">
+      <div class="success-icon">✅</div>
+      <div class="success-title">Заявка отправлена!</div>
+      <div class="success-sub">
+        Мастер подтвердит запись — ожидайте сообщения.<br><br>
+        <span id="success-details"></span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+const MONTHS = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+const DAYS_SHORT = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+const DAYS_FULL  = ['воскресенье','понедельник','вторник','среду','четверг','пятницу','субботу'];
+
+// Состояние
+let masterTgId = null;
+let masterName = '';
+let selectedDate = null;
+let selectedTime = null;
+
+// Читаем ?master= из URL
+const params = new URLSearchParams(location.search);
+masterTgId = parseInt(params.get('master'));
+
+if (!masterTgId) {
+  showError('Ссылка для записи недействительна. Попросите мастера прислать актуальную ссылку.');
+} else {
+  loadMaster();
+}
+
+async function loadMaster() {
+  try {
+    const res = await fetch(`/api/public/master/${masterTgId}`);
+    if (!res.ok) throw new Error('Мастер не найден');
+    const data = await res.json();
+    masterName = data.name;
+    document.getElementById('master-name-header').textContent = data.name;
+    document.getElementById('sum-master').textContent = data.name;
+    renderDates(data.available_dates);
+    showStep('date');
+  } catch (e) {
+    showError(e.message || 'Не удалось загрузить расписание');
+  }
+}
+
+function renderDates(dates) {
+  const grid = document.getElementById('dates-grid');
+  if (!dates.length) {
+    grid.innerHTML = '<div style="grid-column:span 3;text-align:center;color:#aaa;padding:20px">Нет свободных дат на ближайшие 2 недели</div>';
+    return;
+  }
+  grid.innerHTML = dates.map(d => {
+    const dt = new Date(d + 'T00:00:00');
+    const dayName = DAYS_SHORT[dt.getDay()];
+    const dayNum  = dt.getDate();
+    const month   = MONTHS[dt.getMonth()];
+    return `<div class="date-card" onclick="selectDate('${d}', this)">
+      <div class="day-name">${dayName}</div>
+      <div class="day-num">${dayNum}</div>
+      <div class="month">${month}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectDate(date, el) {
+  document.querySelectorAll('.date-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedDate = date;
+  selectedTime = null;
+  document.getElementById('btn-date-next').disabled = false;
+}
+
+async function goToTime() {
+  if (!selectedDate) return;
+  showStep('time');
+  const grid = document.getElementById('slots-grid');
+  grid.innerHTML = '<div class="loading" style="grid-column:span 3">Загрузка...</div>';
+  document.getElementById('btn-time-next').disabled = true;
+  try {
+    const res = await fetch(`/api/public/slots?master=${masterTgId}&date=${selectedDate}`);
+    const data = await res.json();
+    renderSlots(data.slots);
+    const dt = new Date(selectedDate + 'T00:00:00');
+    document.getElementById('sum-date').textContent =
+      `${dt.getDate()} ${MONTHS[dt.getMonth()]}, ${DAYS_SHORT[dt.getDay()]}`;
+  } catch (e) {
+    grid.innerHTML = '<div class="error-msg" style="grid-column:span 3">Ошибка загрузки</div>';
+  }
+}
+
+function renderSlots(slots) {
+  const grid = document.getElementById('slots-grid');
+  if (!slots.length) {
+    grid.innerHTML = '<div style="grid-column:span 3;text-align:center;color:#aaa;padding:20px">На этот день нет свободных слотов</div>';
+    return;
+  }
+  grid.innerHTML = slots.map(s =>
+    `<div class="slot-btn" onclick="selectSlot('${s}', this)">${s}</div>`
+  ).join('');
+}
+
+function selectSlot(time, el) {
+  document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedTime = time;
+  document.getElementById('btn-time-next').disabled = false;
+}
+
+function goToForm() {
+  if (!selectedTime) return;
+  document.getElementById('sum-time').textContent = selectedTime;
+  checkForm();
+  showStep('form');
+  document.getElementById('client-name').focus();
+}
+
+function checkForm() {
+  const name  = document.getElementById('client-name').value.trim();
+  const phone = document.getElementById('client-phone').value.trim();
+  document.getElementById('btn-submit').disabled = !(name && phone.length >= 5);
+}
+
+async function submitBooking() {
+  const name  = document.getElementById('client-name').value.trim();
+  const phone = document.getElementById('client-phone').value.trim();
+  const errEl = document.getElementById('form-error');
+  errEl.style.display = 'none';
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.textContent = 'Отправляем...';
+
+  try {
+    const res = await fetch('/api/public/book', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        master_telegram_id: masterTgId,
+        date: selectedDate,
+        time: selectedTime,
+        client_name: name,
+        client_phone: phone,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || 'Ошибка сервера');
+    }
+    const dt = new Date(selectedDate + 'T00:00:00');
+    document.getElementById('success-details').textContent =
+      `${dt.getDate()} ${MONTHS[dt.getMonth()]} в ${selectedTime} у мастера ${masterName}`;
+    showStep('success');
+    if (tg) setTimeout(() => tg.close(), 4000);
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = '';
+    btn.disabled = false;
+    btn.textContent = 'Записаться';
+  }
+}
+
+function goBack(to) {
+  if (to === 'date') { selectedTime = null; showStep('date'); }
+  if (to === 'time') { showStep('time'); }
+}
+
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-' + id).classList.add('active');
+}
+
+function showError(msg) {
+  document.getElementById('error-text').textContent = msg;
+  showStep('error');
+}
+</script>
+</body>
+</html>

@@ -22,8 +22,8 @@ from database import (
     delete_client, add_appointment, get_inactive_clients,
     get_reminder_days, update_reminder_days,
     get_reminder_days_by_master, update_reminder_days_by_master,
-    get_master_info, get_available_slots, get_master_schedule,
-    update_appointment_status,
+    get_master_info, get_master_info_by_telegram, get_available_slots,
+    get_master_schedule, update_appointment_status,
 )
 
 from scheduler import setup_scheduler
@@ -256,6 +256,91 @@ async def api_inactive(master_id: int = Depends(get_master_id)):
 async def api_set_reminder(body: ReminderUpdate, master_id: int = Depends(get_master_id)):
     await update_reminder_days_by_master(master_id, body.days)
     return {"ok": True}
+
+
+# ── Public API (для клиентов, без авторизации) ────────────────────────
+
+class PublicBooking(BaseModel):
+    master_telegram_id: int
+    date: str
+    time: str
+    client_name: str
+    client_phone: str
+
+
+@app.get("/api/public/master/{telegram_id}")
+async def api_public_master(telegram_id: int):
+    from datetime import datetime as dt, timedelta
+    master = await get_master_info_by_telegram(telegram_id)
+    if not master:
+        raise HTTPException(status_code=404, detail="Мастер не найден")
+    today = dt.now().date()
+    available_dates = []
+    for i in range(1, 14):
+        d = today + timedelta(days=i)
+        date_str = d.strftime("%Y-%m-%d")
+        slots = await get_available_slots(
+            master["id"], date_str,
+            master["work_start"], master["work_end"], master["slot_duration"]
+        )
+        if slots:
+            available_dates.append(date_str)
+        if len(available_dates) == 7:
+            break
+    return {"name": master["name"], "master_id": master["id"], "available_dates": available_dates}
+
+
+@app.get("/api/public/slots")
+async def api_public_slots(master: int, date: str):
+    master_info = await get_master_info_by_telegram(master)
+    if not master_info:
+        raise HTTPException(status_code=404)
+    slots = await get_available_slots(
+        master_info["id"], date,
+        master_info["work_start"], master_info["work_end"], master_info["slot_duration"]
+    )
+    return {"slots": slots}
+
+
+@app.post("/api/public/book", status_code=201)
+async def api_public_book(body: PublicBooking):
+    from datetime import datetime as dt
+    DAYS_RU = {0: "Пн", 1: "Вт", 2: "Ср", 3: "Чт", 4: "Пт", 5: "Сб", 6: "Вс"}
+    master = await get_master_info_by_telegram(body.master_telegram_id)
+    if not master:
+        raise HTTPException(status_code=404, detail="Мастер не найден")
+    slots = await get_available_slots(
+        master["id"], body.date,
+        master["work_start"], master["work_end"], master["slot_duration"]
+    )
+    if body.time not in slots:
+        raise HTTPException(status_code=409, detail="Этот слот уже занят")
+    client_id = await add_client(master["id"], body.client_name, body.client_phone)
+    appt_id = await add_appointment(
+        client_id=client_id,
+        master_id=master["id"],
+        procedure="Запись",
+        appointment_date=body.date,
+        time=body.time,
+        status="pending",
+    )
+    date_fmt = dt.strptime(body.date, "%Y-%m-%d").strftime("%d.%m.%Y")
+    day_name = DAYS_RU[dt.strptime(body.date, "%Y-%m-%d").weekday()]
+    try:
+        from keyboards import booking_confirm_keyboard
+        await bot.send_message(
+            body.master_telegram_id,
+            f"🔔 *Новая запись через сайт!*\n\n"
+            f"👤 {body.client_name}\n"
+            f"📱 {body.client_phone}\n"
+            f"📅 {date_fmt} ({day_name}), {body.time}\n\n"
+            f"Подтвердить?",
+            reply_markup=booking_confirm_keyboard(appt_id),
+            parse_mode="Markdown",
+        )
+    except Exception:
+        pass
+    return {"id": appt_id, "ok": True}
 
 
 # ── WebApp static ─────────────────────────────────────────────────────
