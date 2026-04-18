@@ -148,6 +148,35 @@ body {
 .loading { text-align: center; padding: 40px 20px; color: #aaa; font-size: 14px; }
 .empty   { text-align: center; padding: 30px 20px; color: #aaa; }
 .empty .emoji { font-size: 40px; margin-bottom: 10px; }
+
+/* Themes */
+body.theme-gold .header        { background: linear-gradient(135deg, #F0C060, #C8962A); }
+body.theme-gold .menu-card.accent { background: linear-gradient(135deg, #F0C060, #C8962A); }
+body.theme-gold .btn-primary   { background: linear-gradient(135deg, #F0C060, #C8962A); }
+body.theme-gold .stat-wide     { background: linear-gradient(135deg, #F0C060, #C8962A); }
+body.theme-gold .client-avatar { background: linear-gradient(135deg, #F8E0A0, #F0C060); }
+body.theme-gold .client-badge  { background: #FFF8E0; color: #C8962A; }
+body.theme-gold .back-btn      { color: #C8962A; }
+body.theme-gold .stat-value    { color: #C8962A; }
+body.theme-gold .history-price { color: #C8962A; }
+body.theme-gold .nav-item.active .nav-label { color: #C8962A; }
+body.theme-gold .bottom-nav    { border-top-color: #F0E0C0; }
+body.theme-gold .form-input    { border-color: #F0E0A0; }
+body.theme-gold .form-input:focus { border-color: #C8962A; }
+
+body.theme-lavender .header        { background: linear-gradient(135deg, #C8A8E8, #9060C0); }
+body.theme-lavender .menu-card.accent { background: linear-gradient(135deg, #C8A8E8, #9060C0); }
+body.theme-lavender .btn-primary   { background: linear-gradient(135deg, #C8A8E8, #9060C0); }
+body.theme-lavender .stat-wide     { background: linear-gradient(135deg, #C8A8E8, #9060C0); }
+body.theme-lavender .client-avatar { background: linear-gradient(135deg, #E0C8F8, #C8A8E8); }
+body.theme-lavender .client-badge  { background: #F0E8FC; color: #9060C0; }
+body.theme-lavender .back-btn      { color: #9060C0; }
+body.theme-lavender .stat-value    { color: #9060C0; }
+body.theme-lavender .history-price { color: #9060C0; }
+body.theme-lavender .nav-item.active .nav-label { color: #9060C0; }
+body.theme-lavender .bottom-nav    { border-top-color: #E0D0F0; }
+body.theme-lavender .form-input    { border-color: #E0D0F0; }
+body.theme-lavender .form-input:focus { border-color: #9060C0; }
 </style>
 </head>
 <body>
@@ -277,9 +306,42 @@ body {
 
 <!-- НЕ ПРИХОДИЛИ -->
 <div class="screen" id="screen-inactive">
-  <div class="back-btn" onclick="showHome()">← Назад</div>
   <div class="section-title">🔔 Давно не приходили</div>
   <div id="inactive-list"><div class="loading">Загрузка...</div></div>
+</div>
+
+<!-- НАСТРОЙКИ -->
+<div class="screen" id="screen-settings">
+  <div class="section-title">⚙️ Настройки</div>
+
+  <div style="background:white;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:#555">🎨 Тема оформления</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="theme-btn" id="theme-pink" onclick="setTheme('pink')" style="border-radius:12px;padding:14px 8px;text-align:center;cursor:pointer;border:2px solid transparent">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#E8A0BF,#C9657A);margin:0 auto 6px"></div>
+        <div style="font-size:11px;font-weight:600">Розовая</div>
+      </div>
+      <div class="theme-btn" id="theme-gold" onclick="setTheme('gold')" style="border-radius:12px;padding:14px 8px;text-align:center;cursor:pointer;border:2px solid transparent">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#F0C060,#C8962A);margin:0 auto 6px"></div>
+        <div style="font-size:11px;font-weight:600">Золотая</div>
+      </div>
+      <div class="theme-btn" id="theme-lavender" onclick="setTheme('lavender')" style="border-radius:12px;padding:14px 8px;text-align:center;cursor:pointer;border:2px solid transparent">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#C8A8E8,#9060C0);margin:0 auto 6px"></div>
+        <div style="font-size:11px;font-weight:600">Лаванда</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="background:white;border-radius:16px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:#555">🔔 Напоминания</div>
+    <div style="font-size:13px;color:#666;margin-bottom:10px">Напоминать если клиент не приходил более:</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <input id="reminder-days" type="number" min="7" max="180" value="40"
+        style="width:70px;padding:10px;border-radius:10px;border:1.5px solid #f0d0e0;font-size:16px;text-align:center;outline:none">
+      <span style="font-size:14px;color:#666">дней</span>
+      <button onclick="saveReminderDays()" class="btn btn-primary" style="flex:1;padding:10px">Сохранить</button>
+    </div>
+  </div>
 </div>
 
 <!-- Нижняя навигация -->
@@ -290,14 +352,14 @@ body {
   <div class="nav-item" id="nav-clients" onclick="showClients()">
     <div class="nav-icon">👥</div><div class="nav-label">Клиенты</div>
   </div>
-  <div class="nav-item" id="nav-add" onclick="showAddClient()">
-    <div class="nav-icon">➕</div><div class="nav-label">Добавить</div>
-  </div>
   <div class="nav-item" id="nav-inactive" onclick="showInactive()">
     <div class="nav-icon">🔔</div><div class="nav-label">Напомнить</div>
   </div>
   <div class="nav-item" id="nav-stats" onclick="showStats()">
     <div class="nav-icon">📊</div><div class="nav-label">Статистика</div>
+  </div>
+  <div class="nav-item" id="nav-settings" onclick="showSettings()">
+    <div class="nav-icon">⚙️</div><div class="nav-label">Настройки</div>
   </div>
 </div>
 
@@ -535,7 +597,41 @@ function formatMoney(n) {
   return (n || 0).toLocaleString('ru-RU') + ' ₽';
 }
 
+// ── Settings ──────────────────────────────────────────────────────
+function showSettings() {
+  showScreen('settings', 'settings');
+  const current = localStorage.getItem('theme') || 'pink';
+  updateThemeButtons(current);
+  api('GET', '/api/inactive').then(d => {
+    // подгружаем текущее кол-во дней из inactive (reminder_days)
+  }).catch(() => {});
+}
+
+function setTheme(name) {
+  document.body.className = name === 'pink' ? '' : 'theme-' + name;
+  localStorage.setItem('theme', name);
+  updateThemeButtons(name);
+}
+
+function updateThemeButtons(active) {
+  ['pink', 'gold', 'lavender'].forEach(t => {
+    const el = document.getElementById('theme-' + t);
+    if (el) el.style.border = t === active ? '2px solid #888' : '2px solid transparent';
+  });
+}
+
+async function saveReminderDays() {
+  const days = parseInt(document.getElementById('reminder-days').value);
+  if (!days || days < 7 || days > 180) { tg.showAlert('Введи число от 7 до 180'); return; }
+  try {
+    await api('PUT', '/api/settings/reminder', { days });
+    tg.showAlert('✅ Сохранено!');
+  } catch (e) { tg.showAlert('Ошибка: ' + e.message); }
+}
+
 // ── Init ──────────────────────────────────────────────────────────
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme && savedTheme !== 'pink') setTheme(savedTheme);
 showHome();
 </script>
 </body>
