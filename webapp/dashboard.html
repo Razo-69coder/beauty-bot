@@ -45,27 +45,16 @@ body {
   padding-bottom: 72px;
 }
 
-/* ── Фоновое beauty-фото (размытое) ──────────────────────────── */
+/* ── Фоновое beauty-фото ─────────────────────────────────────── */
 body::before {
   content: '';
   position: fixed; inset: 0;
   background-image: url('https://images.unsplash.com/photo-1595475207225-428b62bda831?w=900&q=70');
   background-size: cover;
   background-position: center;
-  filter: blur(12px) brightness(0.85) saturate(1.2);
-  transform: scale(1.04);
-  z-index: 0;
-  pointer-events: none;
-}
-body::after {
-  content: '';
-  position: fixed; inset: 0;
-  background: linear-gradient(
-    150deg,
-    rgba(255,255,255,0.82) 0%,
-    rgba(255,220,240,0.75) 40%,
-    rgba(220,190,255,0.65) 100%
-  );
+  filter: blur(7px);
+  transform: scale(1.02);
+  opacity: 0.45;
   z-index: 0;
   pointer-events: none;
 }
