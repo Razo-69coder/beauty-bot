@@ -420,6 +420,9 @@ body::before {
   <button class="nav-item" id="nav-clients" onclick="goScreen('clients')">
     <span class="nav-icon">👥</span>Клиенты
   </button>
+  <button class="nav-item" id="nav-inactive" onclick="goScreen('inactive')">
+    <span class="nav-icon">⏰</span>Давно нет
+  </button>
   <button class="nav-item" id="nav-settings" onclick="goScreen('settings')">
     <span class="nav-icon">⚙️</span>Настройки
   </button>
@@ -512,6 +515,19 @@ body::before {
       <div class="loader"><div class="spinner"></div>Загружаем...</div>
     </div>
     <div id="clients-pagination" style="margin-top:12px; display:flex; gap:10px">
+    </div>
+  </div>
+</div>
+
+<!-- ── Давно не приходили ───────────────────────────────────────── -->
+<div class="screen" id="screen-inactive">
+  <div class="header">
+    <h1>⏰ Давно не приходили</h1>
+    <p id="inactive-count-sub">—</p>
+  </div>
+  <div class="content">
+    <div id="inactive-list">
+      <div class="loader"><div class="spinner"></div>Загружаем...</div>
     </div>
   </div>
 </div>
@@ -704,6 +720,18 @@ body::before {
   </div>
 </div>
 
+<!-- История клиента -->
+<div class="overlay" id="overlay-client-history">
+  <div class="overlay-sheet" style="max-height:80vh; overflow-y:auto">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title" id="client-history-title">История визитов</div>
+    <div id="client-history-body">
+      <div class="loader"><div class="spinner"></div>Загружаем...</div>
+    </div>
+    <button class="btn btn-secondary" style="margin-top:12px" onclick="closeOverlay()">Закрыть</button>
+  </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
 //  Состояние
@@ -749,9 +777,10 @@ function goScreen(id) {
   document.getElementById('screen-' + id).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.getElementById('nav-' + id).classList.add('active');
-  if (id === 'dash')    loadDash();
-  if (id === 'sched')   initSched();
-  if (id === 'clients') loadClients(0);
+  if (id === 'dash')     loadDash();
+  if (id === 'sched')    initSched();
+  if (id === 'clients')  loadClients(0);
+  if (id === 'inactive') loadInactive();
   if (id === 'settings') fillSettings();
 }
 
@@ -1011,12 +1040,13 @@ async function loadClients(page) {
     listEl.innerHTML = data.clients.map(c => {
       const initials = (c.name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
       const lastVisit = c.last_visit ? c.last_visit.slice(0, 10) : 'нет визитов';
-      return `<div class="client-row">
+      return `<div class="client-row" onclick="openClientHistory(${c.id}, '${(c.name||'').replace(/'/g,"\\'")}')">
         <div class="client-ava">${initials}</div>
         <div class="client-info">
           <div class="client-name">${c.name}</div>
           <div class="client-meta">${c.phone || ''} · ${lastVisit}</div>
         </div>
+        <span style="color:var(--text-muted); font-size:18px">›</span>
       </div>`;
     }).join('');
   } catch (e) {
@@ -1027,6 +1057,75 @@ async function loadClients(page) {
 function searchClients() {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => loadClients(0), 350);
+}
+
+// ─── Давно не приходили ────────────────────────────────────────────
+
+async function loadInactive() {
+  const listEl = document.getElementById('inactive-list');
+  listEl.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
+  try {
+    const data = await api('GET', '/api/inactive');
+    const clients = data.clients || [];
+    document.getElementById('inactive-count-sub').textContent =
+      clients.length ? `${clients.length} клиентов` : 'Все активны 🎉';
+    if (!clients.length) {
+      listEl.innerHTML = `<div class="empty-state">
+        <div class="emoji">🎉</div>
+        <h3>Все клиенты активны!</h3>
+        <p>Нет клиентов, которые давно не приходили.</p>
+      </div>`;
+      return;
+    }
+    listEl.innerHTML = clients.map(c => {
+      const initials = (c.name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+      const lastVisit = c.last_visit ? c.last_visit.slice(0,10) : 'нет визитов';
+      return `<div class="client-row" onclick="openClientHistory(${c.id}, '${c.name.replace(/'/g,"\\'")}')">
+        <div class="client-ava" style="background:var(--primary-grad)">${initials}</div>
+        <div class="client-info">
+          <div class="client-name">${c.name}</div>
+          <div class="client-meta">${c.phone || ''} · последний визит: ${lastVisit}</div>
+        </div>
+        <span style="color:var(--primary); font-weight:700; font-size:13px">${c.days_ago} дн.</span>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// ─── История клиента ────────────────────────────────────────────────
+
+async function openClientHistory(clientId, clientName) {
+  document.getElementById('client-history-title').textContent = `${clientName} — история`;
+  document.getElementById('client-history-body').innerHTML =
+    '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
+  openOverlay('overlay-client-history');
+  try {
+    const data = await api('GET', `/api/clients/${clientId}`);
+    const hist = data.history || [];
+    if (!hist.length) {
+      document.getElementById('client-history-body').innerHTML =
+        `<div class="empty-state"><div class="emoji">📋</div><h3>Визитов нет</h3><p>История посещений пуста</p></div>`;
+      return;
+    }
+    document.getElementById('client-history-body').innerHTML = hist.map(h => {
+      const d = h.date ? h.date.slice(0,10) : '—';
+      return `<div class="appt-item" style="margin-bottom:8px">
+        <div class="appt-time-col">
+          <div class="appt-time" style="font-size:12px">${d}</div>
+          <div class="appt-dot"></div>
+        </div>
+        <div class="appt-info">
+          <div class="appt-name">${h.procedure || '—'}</div>
+          <div class="appt-phone">${h.price ? fmt(h.price) + ' ₽' : ''} ${h.notes ? '· ' + h.notes : ''}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    document.getElementById('client-history-body').innerHTML =
+      `<div class="alert alert-error">${e.message}</div>`;
+  }
 }
 
 // ─── Настройки ─────────────────────────────────────────────────────
