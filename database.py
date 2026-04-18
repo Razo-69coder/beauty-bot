@@ -1,300 +1,269 @@
-import aiosqlite
-from config import DB_PATH
+import asyncpg
+from config import DATABASE_URL
 from datetime import datetime, timedelta
+
+_pool: asyncpg.Pool = None
+
+
+async def get_pool() -> asyncpg.Pool:
+    global _pool
+    if _pool is None:
+        _pool = await asyncpg.create_pool(DATABASE_URL)
+    return _pool
 
 
 async def init_db():
-    """Создаёт таблицы и выполняет миграции при старте"""
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS masters (
-                id INTEGER PRIMARY KEY,
-                telegram_id INTEGER UNIQUE,
+                id SERIAL PRIMARY KEY,
+                telegram_id BIGINT UNIQUE NOT NULL,
                 name TEXT,
                 reminder_days INTEGER DEFAULT 40,
                 work_start INTEGER DEFAULT 10,
                 work_end INTEGER DEFAULT 20,
                 slot_duration INTEGER DEFAULT 60,
-                created_at TEXT DEFAULT (datetime('now'))
+                created_at TIMESTAMP DEFAULT NOW()
             )
         """)
-        await db.execute("""
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS clients (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                master_id INTEGER,
+                id SERIAL PRIMARY KEY,
+                master_id INTEGER REFERENCES masters(id),
                 name TEXT,
                 phone TEXT,
-                notes TEXT,
-                telegram_id INTEGER,
-                created_at TEXT DEFAULT (datetime('now')),
-                FOREIGN KEY (master_id) REFERENCES masters(id)
+                notes TEXT DEFAULT '',
+                telegram_id BIGINT,
+                created_at TIMESTAMP DEFAULT NOW()
             )
         """)
-        await db.execute("""
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS appointments (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                client_id INTEGER,
-                master_id INTEGER,
+                id SERIAL PRIMARY KEY,
+                client_id INTEGER REFERENCES clients(id),
+                master_id INTEGER REFERENCES masters(id),
                 procedure TEXT,
                 appointment_date TEXT,
                 time TEXT DEFAULT '',
-                price INTEGER,
-                notes TEXT,
-                photo_id TEXT,
+                price INTEGER DEFAULT 0,
+                notes TEXT DEFAULT '',
+                photo_id TEXT DEFAULT '',
                 status TEXT DEFAULT 'confirmed',
                 reminder_24h_sent INTEGER DEFAULT 0,
                 reminder_2h_sent INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT (datetime('now')),
-                FOREIGN KEY (client_id) REFERENCES clients(id)
+                correction_reminder_sent INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW()
             )
         """)
-        await db.execute("""
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS subscriptions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                master_id INTEGER,
-                client_id INTEGER,
+                id SERIAL PRIMARY KEY,
+                master_id INTEGER REFERENCES masters(id),
+                client_id INTEGER REFERENCES clients(id),
                 name TEXT,
                 total_sessions INTEGER,
                 used_sessions INTEGER DEFAULT 0,
                 price INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT (datetime('now')),
-                FOREIGN KEY (master_id) REFERENCES masters(id),
-                FOREIGN KEY (client_id) REFERENCES clients(id)
+                created_at TIMESTAMP DEFAULT NOW()
             )
         """)
-        await db.commit()
-
-        # Миграции для существующих баз
-        migrations = [
-            "ALTER TABLE masters ADD COLUMN reminder_days INTEGER DEFAULT 40",
-            "ALTER TABLE masters ADD COLUMN work_start INTEGER DEFAULT 10",
-            "ALTER TABLE masters ADD COLUMN work_end INTEGER DEFAULT 20",
-            "ALTER TABLE masters ADD COLUMN slot_duration INTEGER DEFAULT 60",
-            "ALTER TABLE clients ADD COLUMN telegram_id INTEGER",
-            "ALTER TABLE appointments ADD COLUMN time TEXT DEFAULT ''",
-            "ALTER TABLE appointments ADD COLUMN status TEXT DEFAULT 'confirmed'",
-            "ALTER TABLE appointments ADD COLUMN reminder_24h_sent INTEGER DEFAULT 0",
-            "ALTER TABLE appointments ADD COLUMN reminder_2h_sent INTEGER DEFAULT 0",
-            "ALTER TABLE appointments ADD COLUMN correction_reminder_sent INTEGER DEFAULT 0",
-        ]
-        for sql in migrations:
-            try:
-                await db.execute(sql)
-                await db.commit()
-            except Exception:
-                pass
 
 
 # ── Мастера ───────────────────────────────────────────────────────────
 
 async def get_or_create_master(telegram_id: int, name: str) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT id FROM masters WHERE telegram_id = ?", (telegram_id,)
-        ) as cur:
-            row = await cur.fetchone()
-            if row:
-                return row[0]
-        await db.execute(
-            "INSERT INTO masters (telegram_id, name) VALUES (?, ?)", (telegram_id, name)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT id FROM masters WHERE telegram_id=$1", telegram_id)
+        if row:
+            return row['id']
+        row = await conn.fetchrow(
+            "INSERT INTO masters (telegram_id, name) VALUES ($1, $2) RETURNING id",
+            telegram_id, name
         )
-        await db.commit()
-        async with db.execute(
-            "SELECT id FROM masters WHERE telegram_id = ?", (telegram_id,)
-        ) as cur:
-            return (await cur.fetchone())[0]
+        return row['id']
 
 
 async def get_master_info(master_id: int) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT id, telegram_id, name, work_start, work_end, slot_duration FROM masters WHERE id=?",
-            (master_id,)
-        ) as cur:
-            row = await cur.fetchone()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, telegram_id, name, work_start, work_end, slot_duration FROM masters WHERE id=$1",
+            master_id
+        )
     if not row:
         return None
     return {
-        "id": row[0], "telegram_id": row[1], "name": row[2],
-        "work_start": row[3] or 10, "work_end": row[4] or 20, "slot_duration": row[5] or 60,
+        "id": row['id'], "telegram_id": row['telegram_id'], "name": row['name'],
+        "work_start": row['work_start'] or 10,
+        "work_end": row['work_end'] or 20,
+        "slot_duration": row['slot_duration'] or 60,
     }
 
 
 async def get_master_info_by_telegram(telegram_id: int) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT id, telegram_id, name, work_start, work_end, slot_duration FROM masters WHERE telegram_id=?",
-            (telegram_id,)
-        ) as cur:
-            row = await cur.fetchone()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, telegram_id, name, work_start, work_end, slot_duration FROM masters WHERE telegram_id=$1",
+            telegram_id
+        )
     if not row:
         return None
     return {
-        "id": row[0], "telegram_id": row[1], "name": row[2],
-        "work_start": row[3] or 10, "work_end": row[4] or 20, "slot_duration": row[5] or 60,
+        "id": row['id'], "telegram_id": row['telegram_id'], "name": row['name'],
+        "work_start": row['work_start'] or 10,
+        "work_end": row['work_end'] or 20,
+        "slot_duration": row['slot_duration'] or 60,
     }
 
 
 async def update_master_work_hours(master_id: int, work_start: int, work_end: int, slot_duration: int):
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE masters SET work_start=?, work_end=?, slot_duration=? WHERE id=?",
-            (work_start, work_end, slot_duration, master_id)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE masters SET work_start=$1, work_end=$2, slot_duration=$3 WHERE id=$4",
+            work_start, work_end, slot_duration, master_id
         )
-        await db.commit()
 
 
 async def get_all_masters() -> list:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT id, telegram_id FROM masters") as cur:
-            return await cur.fetchall()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT id, telegram_id FROM masters")
+    return [(r['id'], r['telegram_id']) for r in rows]
 
 
 async def get_reminder_days(telegram_id: int) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT reminder_days FROM masters WHERE telegram_id=?", (telegram_id,)
-        ) as cur:
-            row = await cur.fetchone()
-            return row[0] if row and row[0] else 40
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        val = await conn.fetchval("SELECT reminder_days FROM masters WHERE telegram_id=$1", telegram_id)
+    return val or 40
 
 
 async def get_reminder_days_by_master(master_id: int) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT reminder_days FROM masters WHERE id=?", (master_id,)
-        ) as cur:
-            row = await cur.fetchone()
-            return row[0] if row and row[0] else 40
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        val = await conn.fetchval("SELECT reminder_days FROM masters WHERE id=$1", master_id)
+    return val or 40
 
 
 async def update_reminder_days(telegram_id: int, days: int):
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE masters SET reminder_days=? WHERE telegram_id=?", (days, telegram_id)
-        )
-        await db.commit()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE masters SET reminder_days=$1 WHERE telegram_id=$2", days, telegram_id)
 
 
 async def update_reminder_days_by_master(master_id: int, days: int):
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE masters SET reminder_days=? WHERE id=?", (days, master_id)
-        )
-        await db.commit()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE masters SET reminder_days=$1 WHERE id=$2", days, master_id)
 
 
 # ── Клиенты ───────────────────────────────────────────────────────────
 
 async def add_client(master_id: int, name: str, phone: str, notes: str = "") -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "INSERT INTO clients (master_id, name, phone, notes) VALUES (?, ?, ?, ?)",
-            (master_id, name, phone, notes)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO clients (master_id, name, phone, notes) VALUES ($1,$2,$3,$4) RETURNING id",
+            master_id, name, phone, notes
         )
-        await db.commit()
-        async with db.execute("SELECT last_insert_rowid()") as cur:
-            return (await cur.fetchone())[0]
+    return row['id']
 
 
 async def add_client_with_telegram(master_id: int, name: str, phone: str, telegram_id: int) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "INSERT INTO clients (master_id, name, phone, notes, telegram_id) VALUES (?, ?, ?, '', ?)",
-            (master_id, name, phone, telegram_id)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO clients (master_id, name, phone, notes, telegram_id) VALUES ($1,$2,$3,'',$4) RETURNING id",
+            master_id, name, phone, telegram_id
         )
-        await db.commit()
-        async with db.execute("SELECT last_insert_rowid()") as cur:
-            return (await cur.fetchone())[0]
+    return row['id']
 
 
 async def get_client_by_telegram(master_id: int, telegram_id: int) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT id, name, phone FROM clients WHERE master_id=? AND telegram_id=?",
-            (master_id, telegram_id)
-        ) as cur:
-            row = await cur.fetchone()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, name, phone FROM clients WHERE master_id=$1 AND telegram_id=$2",
+            master_id, telegram_id
+        )
     if not row:
         return None
-    return {"id": row[0], "name": row[1], "phone": row[2]}
+    return {"id": row['id'], "name": row['name'], "phone": row['phone']}
 
 
 async def get_clients(master_id: int) -> list:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
             SELECT c.id, c.name, c.phone, c.notes,
                    MAX(a.appointment_date) as last_visit
             FROM clients c
             LEFT JOIN appointments a ON a.client_id = c.id
-            WHERE c.master_id = ?
-            GROUP BY c.id
+            WHERE c.master_id = $1
+            GROUP BY c.id, c.name, c.phone, c.notes
             ORDER BY c.name
-        """, (master_id,)) as cur:
-            return await cur.fetchall()
+        """, master_id)
+    return [(r['id'], r['name'], r['phone'], r['notes'], r['last_visit']) for r in rows]
 
 
 async def get_client(client_id: int) -> dict | None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT id, name, phone, notes FROM clients WHERE id = ?", (client_id,)
-        ) as cur:
-            row = await cur.fetchone()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, name, phone, notes FROM clients WHERE id=$1", client_id
+        )
     if not row:
         return None
-    return {"id": row[0], "name": row[1], "phone": row[2], "notes": row[3]}
+    return {"id": row['id'], "name": row['name'], "phone": row['phone'], "notes": row['notes']}
 
 
 async def update_client(client_id: int, master_id: int, name: str, phone: str, notes: str) -> bool:
-    async with aiosqlite.connect(DB_PATH) as db:
-        result = await db.execute(
-            "UPDATE clients SET name=?, phone=?, notes=? WHERE id=? AND master_id=?",
-            (name, phone, notes, client_id, master_id)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE clients SET name=$1, phone=$2, notes=$3 WHERE id=$4 AND master_id=$5",
+            name, phone, notes, client_id, master_id
         )
-        await db.commit()
-        return result.rowcount > 0
+    return result != "UPDATE 0"
 
 
 async def delete_client(client_id: int, master_id: int) -> bool:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("DELETE FROM appointments WHERE client_id = ?", (client_id,))
-        result = await db.execute(
-            "DELETE FROM clients WHERE id = ? AND master_id = ?", (client_id, master_id)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM appointments WHERE client_id=$1", client_id)
+        await conn.execute("DELETE FROM subscriptions WHERE client_id=$1", client_id)
+        result = await conn.execute(
+            "DELETE FROM clients WHERE id=$1 AND master_id=$2", client_id, master_id
         )
-        await db.commit()
-        return result.rowcount > 0
+    return result != "DELETE 0"
 
 
 async def search_clients(master_id: int, query: str) -> list:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("""
-            SELECT c.id, c.name, c.phone, c.notes,
-                   MAX(a.appointment_date) as last_visit
-            FROM clients c
-            LEFT JOIN appointments a ON a.client_id = c.id
-            WHERE c.master_id = ?
-            GROUP BY c.id
-            ORDER BY c.name
-        """, (master_id,)) as cur:
-            all_clients = await cur.fetchall()
+    all_clients = await get_clients(master_id)
     q = query.lower()
     return [c for c in all_clients if q in c[1].lower()]
 
 
 async def get_inactive_clients(master_id: int, days: int) -> list:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
             SELECT c.id, c.name, c.phone,
                    MAX(a.appointment_date) as last_visit,
-                   CAST(julianday('now') - julianday(MAX(a.appointment_date)) AS INTEGER) as days_ago
+                   (CURRENT_DATE - MAX(a.appointment_date::date))::INTEGER as days_ago
             FROM clients c
             LEFT JOIN appointments a ON a.client_id = c.id
-            WHERE c.master_id = ?
-            GROUP BY c.id
-            HAVING last_visit IS NOT NULL AND days_ago >= ?
+            WHERE c.master_id = $1
+            GROUP BY c.id, c.name, c.phone
+            HAVING MAX(a.appointment_date) IS NOT NULL
+               AND (CURRENT_DATE - MAX(a.appointment_date::date))::INTEGER >= $2
             ORDER BY days_ago DESC
-        """, (master_id, days)) as cur:
-            return await cur.fetchall()
+        """, master_id, days)
+    return [(r['id'], r['name'], r['phone'], r['last_visit'], r['days_ago']) for r in rows]
 
 
 # ── Записи ────────────────────────────────────────────────────────────
@@ -305,69 +274,67 @@ async def add_appointment(
     notes: str = "", photo_id: str = "",
     time: str = "", status: str = "confirmed"
 ) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
             INSERT INTO appointments
             (client_id, master_id, procedure, appointment_date, price, notes, photo_id, time, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (client_id, master_id, procedure, appointment_date, price, notes, photo_id, time, status))
-        await db.commit()
-        async with db.execute("SELECT last_insert_rowid()") as cur:
-            return (await cur.fetchone())[0]
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id
+        """, client_id, master_id, procedure, appointment_date, price, notes, photo_id, time, status)
+    return row['id']
 
 
 async def get_client_history(client_id: int) -> list:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
             SELECT procedure, appointment_date, price, notes, photo_id
             FROM appointments
-            WHERE client_id = ?
+            WHERE client_id=$1
             ORDER BY appointment_date DESC
             LIMIT 10
-        """, (client_id,)) as cur:
-            return await cur.fetchall()
+        """, client_id)
+    return [(r['procedure'], r['appointment_date'], r['price'], r['notes'], r['photo_id']) for r in rows]
 
 
 async def update_appointment_status(appointment_id: int, status: str):
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE appointments SET status=? WHERE id=?", (status, appointment_id)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE appointments SET status=$1 WHERE id=$2", status, appointment_id
         )
-        await db.commit()
 
 
 async def get_appointment_client_telegram(appointment_id: int) -> tuple:
-    """Возвращает (client_telegram_id, date, time) для уведомления клиента"""
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
             SELECT c.telegram_id, a.appointment_date, a.time
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
-            WHERE a.id = ?
-        """, (appointment_id,)) as cur:
-            row = await cur.fetchone()
+            WHERE a.id=$1
+        """, appointment_id)
     if not row:
         return None, None, None
-    return row[0], row[1], row[2]
+    return row['telegram_id'], row['appointment_date'], row['time']
 
 
 # ── Слоты и расписание ────────────────────────────────────────────────
 
 async def get_busy_slots(master_id: int, date: str) -> list[str]:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT time FROM appointments WHERE master_id=? AND appointment_date=? AND status != 'cancelled'",
-            (master_id, date)
-        ) as cur:
-            rows = await cur.fetchall()
-    return [r[0] for r in rows if r[0]]
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT time FROM appointments WHERE master_id=$1 AND appointment_date=$2 AND status != 'cancelled'",
+            master_id, date
+        )
+    return [r['time'] for r in rows if r['time']]
 
 
 async def get_available_slots(
     master_id: int, date: str,
     work_start: int, work_end: int, slot_duration: int
 ) -> list[str]:
-    """Вычисляет свободные временные слоты на день"""
     busy = await get_busy_slots(master_id, date)
     slots = []
     total_minutes = work_start * 60
@@ -385,157 +352,149 @@ async def get_available_slots(
 
 
 async def get_master_schedule(master_id: int, date: str) -> list:
-    """Расписание мастера на конкретный день"""
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
             SELECT a.id, c.name, a.procedure, a.time, a.status, c.phone
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
-            WHERE a.master_id=? AND a.appointment_date=?
+            WHERE a.master_id=$1 AND a.appointment_date=$2
             ORDER BY a.time, a.id
-        """, (master_id, date)) as cur:
-            return await cur.fetchall()
+        """, master_id, date)
+    return [(r['id'], r['name'], r['procedure'], r['time'], r['status'], r['phone']) for r in rows]
 
 
 # ── Напоминания клиентам ──────────────────────────────────────────────
 
 async def get_appointments_for_reminder_24h(target_date: str) -> list:
-    """Записи на завтра, которым ещё не отправили 24h-напоминание"""
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
             SELECT a.id, c.telegram_id, c.name, m.telegram_id,
                    a.appointment_date, a.time, a.procedure
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
             JOIN masters m ON m.id = a.master_id
-            WHERE a.appointment_date = ?
+            WHERE a.appointment_date=$1
               AND a.status != 'cancelled'
               AND a.reminder_24h_sent = 0
               AND c.telegram_id IS NOT NULL
-        """, (target_date,)) as cur:
-            return await cur.fetchall()
+        """, target_date)
+    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
 
 
 async def get_appointments_for_reminder_2h(target_date: str, target_time_from: str, target_time_to: str) -> list:
-    """Записи через ~2 часа, которым ещё не отправили 2h-напоминание"""
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
             SELECT a.id, c.telegram_id, c.name, m.telegram_id,
                    a.appointment_date, a.time, a.procedure
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
             JOIN masters m ON m.id = a.master_id
-            WHERE a.appointment_date = ?
-              AND a.time BETWEEN ? AND ?
+            WHERE a.appointment_date=$1
+              AND a.time BETWEEN $2 AND $3
               AND a.status != 'cancelled'
               AND a.reminder_2h_sent = 0
               AND c.telegram_id IS NOT NULL
-        """, (target_date, target_time_from, target_time_to)) as cur:
-            return await cur.fetchall()
+        """, target_date, target_time_from, target_time_to)
+    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
 
 
 async def mark_reminder_sent(appointment_id: int, reminder_type: str):
-    """reminder_type: '24h' или '2h'"""
     col = "reminder_24h_sent" if reminder_type == "24h" else "reminder_2h_sent"
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(f"UPDATE appointments SET {col}=1 WHERE id=?", (appointment_id,))
-        await db.commit()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(f"UPDATE appointments SET {col}=1 WHERE id=$1", appointment_id)
 
 
 async def get_appointments_for_correction_reminder(three_weeks_ago: str) -> list:
-    """Визиты ровно 3 недели назад, статус confirmed, без отправленного напоминания"""
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
             SELECT a.id, c.telegram_id, c.name, m.name, a.procedure
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
             JOIN masters m ON m.id = a.master_id
-            WHERE a.appointment_date = ?
+            WHERE a.appointment_date=$1
               AND a.status = 'confirmed'
               AND a.correction_reminder_sent = 0
               AND c.telegram_id IS NOT NULL
-        """, (three_weeks_ago,)) as cur:
-            return await cur.fetchall()
+        """, three_weeks_ago)
+    return [(r[0], r[1], r[2], r[3], r[4]) for r in rows]
 
 
 async def mark_correction_reminder_sent(appointment_id: int):
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE appointments SET correction_reminder_sent=1 WHERE id=?", (appointment_id,)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE appointments SET correction_reminder_sent=1 WHERE id=$1", appointment_id
         )
-        await db.commit()
 
 
 # ── Абонементы ────────────────────────────────────────────────────────
 
 async def add_subscription(master_id: int, client_id: int, name: str, total: int, price: int) -> int:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "INSERT INTO subscriptions (master_id, client_id, name, total_sessions, price) VALUES (?,?,?,?,?)",
-            (master_id, client_id, name, total, price)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO subscriptions (master_id, client_id, name, total_sessions, price) VALUES ($1,$2,$3,$4,$5) RETURNING id",
+            master_id, client_id, name, total, price
         )
-        await db.commit()
-        async with db.execute("SELECT last_insert_rowid()") as cur:
-            return (await cur.fetchone())[0]
+    return row['id']
 
 
 async def get_client_subscriptions(client_id: int, master_id: int) -> list:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
             SELECT id, name, total_sessions, used_sessions, price
             FROM subscriptions
-            WHERE client_id=? AND master_id=?
+            WHERE client_id=$1 AND master_id=$2
             ORDER BY created_at DESC
-        """, (client_id, master_id)) as cur:
-            return await cur.fetchall()
+        """, client_id, master_id)
+    return [(r['id'], r['name'], r['total_sessions'], r['used_sessions'], r['price']) for r in rows]
 
 
 async def use_subscription_session(sub_id: int, master_id: int) -> bool:
-    """Списывает один сеанс. Возвращает False если сеансы исчерпаны."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT used_sessions, total_sessions FROM subscriptions WHERE id=? AND master_id=?",
-            (sub_id, master_id)
-        ) as cur:
-            row = await cur.fetchone()
-        if not row or row[0] >= row[1]:
-            return False
-        await db.execute(
-            "UPDATE subscriptions SET used_sessions=used_sessions+1 WHERE id=?", (sub_id,)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT used_sessions, total_sessions FROM subscriptions WHERE id=$1 AND master_id=$2",
+            sub_id, master_id
         )
-        await db.commit()
-        return True
+        if not row or row['used_sessions'] >= row['total_sessions']:
+            return False
+        await conn.execute(
+            "UPDATE subscriptions SET used_sessions=used_sessions+1 WHERE id=$1", sub_id
+        )
+    return True
 
 
 # ── Статистика ────────────────────────────────────────────────────────
 
 async def get_statistics(master_id: int) -> dict:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT COUNT(*) FROM clients WHERE master_id=?", (master_id,)
-        ) as c:
-            total_clients = (await c.fetchone())[0]
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        total_clients = await conn.fetchval(
+            "SELECT COUNT(*) FROM clients WHERE master_id=$1", master_id
+        )
+        row = await conn.fetchrow(
+            "SELECT COUNT(*), COALESCE(SUM(price), 0) FROM appointments WHERE master_id=$1", master_id
+        )
+        total_appointments, total_earnings = row[0], row[1]
 
-        async with db.execute(
-            "SELECT COUNT(*), COALESCE(SUM(price), 0) FROM appointments WHERE master_id=?",
-            (master_id,)
-        ) as c:
-            row = await c.fetchone()
-            total_appointments, total_earnings = row
-
-        async with db.execute(
+        month_earnings = await conn.fetchval(
             "SELECT COALESCE(SUM(price), 0) FROM appointments "
-            "WHERE master_id=? AND strftime('%Y-%m', appointment_date) = strftime('%Y-%m', 'now')",
-            (master_id,)
-        ) as c:
-            month_earnings = (await c.fetchone())[0]
-
-        async with db.execute(
+            "WHERE master_id=$1 AND TO_CHAR(appointment_date::date, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')",
+            master_id
+        )
+        top_rows = await conn.fetch(
             "SELECT procedure, COUNT(*) as cnt FROM appointments "
-            "WHERE master_id=? GROUP BY procedure ORDER BY cnt DESC LIMIT 3",
-            (master_id,)
-        ) as c:
-            top_procedures = await c.fetchall()
+            "WHERE master_id=$1 GROUP BY procedure ORDER BY cnt DESC LIMIT 3",
+            master_id
+        )
+        top_procedures = [(r['procedure'], r['cnt']) for r in top_rows]
 
     return {
         "total_clients": total_clients,

@@ -25,6 +25,7 @@ from database import (
     get_master_info, get_available_slots, get_master_schedule,
     update_appointment_status,
 )
+
 from scheduler import setup_scheduler
 from handlers import start, clients, appointments, settings, stats
 from handlers import booking, schedule, subscriptions
