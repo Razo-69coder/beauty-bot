@@ -1,6 +1,10 @@
 import io
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
+
+import jwt
+import httpx
 from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -13,10 +17,21 @@ from database import (
     get_client, add_client, update_client, delete_client,
     get_client_history, add_appointment, get_inactive_clients,
     get_statistics, get_reminder_days, update_reminder_days,
+    # Новые функции
+    get_master_public_info, get_available_dates, get_available_slots,
+    public_book, create_login_code, verify_login_code,
+    get_master_full, update_master_settings, update_master_payment,
+    get_schedule,
 )
-from models import ClientCreate, ClientUpdate, AppointmentCreate, ReminderUpdate
+from models import (
+    ClientCreate, ClientUpdate, AppointmentCreate, ReminderUpdate,
+    PublicBooking, RequestCode, VerifyCode, MasterSettings, PaymentUpdate,
+)
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "")  # https://your-site.com
 
 
 @asynccontextmanager
@@ -37,26 +52,65 @@ app.add_middleware(
 PAGE_SIZE = 10
 
 
-# ─── Авторизация ─────────────────────────────────────────────────
+# ─── JWT утилиты ─────────────────────────────────────────────────────
+
+def _jwt_secret() -> str:
+    return BOT_TOKEN or "beauty_book_secret_fallback"
+
+
+def create_jwt(telegram_id: int, master_id: int) -> str:
+    payload = {
+        "tg": telegram_id,
+        "mid": master_id,
+        "exp": datetime.utcnow() + timedelta(days=30),
+    }
+    return jwt.encode(payload, _jwt_secret(), algorithm="HS256")
+
+
+def decode_jwt(token: str) -> dict | None:
+    try:
+        return jwt.decode(token, _jwt_secret(), algorithms=["HS256"])
+    except jwt.InvalidTokenError:
+        return None
+
+
+async def get_jwt_master_id(authorization: str = Header(None)) -> int:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Требуется авторизация")
+    payload = decode_jwt(authorization[7:])
+    if not payload:
+        raise HTTPException(401, "Неверный или устаревший токен")
+    return int(payload["mid"])
+
+
+# ─── Telegram утилита (отправка сообщения боту) ───────────────────────
+
+async def send_tg_message(chat_id: int, text: str):
+    if not BOT_TOKEN:
+        return
+    async with httpx.AsyncClient(timeout=5) as client:
+        try:
+            await client.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+            )
+        except Exception:
+            pass
+
+
+# ─── Авторизация (Telegram Mini App) ─────────────────────────────────
+
 async def get_telegram_id(
     x_init_data: str = Header(None),
     x_dev_telegram_id: str = Header(None),
 ) -> int:
-    """
-    В режиме разработки передаём x-dev-telegram-id прямо в заголовке.
-    В продакшене используем настоящий initData от Telegram.
-    """
     if x_dev_telegram_id:
         return int(x_dev_telegram_id)
-
     if not x_init_data:
         raise HTTPException(status_code=401, detail="Требуется авторизация")
-
-    bot_token = os.getenv("BOT_TOKEN")
-    user = validate_init_data(x_init_data, bot_token)
+    user = validate_init_data(x_init_data, BOT_TOKEN)
     if not user:
         raise HTTPException(status_code=401, detail="Неверные данные авторизации")
-
     return user["id"]
 
 
@@ -70,7 +124,152 @@ async def get_master_id(
     return await get_or_create_master(telegram_id, name)
 
 
-# ─── Мастер ──────────────────────────────────────────────────────
+# ─── Публичные эндпоинты (без авторизации, для страницы записи) ──────
+
+@app.get("/api/public/master/{telegram_id}")
+async def public_master_info(telegram_id: int):
+    info = await get_master_public_info(telegram_id)
+    if not info:
+        raise HTTPException(404, "Мастер не найден")
+    dates = await get_available_dates(
+        info["id"], info["work_start"], info["work_end"], info["slot_duration"]
+    )
+    return {"name": info["name"], "available_dates": dates}
+
+
+@app.get("/api/public/slots")
+async def public_slots(master: int, date: str):
+    info = await get_master_public_info(master)
+    if not info:
+        raise HTTPException(404, "Мастер не найден")
+    slots = await get_available_slots(
+        info["id"], date, info["work_start"], info["work_end"], info["slot_duration"]
+    )
+    return {"slots": slots}
+
+
+@app.post("/api/public/book", status_code=201)
+async def public_book_endpoint(body: PublicBooking):
+    try:
+        appt_id = await public_book(
+            body.master_telegram_id, body.date, body.time,
+            body.client_name, body.client_phone,
+        )
+        # Уведомляем мастера в Telegram
+        from datetime import date as date_cls
+        d = datetime.strptime(body.date, "%Y-%m-%d")
+        await send_tg_message(
+            body.master_telegram_id,
+            f"📩 *Новая онлайн-запись!*\n"
+            f"👤 {body.client_name} · {body.client_phone}\n"
+            f"📅 {d.strftime('%d.%m.%Y')} в {body.time}\n\n"
+            f"Откройте приложение для подтверждения.",
+        )
+        return {"ok": True, "appointment_id": appt_id}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+# ─── Авторизация веб-панели (код из бота) ─────────────────────────────
+
+@app.post("/api/auth/request-code")
+async def auth_request_code(body: RequestCode):
+    info = await get_master_public_info(body.telegram_id)
+    if not info:
+        raise HTTPException(
+            404,
+            "Telegram ID не зарегистрирован. Сначала запустите бота командой /start"
+        )
+    code = await create_login_code(body.telegram_id)
+    await send_tg_message(
+        body.telegram_id,
+        f"🔑 *Код входа в Beauty Book*\n\n`{code}`\n\nДействует 10 минут."
+    )
+    return {"ok": True}
+
+
+@app.post("/api/auth/verify")
+async def auth_verify(body: VerifyCode):
+    ok = await verify_login_code(body.telegram_id, body.code)
+    if not ok:
+        raise HTTPException(400, "Неверный или устаревший код")
+    info = await get_master_public_info(body.telegram_id)
+    master_full = await get_master_full(info["id"])
+    token = create_jwt(body.telegram_id, info["id"])
+    return {
+        "token": token,
+        "master": {
+            "name": master_full["name"],
+            "telegram_id": body.telegram_id,
+            "work_start": master_full["work_start"],
+            "work_end": master_full["work_end"],
+            "slot_duration": master_full["slot_duration"],
+            "reminder_days": master_full["reminder_days"],
+            "payment_card": master_full["payment_card"],
+        },
+    }
+
+
+# ─── Дашборд (JWT авторизация) ────────────────────────────────────────
+
+@app.get("/api/me")
+async def dashboard_me(master_id: int = Depends(get_jwt_master_id)):
+    master = await get_master_full(master_id)
+    if not master:
+        raise HTTPException(404, "Мастер не найден")
+    stats = await get_statistics(master_id)
+    webapp_url = WEBAPP_URL or ""
+    booking_link = f"{webapp_url}/booking.html?master={master['telegram_id']}" if webapp_url else ""
+    return {**master, "stats": stats, "booking_link": booking_link}
+
+
+@app.get("/api/dashboard/stats")
+async def dashboard_stats(master_id: int = Depends(get_jwt_master_id)):
+    return await get_statistics(master_id)
+
+
+@app.get("/api/dashboard/schedule")
+async def dashboard_schedule(date: str, master_id: int = Depends(get_jwt_master_id)):
+    appointments = await get_schedule(master_id, date)
+    return {"date": date, "appointments": appointments}
+
+
+@app.get("/api/dashboard/clients")
+async def dashboard_clients(
+    page: int = 0,
+    search: str = "",
+    master_id: int = Depends(get_jwt_master_id),
+):
+    if search:
+        results = await search_clients(master_id, search)
+        return {"clients": results, "total": len(results)}
+    clients, total = await get_clients_page(master_id, page, PAGE_SIZE)
+    return {"clients": clients, "total": total, "page": page}
+
+
+@app.put("/api/dashboard/settings")
+async def dashboard_settings(
+    body: MasterSettings,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    await update_master_settings(
+        master_id, body.work_start, body.work_end,
+        body.slot_duration, body.reminder_days, body.name,
+    )
+    return {"ok": True}
+
+
+@app.put("/api/dashboard/payment")
+async def dashboard_payment(
+    body: PaymentUpdate,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    await update_master_payment(master_id, body.payment_card)
+    return {"ok": True}
+
+
+# ─── Мастер (Mini App) ───────────────────────────────────────────────
+
 @app.get("/api/master")
 async def master_info(
     x_init_data: str = Header(None),
@@ -81,7 +280,8 @@ async def master_info(
     return {"telegram_id": telegram_id, "reminder_days": reminder_days}
 
 
-# ─── Клиенты ─────────────────────────────────────────────────────
+# ─── Клиенты ─────────────────────────────────────────────────────────
+
 @app.get("/api/clients")
 async def clients_list(
     page: int = 0,
@@ -91,17 +291,13 @@ async def clients_list(
     if search:
         results = await search_clients(master_id, search)
         return {"clients": results, "total": len(results), "page": 0, "pages": 1}
-
     clients, total = await get_clients_page(master_id, page, PAGE_SIZE)
     pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
     return {"clients": clients, "total": total, "page": page, "pages": pages}
 
 
 @app.post("/api/clients", status_code=201)
-async def create_client(
-    body: ClientCreate,
-    master_id: int = Depends(get_master_id),
-):
+async def create_client(body: ClientCreate, master_id: int = Depends(get_master_id)):
     client_id = await add_client(master_id, body.name, body.phone, body.notes)
     return {"id": client_id}
 
@@ -117,9 +313,7 @@ async def client_detail(client_id: int, master_id: int = Depends(get_master_id))
 
 @app.put("/api/clients/{client_id}")
 async def edit_client(
-    client_id: int,
-    body: ClientUpdate,
-    master_id: int = Depends(get_master_id),
+    client_id: int, body: ClientUpdate, master_id: int = Depends(get_master_id),
 ):
     ok = await update_client(client_id, master_id, body.name, body.phone, body.notes)
     if not ok:
@@ -135,11 +329,11 @@ async def remove_client(client_id: int, master_id: int = Depends(get_master_id))
     return {"ok": True}
 
 
-# ─── Процедуры ───────────────────────────────────────────────────
+# ─── Процедуры ───────────────────────────────────────────────────────
+
 @app.post("/api/appointments", status_code=201)
 async def create_appointment(
-    body: AppointmentCreate,
-    master_id: int = Depends(get_master_id),
+    body: AppointmentCreate, master_id: int = Depends(get_master_id),
 ):
     appt_id = await add_appointment(
         body.client_id, master_id, body.procedure,
@@ -148,7 +342,8 @@ async def create_appointment(
     return {"id": appt_id}
 
 
-# ─── Неактивные клиенты ──────────────────────────────────────────
+# ─── Неактивные клиенты ──────────────────────────────────────────────
+
 @app.get("/api/inactive")
 async def inactive_clients(
     x_init_data: str = Header(None),
@@ -161,13 +356,15 @@ async def inactive_clients(
     return {"clients": clients, "reminder_days": days}
 
 
-# ─── Статистика ──────────────────────────────────────────────────
+# ─── Статистика ──────────────────────────────────────────────────────
+
 @app.get("/api/stats")
 async def stats(master_id: int = Depends(get_master_id)):
     return await get_statistics(master_id)
 
 
-# ─── Настройки ───────────────────────────────────────────────────
+# ─── Настройки (Mini App) ────────────────────────────────────────────
+
 @app.put("/api/settings/reminder")
 async def set_reminder(
     body: ReminderUpdate,
@@ -179,7 +376,8 @@ async def set_reminder(
     return {"ok": True, "days": body.days}
 
 
-# ─── Экспорт в Excel ─────────────────────────────────────────────
+# ─── Экспорт в Excel ─────────────────────────────────────────────────
+
 @app.get("/api/export")
 async def export_excel(master_id: int = Depends(get_master_id)):
     try:

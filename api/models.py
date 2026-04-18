@@ -25,3 +25,38 @@ class AppointmentCreate(BaseModel):
 
 class ReminderUpdate(BaseModel):
     days: int
+
+
+# ── Публичная запись ──────────────────────────────────────────────
+
+class PublicBooking(BaseModel):
+    master_telegram_id: int
+    date: str
+    time: str
+    client_name: str
+    client_phone: str
+
+
+# ── Авторизация в веб-панели ──────────────────────────────────────
+
+class RequestCode(BaseModel):
+    telegram_id: int
+
+
+class VerifyCode(BaseModel):
+    telegram_id: int
+    code: str
+
+
+# ── Настройки мастера ─────────────────────────────────────────────
+
+class MasterSettings(BaseModel):
+    name: str
+    work_start: int = 10
+    work_end: int = 20
+    slot_duration: int = 60
+    reminder_days: int = 40
+
+
+class PaymentUpdate(BaseModel):
+    payment_card: str

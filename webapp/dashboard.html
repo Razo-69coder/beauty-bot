@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Beauty Book — Личный кабинет</title>
+<style>
+/* ── Переменные тем ───────────────────────────────────────────── */
+:root {
+  --primary: #C9657A;
+  --primary-grad: linear-gradient(135deg, #E8A0BF, #C9657A);
+  --primary-light: #FFF0F5;
+  --primary-mid: #F8C8D8;
+  --accent: #E8A0BF;
+  --bg: #FAF0F4;
+  --card: #ffffff;
+  --text: #3D2B2B;
+  --text-muted: #999;
+  --border: #F0D0E0;
+  --shadow: rgba(200, 100, 120, 0.12);
+  --shadow-strong: rgba(200, 100, 120, 0.22);
+}
+[data-theme="peach"] {
+  --primary: #C8845A;
+  --primary-grad: linear-gradient(135deg, #F0C09A, #C8845A);
+  --primary-light: #FFF5EE;
+  --primary-mid: #F5D5B8;
+  --accent: #F0C09A;
+  --bg: #FAF2EE;
+  --card: #ffffff;
+  --text: #3D2B1B;
+  --text-muted: #a08070;
+  --border: #F0D8C0;
+  --shadow: rgba(200, 130, 80, 0.12);
+  --shadow-strong: rgba(200, 130, 80, 0.22);
+}
+
+/* ── Сброс ────────────────────────────────────────────────────── */
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding-bottom: 72px;
+}
+
+/* ── Фоновые декоры ───────────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 280px;
+  background: var(--primary-grad);
+  opacity: 0.08;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ── Экраны ───────────────────────────────────────────────────── */
+.screen { display: none; position: relative; z-index: 1; }
+.screen.active { display: block; }
+
+/* ── Хедер ────────────────────────────────────────────────────── */
+.header {
+  background: var(--primary-grad);
+  padding: 20px 16px 18px;
+  color: white;
+  position: relative;
+}
+.header h1 { font-size: 20px; font-weight: 800; }
+.header p  { font-size: 13px; opacity: 0.88; margin-top: 2px; }
+.header-actions {
+  position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+  display: flex; gap: 8px; align-items: center;
+}
+.icon-btn {
+  width: 34px; height: 34px; border-radius: 50%; border: none;
+  background: rgba(255,255,255,0.22); color: white;
+  font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.icon-btn:active { background: rgba(255,255,255,0.35); }
+
+/* ── Нижняя навигация ─────────────────────────────────────────── */
+.nav-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--card); border-top: 1px solid var(--border);
+  display: flex; z-index: 100;
+  box-shadow: 0 -2px 16px var(--shadow);
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  padding: 10px 0 8px; cursor: pointer; border: none; background: none;
+  color: var(--text-muted); font-size: 10px; font-weight: 600; gap: 3px;
+  transition: color 0.15s;
+}
+.nav-item .nav-icon { font-size: 22px; }
+.nav-item.active { color: var(--primary); }
+
+/* ── Карточки ─────────────────────────────────────────────────── */
+.card {
+  background: var(--card); border-radius: 18px;
+  box-shadow: 0 2px 14px var(--shadow);
+  overflow: hidden;
+}
+.content { padding: 16px; }
+
+/* ── Кнопки ────────────────────────────────────────────────────── */
+.btn {
+  padding: 14px 20px; border-radius: 14px; border: none;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s; display: inline-flex;
+  align-items: center; justify-content: center; gap: 7px;
+}
+.btn:active { opacity: 0.82; transform: scale(0.98); }
+.btn-primary { background: var(--primary-grad); color: white; width: 100%; }
+.btn-secondary {
+  background: var(--card); color: var(--primary);
+  box-shadow: 0 2px 8px var(--shadow); width: 100%;
+}
+.btn-ghost {
+  background: var(--primary-light); color: var(--primary);
+  font-size: 13px; padding: 10px 16px; border-radius: 12px;
+}
+.btn:disabled { opacity: 0.45; cursor: default; }
+
+/* ── Инпуты ────────────────────────────────────────────────────── */
+.field { margin-bottom: 14px; }
+.field label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 5px; color: var(--text-muted); }
+.field input, .field select {
+  width: 100%; padding: 13px 14px; border-radius: 12px;
+  border: 1.5px solid var(--border); background: var(--card);
+  font-size: 15px; outline: none; color: var(--text);
+  transition: border-color 0.2s;
+}
+.field input:focus, .field select:focus { border-color: var(--primary); }
+
+/* ── Секция ────────────────────────────────────────────────────── */
+.section-title {
+  font-size: 13px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.4px; color: var(--text-muted); margin: 20px 0 10px;
+}
+
+/* ── Пустое состояние ─────────────────────────────────────────── */
+.empty-state {
+  text-align: center; padding: 40px 20px;
+  color: var(--text-muted);
+}
+.empty-state .emoji { font-size: 48px; margin-bottom: 12px; }
+.empty-state h3 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.empty-state p  { font-size: 13px; line-height: 1.5; }
+
+/* ── Алерт ────────────────────────────────────────────────────── */
+.alert {
+  border-radius: 12px; padding: 12px 14px; margin-bottom: 14px;
+  font-size: 14px; line-height: 1.4;
+}
+.alert-error   { background: #fff0f0; color: #c04040; }
+.alert-success { background: #f0fff4; color: #308050; }
+.alert-info    { background: var(--primary-light); color: var(--primary); }
+
+/* ── Лоадер ────────────────────────────────────────────────────── */
+.loader { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; }
+.spinner {
+  width: 32px; height: 32px; border: 3px solid var(--border);
+  border-top-color: var(--primary); border-radius: 50%;
+  animation: spin 0.7s linear infinite; margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ════════════════════════════════════════════════════════════════
+   ЭКРАН: ЛОГИН
+═══════════════════════════════════════════════════════════════ */
+.login-wrap {
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 24px;
+}
+.login-logo { font-size: 56px; margin-bottom: 8px; }
+.login-title { font-size: 26px; font-weight: 900; margin-bottom: 4px; }
+.login-sub   { font-size: 14px; color: var(--text-muted); margin-bottom: 32px; }
+.login-card  { width: 100%; max-width: 380px; }
+.login-step  { display: none; }
+.login-step.active { display: block; }
+.code-hint   { font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 8px; }
+.code-input  { text-align: center; font-size: 28px; letter-spacing: 10px; font-weight: 800; }
+.switch-step {
+  text-align: center; font-size: 13px; color: var(--primary);
+  cursor: pointer; margin-top: 12px; text-decoration: underline;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ЭКРАН: ДАШБОРД
+═══════════════════════════════════════════════════════════════ */
+.dash-header {
+  background: var(--primary-grad); padding: 22px 16px 24px; color: white;
+}
+.dash-greeting { font-size: 22px; font-weight: 900; }
+.dash-sub      { font-size: 13px; opacity: 0.85; margin-top: 3px; }
+
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.stat-card {
+  background: var(--card); border-radius: 16px; padding: 16px;
+  box-shadow: 0 2px 12px var(--shadow);
+}
+.stat-card .stat-icon  { font-size: 24px; margin-bottom: 8px; }
+.stat-card .stat-value { font-size: 26px; font-weight: 900; color: var(--primary); }
+.stat-card .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+.booking-link-card {
+  background: var(--card); border-radius: 16px; padding: 14px 16px;
+  margin-bottom: 12px; box-shadow: 0 2px 10px var(--shadow);
+  display: flex; align-items: center; gap: 12px;
+}
+.booking-link-icon { font-size: 26px; flex-shrink: 0; }
+.booking-link-text { flex: 1; min-width: 0; }
+.booking-link-text h4 { font-size: 14px; font-weight: 700; }
+.booking-link-text p  {
+  font-size: 12px; color: var(--text-muted); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.copy-btn {
+  background: var(--primary-light); border: none; border-radius: 10px;
+  padding: 8px 12px; font-size: 12px; font-weight: 700;
+  color: var(--primary); cursor: pointer; flex-shrink: 0;
+}
+
+.top-procedures { }
+.proc-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.proc-item:last-child { border-bottom: none; }
+.proc-bar-wrap { flex: 1; background: var(--primary-light); border-radius: 6px; height: 6px; }
+.proc-bar { background: var(--primary-grad); height: 6px; border-radius: 6px; }
+.proc-name { font-size: 13px; font-weight: 600; min-width: 0; flex: 1.5; }
+.proc-count { font-size: 12px; color: var(--text-muted); width: 30px; text-align: right; }
+
+/* ════════════════════════════════════════════════════════════════
+   ЭКРАН: РАСПИСАНИЕ
+═══════════════════════════════════════════════════════════════ */
+.week-strip {
+  background: var(--card); padding: 12px 8px; display: flex;
+  overflow-x: auto; gap: 6px; scrollbar-width: none;
+  box-shadow: 0 2px 8px var(--shadow); margin-bottom: 2px;
+}
+.week-strip::-webkit-scrollbar { display: none; }
+.day-pill {
+  flex-shrink: 0; width: 48px; padding: 8px 4px;
+  border-radius: 14px; text-align: center; cursor: pointer;
+  border: 2px solid transparent; transition: all 0.15s;
+}
+.day-pill .dp-name { font-size: 10px; font-weight: 700; color: var(--text-muted); }
+.day-pill .dp-num  { font-size: 20px; font-weight: 900; }
+.day-pill.today .dp-name { color: var(--primary); }
+.day-pill.today .dp-num  { color: var(--primary); }
+.day-pill.selected { background: var(--primary-grad); border-color: transparent; }
+.day-pill.selected .dp-name,
+.day-pill.selected .dp-num { color: white !important; }
+
+.appt-item {
+  background: var(--card); border-radius: 14px; padding: 14px;
+  margin-bottom: 10px; box-shadow: 0 2px 8px var(--shadow);
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.appt-time-col { text-align: center; flex-shrink: 0; }
+.appt-time { font-size: 16px; font-weight: 900; color: var(--primary); }
+.appt-dot  { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; margin: 6px auto; }
+.appt-info { flex: 1; min-width: 0; }
+.appt-name { font-size: 15px; font-weight: 700; }
+.appt-proc { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.appt-phone { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.appt-status {
+  font-size: 11px; font-weight: 700; padding: 3px 8px;
+  border-radius: 20px; flex-shrink: 0;
+}
+.status-confirmed { background: #f0fff4; color: #30a060; }
+.status-pending   { background: #fff8e8; color: #c08030; }
+.status-cancelled { background: #fff0f0; color: #c04040; }
+
+/* ════════════════════════════════════════════════════════════════
+   ЭКРАН: КЛИЕНТЫ
+═══════════════════════════════════════════════════════════════ */
+.search-wrap {
+  background: var(--card); border-radius: 14px; padding: 10px 14px;
+  display: flex; align-items: center; gap: 9px;
+  box-shadow: 0 2px 8px var(--shadow); margin-bottom: 12px;
+}
+.search-wrap input { border: none; outline: none; background: none; font-size: 14px; flex: 1; color: var(--text); }
+
+.client-row {
+  background: var(--card); border-radius: 14px; padding: 13px 15px;
+  margin-bottom: 10px; box-shadow: 0 2px 8px var(--shadow);
+  display: flex; align-items: center; gap: 12px; cursor: pointer;
+  transition: transform 0.1s;
+}
+.client-row:active { transform: scale(0.98); }
+.client-ava {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--primary-grad); display: flex; align-items: center;
+  justify-content: center; font-size: 18px; flex-shrink: 0; color: white;
+  font-weight: 800;
+}
+.client-info { flex: 1; min-width: 0; }
+.client-name { font-size: 15px; font-weight: 700; }
+.client-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.client-badge {
+  background: var(--primary-light); color: var(--primary);
+  border-radius: 20px; padding: 3px 9px; font-size: 11px; font-weight: 700;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ЭКРАН: НАСТРОЙКИ
+═══════════════════════════════════════════════════════════════ */
+.settings-section {
+  background: var(--card); border-radius: 18px;
+  box-shadow: 0 2px 12px var(--shadow); margin-bottom: 14px; overflow: hidden;
+}
+.settings-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.settings-row:last-child { border-bottom: none; }
+.settings-row .row-left { display: flex; align-items: center; gap: 12px; }
+.settings-row .row-icon { font-size: 20px; }
+.settings-row .row-title { font-size: 14px; font-weight: 600; }
+.settings-row .row-sub   { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+.settings-row .row-value { font-size: 13px; color: var(--text-muted); }
+.settings-row .row-arrow { color: var(--text-muted); font-size: 16px; }
+
+.theme-toggle { display: flex; gap: 8px; }
+.theme-btn {
+  flex: 1; padding: 10px; border-radius: 12px; border: 2px solid var(--border);
+  background: var(--card); font-size: 13px; font-weight: 600; cursor: pointer;
+  color: var(--text); transition: all 0.15s;
+}
+.theme-btn.active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+
+/* Модальный оверлей */
+.overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 200; align-items: flex-end;
+}
+.overlay.open { display: flex; }
+.overlay-sheet {
+  background: var(--card); border-radius: 22px 22px 0 0;
+  padding: 20px 16px 32px; width: 100%; animation: slideUp 0.25s ease;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.overlay-handle {
+  width: 40px; height: 4px; background: var(--border);
+  border-radius: 4px; margin: 0 auto 16px;
+}
+.overlay-title { font-size: 17px; font-weight: 800; margin-bottom: 16px; }
+
+/* Ссылка для копирования */
+.link-box {
+  background: var(--primary-light); border-radius: 12px; padding: 12px 14px;
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  transition: background 0.15s;
+}
+.link-box:active { background: var(--primary-mid); }
+.link-box code { flex: 1; font-size: 12px; color: var(--primary); word-break: break-all; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<!-- ── Экран логина ─────────────────────────────────────────────── -->
+<div class="screen active" id="screen-login">
+  <div class="login-wrap">
+    <div class="login-logo">💅</div>
+    <div class="login-title">Beauty Book</div>
+    <div class="login-sub">Личный кабинет мастера</div>
+
+    <div class="card login-card" style="padding: 24px;">
+      <!-- Шаг 1: ввод Telegram ID -->
+      <div class="login-step active" id="lstep-1">
+        <div class="field">
+          <label>Ваш Telegram ID</label>
+          <input id="inp-tgid" type="number" placeholder="123456789"
+            inputmode="numeric" oninput="checkTgId()">
+        </div>
+        <div id="login-err" class="alert alert-error" style="display:none"></div>
+        <button class="btn btn-primary" id="btn-get-code" disabled onclick="requestCode()">
+          Получить код в Telegram
+        </button>
+        <div class="code-hint" style="margin-top:10px">
+          Узнать свой ID: напишите <b>@userinfobot</b> в Telegram
+        </div>
+      </div>
+
+      <!-- Шаг 2: ввод кода -->
+      <div class="login-step" id="lstep-2">
+        <div style="text-align:center; margin-bottom:16px;">
+          <div style="font-size:36px">📱</div>
+          <div style="font-size:15px; font-weight:700; margin-top:8px">Введите код из Telegram</div>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:4px">Код отправлен на аккаунт <span id="tg-id-display"></span></div>
+        </div>
+        <div class="field">
+          <input id="inp-code" class="code-input" type="text" maxlength="6"
+            placeholder="000000" inputmode="numeric" oninput="checkCode()">
+        </div>
+        <div id="code-err" class="alert alert-error" style="display:none"></div>
+        <button class="btn btn-primary" id="btn-verify" disabled onclick="verifyCode()">
+          Войти
+        </button>
+        <div class="switch-step" onclick="backToStep1()">← Изменить Telegram ID</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Навигация (только после логина) ─────────────────────────── -->
+<nav class="nav-bar" id="nav-bar" style="display:none">
+  <button class="nav-item active" id="nav-dash" onclick="goScreen('dash')">
+    <span class="nav-icon">🏠</span>Главная
+  </button>
+  <button class="nav-item" id="nav-sched" onclick="goScreen('sched')">
+    <span class="nav-icon">📅</span>Расписание
+  </button>
+  <button class="nav-item" id="nav-clients" onclick="goScreen('clients')">
+    <span class="nav-icon">👥</span>Клиенты
+  </button>
+  <button class="nav-item" id="nav-settings" onclick="goScreen('settings')">
+    <span class="nav-icon">⚙️</span>Настройки
+  </button>
+</nav>
+
+<!-- ── Дашборд ─────────────────────────────────────────────────── -->
+<div class="screen" id="screen-dash">
+  <div class="dash-header">
+    <div style="padding-right:44px">
+      <div class="dash-greeting" id="dash-greeting">Привет!</div>
+      <div class="dash-sub" id="dash-date">Загрузка...</div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="logout()" title="Выйти">🚪</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- Статистика -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-value" id="s-clients">—</div>
+        <div class="stat-label">Клиентов</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💰</div>
+        <div class="stat-value" id="s-month">—</div>
+        <div class="stat-label">Выручка за месяц</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📋</div>
+        <div class="stat-value" id="s-total">—</div>
+        <div class="stat-label">Всего записей</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💳</div>
+        <div class="stat-value" id="s-earnings">—</div>
+        <div class="stat-label">Общая выручка</div>
+      </div>
+    </div>
+
+    <!-- Ссылка для записи -->
+    <div class="booking-link-card" id="booking-link-wrap" style="display:none">
+      <div class="booking-link-icon">🔗</div>
+      <div class="booking-link-text">
+        <h4>Ваша ссылка для записи</h4>
+        <p id="booking-link-text">—</p>
+      </div>
+      <button class="copy-btn" onclick="copyBookingLink()">Копировать</button>
+    </div>
+
+    <!-- Топ процедур -->
+    <div class="section-title">Популярные процедуры</div>
+    <div class="card" style="padding:14px 16px">
+      <div id="top-procedures">
+        <div class="loader"><div class="spinner"></div>Загружаем...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Расписание ───────────────────────────────────────────────── -->
+<div class="screen" id="screen-sched">
+  <div class="header">
+    <h1>📅 Расписание</h1>
+    <p id="sched-date-title">Сегодня</p>
+  </div>
+
+  <div class="week-strip" id="week-strip"></div>
+
+  <div class="content" id="sched-content">
+    <div class="loader"><div class="spinner"></div>Загружаем...</div>
+  </div>
+</div>
+
+<!-- ── Клиенты ─────────────────────────────────────────────────── -->
+<div class="screen" id="screen-clients">
+  <div class="header">
+    <h1>👥 Клиенты</h1>
+    <p id="clients-count-sub">—</p>
+  </div>
+  <div class="content">
+    <div class="search-wrap">
+      <span style="font-size:16px">🔍</span>
+      <input id="client-search" placeholder="Поиск по имени..."
+        oninput="searchClients()" autocomplete="off">
+    </div>
+    <div id="clients-list">
+      <div class="loader"><div class="spinner"></div>Загружаем...</div>
+    </div>
+    <div id="clients-pagination" style="margin-top:12px; display:flex; gap:10px">
+    </div>
+  </div>
+</div>
+
+<!-- ── Настройки ───────────────────────────────────────────────── -->
+<div class="screen" id="screen-settings">
+  <div class="header">
+    <h1>⚙️ Настройки</h1>
+    <p>Личный кабинет мастера</p>
+  </div>
+  <div class="content">
+
+    <!-- Профиль -->
+    <div class="section-title">Профиль</div>
+    <div class="settings-section">
+      <div class="settings-row" onclick="openOverlay('overlay-profile')">
+        <div class="row-left">
+          <span class="row-icon">👤</span>
+          <div>
+            <div class="row-title">Имя мастера</div>
+            <div class="row-sub" id="set-name-sub">—</div>
+          </div>
+        </div>
+        <span class="row-arrow">›</span>
+      </div>
+      <div class="settings-row" onclick="openOverlay('overlay-payment')">
+        <div class="row-left">
+          <span class="row-icon">💳</span>
+          <div>
+            <div class="row-title">Реквизиты для оплаты</div>
+            <div class="row-sub" id="set-payment-sub">Не указаны</div>
+          </div>
+        </div>
+        <span class="row-arrow">›</span>
+      </div>
+    </div>
+
+    <!-- Расписание -->
+    <div class="section-title">Рабочее время</div>
+    <div class="settings-section">
+      <div class="settings-row" onclick="openOverlay('overlay-schedule')">
+        <div class="row-left">
+          <span class="row-icon">🕐</span>
+          <div>
+            <div class="row-title">Часы работы</div>
+            <div class="row-sub" id="set-hours-sub">10:00 — 20:00</div>
+          </div>
+        </div>
+        <span class="row-arrow">›</span>
+      </div>
+      <div class="settings-row" onclick="openOverlay('overlay-slot')">
+        <div class="row-left">
+          <span class="row-icon">⏱️</span>
+          <div>
+            <div class="row-title">Длительность слота</div>
+            <div class="row-sub" id="set-slot-sub">60 минут</div>
+          </div>
+        </div>
+        <span class="row-arrow">›</span>
+      </div>
+      <div class="settings-row" onclick="openOverlay('overlay-reminder')">
+        <div class="row-left">
+          <span class="row-icon">🔔</span>
+          <div>
+            <div class="row-title">Напомнить о клиенте</div>
+            <div class="row-sub" id="set-remind-sub">через 40 дней</div>
+          </div>
+        </div>
+        <span class="row-arrow">›</span>
+      </div>
+    </div>
+
+    <!-- Ссылка записи -->
+    <div class="section-title">Ссылка для клиентов</div>
+    <div class="settings-section">
+      <div class="settings-row">
+        <div class="row-left">
+          <span class="row-icon">🔗</span>
+          <div>
+            <div class="row-title">Персональная ссылка</div>
+            <div class="row-sub" id="set-link-sub" style="word-break:break-all">—</div>
+          </div>
+        </div>
+        <button class="copy-btn" onclick="copyBookingLink()">Копировать</button>
+      </div>
+    </div>
+
+    <!-- Оформление -->
+    <div class="section-title">Тема оформления</div>
+    <div class="settings-section" style="padding:14px 16px">
+      <div class="theme-toggle">
+        <button class="theme-btn active" id="theme-pink" onclick="setTheme('pink')">🌸 Розовая</button>
+        <button class="theme-btn" id="theme-peach" onclick="setTheme('peach')">🍑 Персиковая</button>
+      </div>
+    </div>
+
+    <!-- Выход -->
+    <button class="btn btn-secondary" style="margin-top:8px" onclick="logout()">
+      🚪 Выйти из аккаунта
+    </button>
+  </div>
+</div>
+
+<!-- ══ Оверлеи настроек ════════════════════════════════════════ -->
+
+<!-- Профиль -->
+<div class="overlay" id="overlay-profile">
+  <div class="overlay-sheet" onclick.stop>
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">Имя мастера</div>
+    <div class="field">
+      <label>Как вас зовут</label>
+      <input id="ov-name" type="text" placeholder="Анна">
+    </div>
+    <button class="btn btn-primary" onclick="saveName()">Сохранить</button>
+  </div>
+</div>
+
+<!-- Реквизиты -->
+<div class="overlay" id="overlay-payment">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">Реквизиты для оплаты</div>
+    <div class="field">
+      <label>Номер карты или СБП-телефон</label>
+      <input id="ov-payment" type="text" placeholder="2200 0000 0000 0000 или +79001234567">
+    </div>
+    <div class="alert alert-info" style="margin-bottom:14px; font-size:13px">
+      Клиенты увидят эти реквизиты при покупке абонемента — оплата идёт напрямую вам.
+    </div>
+    <button class="btn btn-primary" onclick="savePayment()">Сохранить</button>
+  </div>
+</div>
+
+<!-- Часы работы -->
+<div class="overlay" id="overlay-schedule">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">Часы работы</div>
+    <div style="display:flex; gap:12px">
+      <div class="field" style="flex:1">
+        <label>Начало</label>
+        <select id="ov-wstart"></select>
+      </div>
+      <div class="field" style="flex:1">
+        <label>Конец</label>
+        <select id="ov-wend"></select>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="saveSchedule()">Сохранить</button>
+  </div>
+</div>
+
+<!-- Слот -->
+<div class="overlay" id="overlay-slot">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">Длительность слота</div>
+    <div class="field">
+      <label>Минут на одну запись</label>
+      <select id="ov-slot">
+        <option value="30">30 минут</option>
+        <option value="45">45 минут</option>
+        <option value="60" selected>60 минут</option>
+        <option value="90">90 минут</option>
+        <option value="120">2 часа</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="saveSlot()">Сохранить</button>
+  </div>
+</div>
+
+<!-- Напоминание -->
+<div class="overlay" id="overlay-reminder">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">Напомнить о клиенте</div>
+    <div class="field">
+      <label>Если клиент не пришёл N дней</label>
+      <select id="ov-remind">
+        <option value="14">14 дней</option>
+        <option value="21">21 день</option>
+        <option value="30">30 дней</option>
+        <option value="40" selected>40 дней</option>
+        <option value="60">60 дней</option>
+        <option value="90">90 дней</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="saveReminder()">Сохранить</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  Состояние
+// ═══════════════════════════════════════════════════════════════════
+const API = '';  // пустая строка = тот же origin
+
+let token = localStorage.getItem('bb_token') || '';
+let master = JSON.parse(localStorage.getItem('bb_master') || 'null');
+let bookingLink = '';
+let schedDate = todayStr();
+let clientPage = 0;
+let searchTimer = null;
+
+// ─── Утилиты ───────────────────────────────────────────────────────
+
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function fmt(n) {
+  return Number(n).toLocaleString('ru-RU');
+}
+
+function authHeaders() {
+  return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+}
+
+async function api(method, path, body) {
+  const opts = { method, headers: authHeaders() };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.detail || 'Ошибка сервера');
+  }
+  return r.json();
+}
+
+// ─── Навигация ─────────────────────────────────────────────────────
+
+function goScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-' + id).classList.add('active');
+  if (id === 'dash')    loadDash();
+  if (id === 'sched')   initSched();
+  if (id === 'clients') loadClients(0);
+  if (id === 'settings') fillSettings();
+}
+
+// ─── Тема ──────────────────────────────────────────────────────────
+
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t === 'peach' ? 'peach' : '');
+  localStorage.setItem('bb_theme', t);
+  document.getElementById('theme-pink').classList.toggle('active', t !== 'peach');
+  document.getElementById('theme-peach').classList.toggle('active', t === 'peach');
+}
+
+// ─── Вход ──────────────────────────────────────────────────────────
+
+function checkTgId() {
+  const v = document.getElementById('inp-tgid').value.trim();
+  document.getElementById('btn-get-code').disabled = !(v.length >= 5);
+}
+
+async function requestCode() {
+  const tgId = parseInt(document.getElementById('inp-tgid').value.trim());
+  const btn = document.getElementById('btn-get-code');
+  const errEl = document.getElementById('login-err');
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Отправляем...';
+  try {
+    await fetch(API + '/api/auth/request-code', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({telegram_id: tgId}),
+    }).then(async r => {
+      if (!r.ok) { const d = await r.json(); throw new Error(d.detail); }
+    });
+    document.getElementById('tg-id-display').textContent = tgId;
+    document.getElementById('lstep-1').classList.remove('active');
+    document.getElementById('lstep-2').classList.add('active');
+    document.getElementById('inp-code').focus();
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = '';
+    btn.disabled = false;
+    btn.textContent = 'Получить код в Telegram';
+  }
+}
+
+function checkCode() {
+  const v = document.getElementById('inp-code').value.trim();
+  document.getElementById('btn-verify').disabled = v.length < 6;
+}
+
+async function verifyCode() {
+  const tgId = parseInt(document.getElementById('inp-tgid').value.trim());
+  const code = document.getElementById('inp-code').value.trim();
+  const btn = document.getElementById('btn-verify');
+  const errEl = document.getElementById('code-err');
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Входим...';
+  try {
+    const data = await fetch(API + '/api/auth/verify', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({telegram_id: tgId, code}),
+    }).then(async r => {
+      if (!r.ok) { const d = await r.json(); throw new Error(d.detail); }
+      return r.json();
+    });
+    token = data.token;
+    master = data.master;
+    localStorage.setItem('bb_token', token);
+    localStorage.setItem('bb_master', JSON.stringify(master));
+    afterLogin();
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = '';
+    btn.disabled = false;
+    btn.textContent = 'Войти';
+  }
+}
+
+function backToStep1() {
+  document.getElementById('lstep-2').classList.remove('active');
+  document.getElementById('lstep-1').classList.add('active');
+  document.getElementById('inp-code').value = '';
+  document.getElementById('code-err').style.display = 'none';
+}
+
+function afterLogin() {
+  document.getElementById('nav-bar').style.display = 'flex';
+  goScreen('dash');
+}
+
+function logout() {
+  localStorage.removeItem('bb_token');
+  localStorage.removeItem('bb_master');
+  token = '';
+  master = null;
+  document.getElementById('nav-bar').style.display = 'none';
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-login').classList.add('active');
+  // сброс формы
+  document.getElementById('inp-tgid').value = '';
+  document.getElementById('inp-code').value = '';
+  document.getElementById('lstep-1').classList.add('active');
+  document.getElementById('lstep-2').classList.remove('active');
+  document.getElementById('btn-get-code').disabled = true;
+}
+
+// ─── Дашборд ───────────────────────────────────────────────────────
+
+async function loadDash() {
+  const today = new Date();
+  const MONTHS = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  const DAYS = ['воскресенье','понедельник','вторник','среду','четверг','пятницу','субботу'];
+  document.getElementById('dash-greeting').textContent = `Привет, ${master?.name || 'Мастер'}! ✨`;
+  document.getElementById('dash-date').textContent =
+    `${DAYS[today.getDay()]}, ${today.getDate()} ${MONTHS[today.getMonth()]}`;
+
+  try {
+    const data = await api('GET', '/api/me');
+    document.getElementById('s-clients').textContent = fmt(data.stats.total_clients);
+    document.getElementById('s-month').textContent = fmt(data.stats.month_earnings) + ' ₽';
+    document.getElementById('s-total').textContent = fmt(data.stats.total_appointments);
+    document.getElementById('s-earnings').textContent = fmt(data.stats.total_earnings) + ' ₽';
+
+    if (data.booking_link) {
+      bookingLink = data.booking_link;
+      document.getElementById('booking-link-wrap').style.display = 'flex';
+      document.getElementById('booking-link-text').textContent = data.booking_link;
+    }
+
+    const procs = data.stats.top_procedures;
+    const procEl = document.getElementById('top-procedures');
+    if (!procs || !procs.length) {
+      procEl.innerHTML = `<div class="empty-state"><div class="emoji">📊</div>
+        <h3>Записей пока нет</h3><p>Добавьте первую процедуру в Telegram-боте</p></div>`;
+      return;
+    }
+    const max = procs[0].count || 1;
+    procEl.innerHTML = procs.map(p => `
+      <div class="proc-item">
+        <div class="proc-name">${p.procedure}</div>
+        <div class="proc-bar-wrap"><div class="proc-bar" style="width:${Math.round(p.count/max*100)}%"></div></div>
+        <div class="proc-count">${p.count}</div>
+      </div>`).join('');
+  } catch (e) {
+    document.getElementById('top-procedures').innerHTML =
+      `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+function copyBookingLink() {
+  if (!bookingLink) return;
+  navigator.clipboard?.writeText(bookingLink).catch(() => {});
+  // визуальный фидбек
+  const btn = document.querySelector('.copy-btn');
+  if (btn) { const t = btn.textContent; btn.textContent = '✓ Скопировано'; setTimeout(() => btn.textContent = t, 2000); }
+}
+
+// ─── Расписание ────────────────────────────────────────────────────
+
+const DAYS_SHORT = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+const MONTHS_SHORT = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+
+function initSched() {
+  renderWeekStrip();
+  loadSchedule(schedDate);
+}
+
+function renderWeekStrip() {
+  const strip = document.getElementById('week-strip');
+  const today = new Date();
+  let html = '';
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const ds = d.toISOString().split('T')[0];
+    const isToday = i === 0;
+    const isSelected = ds === schedDate;
+    html += `<div class="day-pill ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}"
+      onclick="selectSchedDay('${ds}', this)">
+      <div class="dp-name">${DAYS_SHORT[d.getDay()]}</div>
+      <div class="dp-num">${d.getDate()}</div>
+    </div>`;
+  }
+  strip.innerHTML = html;
+}
+
+function selectSchedDay(ds, el) {
+  schedDate = ds;
+  document.querySelectorAll('.day-pill').forEach(p => p.classList.remove('selected'));
+  el.classList.add('selected');
+  loadSchedule(ds);
+}
+
+async function loadSchedule(dateStr) {
+  const content = document.getElementById('sched-content');
+  const d = new Date(dateStr + 'T00:00:00');
+  document.getElementById('sched-date-title').textContent =
+    `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}, ${DAYS_SHORT[d.getDay()]}`;
+  content.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
+  try {
+    const data = await api('GET', `/api/dashboard/schedule?date=${dateStr}`);
+    if (!data.appointments.length) {
+      content.innerHTML = `<div class="empty-state">
+        <div class="emoji">🌸</div>
+        <h3>Записей нет</h3>
+        <p>На этот день пока нет записей.<br>Свободный день — заслуженный отдых!</p>
+      </div>`;
+      return;
+    }
+    const statusLabel = { confirmed: 'Подтверждена', pending: 'Ожидает', cancelled: 'Отменена' };
+    const statusClass = { confirmed: 'status-confirmed', pending: 'status-pending', cancelled: 'status-cancelled' };
+    content.innerHTML = data.appointments.map(a => `
+      <div class="appt-item">
+        <div class="appt-time-col">
+          <div class="appt-time">${a.time || '—'}</div>
+          <div class="appt-dot"></div>
+        </div>
+        <div class="appt-info">
+          <div class="appt-name">${a.client}</div>
+          <div class="appt-proc">${a.procedure}</div>
+          <div class="appt-phone">${a.phone || ''} ${a.price ? '· ' + fmt(a.price) + ' ₽' : ''}</div>
+        </div>
+        <span class="appt-status ${statusClass[a.status] || 'status-confirmed'}">
+          ${statusLabel[a.status] || a.status}
+        </span>
+      </div>`).join('');
+  } catch (e) {
+    content.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// ─── Клиенты ───────────────────────────────────────────────────────
+
+async function loadClients(page) {
+  clientPage = page;
+  const listEl = document.getElementById('clients-list');
+  listEl.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
+  try {
+    const q = document.getElementById('client-search').value.trim();
+    const url = q
+      ? `/api/dashboard/clients?search=${encodeURIComponent(q)}`
+      : `/api/dashboard/clients?page=${page}`;
+    const data = await api('GET', url);
+    document.getElementById('clients-count-sub').textContent = `${data.total} клиентов`;
+
+    if (!data.clients.length) {
+      listEl.innerHTML = `<div class="empty-state">
+        <div class="emoji">💆</div>
+        <h3>${q ? 'Не найдено' : 'Клиентов пока нет'}</h3>
+        <p>${q ? 'Попробуйте другой запрос' : 'Добавьте первого клиента через Telegram-бот'}</p>
+      </div>`;
+      return;
+    }
+    listEl.innerHTML = data.clients.map(c => {
+      const initials = (c.name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+      const lastVisit = c.last_visit ? c.last_visit.slice(0, 10) : 'нет визитов';
+      return `<div class="client-row">
+        <div class="client-ava">${initials}</div>
+        <div class="client-info">
+          <div class="client-name">${c.name}</div>
+          <div class="client-meta">${c.phone || ''} · ${lastVisit}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+function searchClients() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadClients(0), 350);
+}
+
+// ─── Настройки ─────────────────────────────────────────────────────
+
+function fillSettings() {
+  if (!master) return;
+  document.getElementById('set-name-sub').textContent = master.name || '—';
+  document.getElementById('set-payment-sub').textContent = master.payment_card || 'Не указаны';
+  document.getElementById('set-hours-sub').textContent =
+    `${master.work_start || 10}:00 — ${master.work_end || 20}:00`;
+  document.getElementById('set-slot-sub').textContent = `${master.slot_duration || 60} минут`;
+  document.getElementById('set-remind-sub').textContent = `через ${master.reminder_days || 40} дней`;
+  const link = bookingLink || `${location.origin}/booking.html?master=${master.telegram_id}`;
+  document.getElementById('set-link-sub').textContent = link;
+
+  // Заполняем оверлеи
+  document.getElementById('ov-name').value = master.name || '';
+  document.getElementById('ov-payment').value = master.payment_card || '';
+  document.getElementById('ov-slot').value = master.slot_duration || 60;
+  document.getElementById('ov-remind').value = master.reminder_days || 40;
+
+  // Часы работы: заполняем select
+  const wsEl = document.getElementById('ov-wstart');
+  const weEl = document.getElementById('ov-wend');
+  wsEl.innerHTML = weEl.innerHTML = '';
+  for (let h = 6; h <= 23; h++) {
+    const opt1 = new Option(`${h}:00`, h); if (h === (master.work_start || 10)) opt1.selected = true;
+    const opt2 = new Option(`${h}:00`, h); if (h === (master.work_end   || 20)) opt2.selected = true;
+    wsEl.add(opt1); weEl.add(opt2);
+  }
+}
+
+async function saveName() {
+  const name = document.getElementById('ov-name').value.trim();
+  if (!name) return;
+  await saveSettings({ name, work_start: master.work_start, work_end: master.work_end,
+    slot_duration: master.slot_duration, reminder_days: master.reminder_days });
+  master.name = name;
+  localStorage.setItem('bb_master', JSON.stringify(master));
+  document.getElementById('set-name-sub').textContent = name;
+  closeOverlay();
+}
+
+async function savePayment() {
+  const card = document.getElementById('ov-payment').value.trim();
+  try {
+    await api('PUT', '/api/dashboard/payment', { payment_card: card });
+    master.payment_card = card;
+    localStorage.setItem('bb_master', JSON.stringify(master));
+    document.getElementById('set-payment-sub').textContent = card || 'Не указаны';
+    closeOverlay();
+  } catch (e) { alert(e.message); }
+}
+
+async function saveSchedule() {
+  const ws = parseInt(document.getElementById('ov-wstart').value);
+  const we = parseInt(document.getElementById('ov-wend').value);
+  if (ws >= we) { alert('Начало работы должно быть раньше конца'); return; }
+  await saveSettings({ name: master.name, work_start: ws, work_end: we,
+    slot_duration: master.slot_duration, reminder_days: master.reminder_days });
+  master.work_start = ws; master.work_end = we;
+  localStorage.setItem('bb_master', JSON.stringify(master));
+  document.getElementById('set-hours-sub').textContent = `${ws}:00 — ${we}:00`;
+  closeOverlay();
+}
+
+async function saveSlot() {
+  const slot = parseInt(document.getElementById('ov-slot').value);
+  await saveSettings({ name: master.name, work_start: master.work_start, work_end: master.work_end,
+    slot_duration: slot, reminder_days: master.reminder_days });
+  master.slot_duration = slot;
+  localStorage.setItem('bb_master', JSON.stringify(master));
+  document.getElementById('set-slot-sub').textContent = `${slot} минут`;
+  closeOverlay();
+}
+
+async function saveReminder() {
+  const days = parseInt(document.getElementById('ov-remind').value);
+  await saveSettings({ name: master.name, work_start: master.work_start, work_end: master.work_end,
+    slot_duration: master.slot_duration, reminder_days: days });
+  master.reminder_days = days;
+  localStorage.setItem('bb_master', JSON.stringify(master));
+  document.getElementById('set-remind-sub').textContent = `через ${days} дней`;
+  closeOverlay();
+}
+
+async function saveSettings(body) {
+  try {
+    await api('PUT', '/api/dashboard/settings', body);
+  } catch (e) { alert(e.message); }
+}
+
+// ─── Оверлеи ───────────────────────────────────────────────────────
+
+function openOverlay(id) {
+  document.getElementById(id).classList.add('open');
+}
+
+function closeOverlay() {
+  document.querySelectorAll('.overlay.open').forEach(o => o.classList.remove('open'));
+}
+
+// Закрытие по клику на фон
+document.querySelectorAll('.overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) closeOverlay(); });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  Инициализация
+// ═══════════════════════════════════════════════════════════════════
+
+(function init() {
+  // Восстановить тему
+  const savedTheme = localStorage.getItem('bb_theme') || 'pink';
+  setTheme(savedTheme);
+
+  // Если уже залогинен — открываем дашборд
+  if (token && master) {
+    afterLogin();
+  }
+})();
+</script>
+</body>
+</html>
