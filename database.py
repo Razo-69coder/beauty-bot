@@ -200,10 +200,27 @@ async def get_reminder_days(telegram_id: int) -> int:
             return row[0] if row and row[0] else 40
 
 
+async def get_reminder_days_by_master(master_id: int) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT reminder_days FROM masters WHERE id=?", (master_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row and row[0] else 40
+
+
 async def update_reminder_days(telegram_id: int, days: int):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             "UPDATE masters SET reminder_days=? WHERE telegram_id=?", (days, telegram_id)
+        )
+        await db.commit()
+
+
+async def update_reminder_days_by_master(master_id: int, days: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE masters SET reminder_days=? WHERE id=?", (days, master_id)
         )
         await db.commit()
 

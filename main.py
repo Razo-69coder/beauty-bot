@@ -20,6 +20,7 @@ from database import (
     get_client_history, get_statistics, add_client, update_client,
     delete_client, add_appointment, get_inactive_clients,
     get_reminder_days, update_reminder_days,
+    get_reminder_days_by_master, update_reminder_days_by_master,
 )
 from scheduler import setup_scheduler
 from handlers import start, clients, appointments, settings, stats
@@ -197,25 +198,15 @@ async def api_stats(master_id: int = Depends(get_master_id)):
 
 
 @app.get("/api/inactive")
-async def api_inactive(master_id: int = Depends(get_master_id), x_init_data: str = Header(None), x_dev_telegram_id: str = Header(None)):
-    telegram_id = int(x_dev_telegram_id) if x_dev_telegram_id else None
-    if not telegram_id and x_init_data:
-        user = _parse_init_data(x_init_data)
-        telegram_id = user["id"] if user else None
-    days = await get_reminder_days(telegram_id) if telegram_id else 40
+async def api_inactive(master_id: int = Depends(get_master_id)):
+    days = await get_reminder_days_by_master(master_id)
     rows = await get_inactive_clients(master_id, days)
     return {"clients": [{"id": r[0], "name": r[1], "phone": r[2], "last_visit": r[3], "days_ago": r[4]} for r in rows]}
 
 
 @app.put("/api/settings/reminder")
-async def api_set_reminder(body: ReminderUpdate, x_init_data: str = Header(None), x_dev_telegram_id: str = Header(None)):
-    telegram_id = int(x_dev_telegram_id) if x_dev_telegram_id else None
-    if not telegram_id and x_init_data:
-        user = _parse_init_data(x_init_data)
-        telegram_id = user["id"] if user else None
-    if not telegram_id:
-        raise HTTPException(status_code=401)
-    await update_reminder_days(telegram_id, body.days)
+async def api_set_reminder(body: ReminderUpdate, master_id: int = Depends(get_master_id)):
+    await update_reminder_days_by_master(master_id, body.days)
     return {"ok": True}
 
 
