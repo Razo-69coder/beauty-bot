@@ -1,6 +1,4 @@
 aiogram==3.7.0
-pydantic>=2.10.0
-pydantic-core>=2.27.0
 aiosqlite==0.20.0
 apscheduler==3.10.4
 python-dotenv==1.0.1
