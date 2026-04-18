@@ -16,6 +16,10 @@ from aiogram.types import Update
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import BOT_TOKEN, WEBHOOK_URL, WEBHOOK_SECRET
+import jwt
+import httpx
+from datetime import datetime as _dt, timedelta as _td
+
 from database import (
     init_db, get_or_create_master, get_clients, get_client,
     get_client_history, get_statistics, add_client, update_client,
@@ -24,6 +28,9 @@ from database import (
     get_reminder_days_by_master, update_reminder_days_by_master,
     get_master_info, get_master_info_by_telegram, get_available_slots,
     get_master_schedule, update_appointment_status,
+    create_login_code, verify_login_code,
+    get_master_full, update_master_full_settings, update_master_payment,
+    search_clients,
 )
 
 from scheduler import setup_scheduler
@@ -344,4 +351,140 @@ async def api_public_book(body: PublicBooking):
 
 
 # ── WebApp static ─────────────────────────────────────────────────────
+# ── JWT утилиты ───────────────────────────────────────────────────────
+
+def _jwt_secret() -> str:
+    return BOT_TOKEN or "beauty_fallback_secret"
+
+def _create_jwt(telegram_id: int, master_id: int) -> str:
+    return jwt.encode(
+        {"tg": telegram_id, "mid": master_id, "exp": _dt.utcnow() + _td(days=30)},
+        _jwt_secret(), algorithm="HS256"
+    )
+
+def _decode_jwt(token: str) -> dict | None:
+    try:
+        return jwt.decode(token, _jwt_secret(), algorithms=["HS256"])
+    except jwt.InvalidTokenError:
+        return None
+
+async def get_jwt_master_id(authorization: str = Header(None)) -> int:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Требуется авторизация")
+    payload = _decode_jwt(authorization[7:])
+    if not payload:
+        raise HTTPException(401, "Неверный или устаревший токен")
+    return int(payload["mid"])
+
+async def _send_tg(chat_id: int, text: str):
+    if not BOT_TOKEN:
+        return
+    async with httpx.AsyncClient(timeout=5) as c:
+        try:
+            await c.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+            )
+        except Exception:
+            pass
+
+
+# ── Авторизация веб-панели ────────────────────────────────────────────
+
+class _RequestCode(BaseModel):
+    telegram_id: int
+
+class _VerifyCode(BaseModel):
+    telegram_id: int
+    code: str
+
+class _MasterSettings(BaseModel):
+    name: str
+    work_start: int = 10
+    work_end: int = 20
+    slot_duration: int = 60
+    reminder_days: int = 40
+
+class _PaymentUpdate(BaseModel):
+    payment_card: str
+
+
+@app.post("/api/auth/request-code")
+async def auth_request_code(body: _RequestCode):
+    m = await get_master_info_by_telegram(body.telegram_id)
+    if not m:
+        raise HTTPException(404, "Telegram ID не зарегистрирован. Сначала запустите бота командой /start")
+    code = await create_login_code(body.telegram_id)
+    await _send_tg(body.telegram_id, f"🔑 *Код входа в Beauty Book*\n\n`{code}`\n\nДействует 10 минут.")
+    return {"ok": True}
+
+
+@app.post("/api/auth/verify")
+async def auth_verify(body: _VerifyCode):
+    ok = await verify_login_code(body.telegram_id, body.code)
+    if not ok:
+        raise HTTPException(400, "Неверный или устаревший код")
+    m = await get_master_info_by_telegram(body.telegram_id)
+    full = await get_master_full(m["id"])
+    token = _create_jwt(body.telegram_id, m["id"])
+    return {"token": token, "master": full}
+
+
+# ── Дашборд (JWT) ─────────────────────────────────────────────────────
+
+@app.get("/api/me")
+async def dash_me(master_id: int = Depends(get_jwt_master_id)):
+    full = await get_master_full(master_id)
+    if not full:
+        raise HTTPException(404, "Мастер не найден")
+    stats = await get_statistics(master_id)
+    webapp_url = config.WEBHOOK_URL or ""
+    booking_link = f"{webapp_url}/app/booking.html?master={full['telegram_id']}"
+    return {**full, "stats": stats, "booking_link": booking_link}
+
+
+@app.get("/api/dashboard/schedule")
+async def dash_schedule(date: str, master_id: int = Depends(get_jwt_master_id)):
+    rows = await get_master_schedule(master_id, date)
+    return {
+        "date": date,
+        "appointments": [
+            {"id": r[0], "client": r[1], "procedure": r[2], "time": r[3], "status": r[4], "phone": r[5]}
+            for r in rows
+        ],
+    }
+
+
+@app.get("/api/dashboard/clients")
+async def dash_clients(
+    page: int = 0,
+    search: str = "",
+    master_id: int = Depends(get_jwt_master_id),
+):
+    if search:
+        rows = await search_clients(master_id, search)
+        return {"clients": rows, "total": len(rows)}
+    rows = await get_clients(master_id)
+    total = len(rows)
+    page_size = 20
+    paged = rows[page * page_size: (page + 1) * page_size]
+    return {"clients": paged, "total": total}
+
+
+@app.put("/api/dashboard/settings")
+async def dash_settings(body: _MasterSettings, master_id: int = Depends(get_jwt_master_id)):
+    await update_master_full_settings(
+        master_id, body.name, body.work_start, body.work_end,
+        body.slot_duration, body.reminder_days,
+    )
+    return {"ok": True}
+
+
+@app.put("/api/dashboard/payment")
+async def dash_payment(body: _PaymentUpdate, master_id: int = Depends(get_jwt_master_id)):
+    await update_master_payment(master_id, body.payment_card)
+    return {"ok": True}
+
+
+# ── Статика (webapp) ──────────────────────────────────────────────────
 app.mount("/app", StaticFiles(directory="webapp", html=True), name="webapp")

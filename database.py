@@ -68,6 +68,23 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS login_codes (
+                id SERIAL PRIMARY KEY,
+                telegram_id BIGINT NOT NULL,
+                code TEXT NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                used INTEGER DEFAULT 0
+            )
+        """)
+        # Миграции для существующих баз
+        for sql in [
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS payment_card TEXT DEFAULT ''",
+        ]:
+            try:
+                await conn.execute(sql)
+            except Exception:
+                pass
 
 
 # ── Мастера ───────────────────────────────────────────────────────────
@@ -501,5 +518,75 @@ async def get_statistics(master_id: int) -> dict:
         "total_appointments": total_appointments,
         "total_earnings": total_earnings,
         "month_earnings": month_earnings,
-        "top_procedures": top_procedures,
+        "top_procedures": [{"procedure": p[0], "count": p[1]} for p in top_procedures],
     }
+
+
+# ── Веб-панель: авторизация (код из бота) ─────────────────────────────
+
+async def create_login_code(telegram_id: int) -> str:
+    import random, string
+    from datetime import datetime, timedelta
+    code = "".join(random.choices(string.digits, k=6))
+    expires_at = datetime.utcnow() + timedelta(minutes=10)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM login_codes WHERE telegram_id=$1", telegram_id)
+        await conn.execute(
+            "INSERT INTO login_codes (telegram_id, code, expires_at) VALUES ($1,$2,$3)",
+            telegram_id, code, expires_at
+        )
+    return code
+
+
+async def verify_login_code(telegram_id: int, code: str) -> bool:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id FROM login_codes WHERE telegram_id=$1 AND code=$2 AND expires_at > NOW() AND used=0",
+            telegram_id, code
+        )
+        if not row:
+            return False
+        await conn.execute("UPDATE login_codes SET used=1 WHERE id=$1", row['id'])
+    return True
+
+
+# ── Веб-панель: настройки мастера ─────────────────────────────────────
+
+async def get_master_full(master_id: int) -> dict | None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, telegram_id, name, reminder_days, work_start, work_end, slot_duration, "
+            "COALESCE(payment_card,'') as payment_card "
+            "FROM masters WHERE id=$1",
+            master_id
+        )
+    if not row:
+        return None
+    return {
+        "id": row['id'], "telegram_id": row['telegram_id'], "name": row['name'],
+        "reminder_days": row['reminder_days'] or 40,
+        "work_start": row['work_start'] or 10, "work_end": row['work_end'] or 20,
+        "slot_duration": row['slot_duration'] or 60,
+        "payment_card": row['payment_card'],
+    }
+
+
+async def update_master_full_settings(master_id: int, name: str, work_start: int,
+                                       work_end: int, slot_duration: int, reminder_days: int):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE masters SET name=$1, work_start=$2, work_end=$3, slot_duration=$4, reminder_days=$5 WHERE id=$6",
+            name, work_start, work_end, slot_duration, reminder_days, master_id
+        )
+
+
+async def update_master_payment(master_id: int, payment_card: str):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE masters SET payment_card=$1 WHERE id=$2", payment_card, master_id
+        )
