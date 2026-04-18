@@ -6,30 +6,21 @@ WEBAPP_URL = f"{WEBHOOK_URL}/app" if WEBHOOK_URL else ""
 
 # ─── Главное меню ───────────────────────────────────────────────
 def main_menu() -> InlineKeyboardMarkup:
-    rows = []
     if WEBAPP_URL:
-        rows.append([InlineKeyboardButton(text="💅 Открыть Beauty Book", web_app={"url": WEBAPP_URL})])
-    rows += [
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="💅 Открыть Beauty Book", web_app={"url": WEBAPP_URL})]
+        ])
+    # Fallback если WebApp недоступен (локальная разработка)
+    return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="👥 Мои клиенты", callback_data="clients_list"),
             InlineKeyboardButton(text="➕ Новый клиент", callback_data="client_add"),
         ],
         [
-            InlineKeyboardButton(text="🔍 Найти клиента", callback_data="client_search"),
-            InlineKeyboardButton(text="📅 Записать клиента", callback_data="appointment_new"),
-        ],
-        [
-            InlineKeyboardButton(text="🔔 Кто давно не приходил", callback_data="inactive_clients"),
-        ],
-        [
             InlineKeyboardButton(text="📊 Статистика", callback_data="stats"),
             InlineKeyboardButton(text="⚙️ Настройки", callback_data="settings"),
         ],
-        [
-            InlineKeyboardButton(text="💡 Помощь", callback_data="help"),
-        ],
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+    ])
 
 
 # ─── Список клиентов ─────────────────────────────────────────────
