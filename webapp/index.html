@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Beauty Book</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--tg-theme-bg-color, #FFF0F5);
+  color: var(--tg-theme-text-color, #3D2B2B);
+  min-height: 100vh;
+  padding-bottom: 70px;
+}
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, #E8A0BF, #C9657A);
+  padding: 20px 16px 16px;
+  color: white;
+}
+.header h1 { font-size: 20px; font-weight: 700; }
+.header p  { font-size: 13px; opacity: 0.9; margin-top: 3px; }
+
+/* Content */
+.screen { display: none; padding: 16px; }
+.screen.active { display: block; }
+
+/* Menu grid */
+.menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.menu-card {
+  background: white; border-radius: 16px; padding: 18px 14px;
+  text-align: center; box-shadow: 0 2px 12px rgba(200,100,120,0.1);
+  cursor: pointer; transition: transform 0.1s; border: none; width: 100%;
+}
+.menu-card:active { transform: scale(0.97); }
+.menu-card.accent { background: linear-gradient(135deg, #E8A0BF, #C9657A); }
+.menu-card.accent .label { color: white; }
+.menu-card.accent .sub { color: rgba(255,255,255,0.85); }
+.menu-card .icon  { font-size: 26px; margin-bottom: 7px; }
+.menu-card .label { font-size: 13px; font-weight: 600; color: #3D2B2B; }
+.menu-card .sub   { font-size: 11px; color: #999; margin-top: 2px; }
+.menu-card.full { grid-column: span 2; }
+
+/* Search */
+.search-bar {
+  background: white; border-radius: 12px; padding: 11px 14px;
+  display: flex; align-items: center; gap: 9px; margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.search-bar input { border:none; outline:none; font-size:14px; background:transparent; flex:1; }
+
+/* Client cards */
+.client-card {
+  background: white; border-radius: 14px; padding: 13px 15px;
+  margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  display: flex; align-items: center; gap: 12px; cursor: pointer;
+}
+.client-avatar {
+  width: 42px; height: 42px;
+  background: linear-gradient(135deg, #F8C8D8, #E8A0BF);
+  border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: 18px; flex-shrink: 0;
+}
+.client-info { flex: 1; min-width: 0; }
+.client-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.client-meta { font-size: 12px; color: #999; margin-top: 2px; }
+.client-badge {
+  background: #FFF0F5; color: #C9657A;
+  border-radius: 20px; padding: 3px 9px; font-size: 11px; font-weight: 600; flex-shrink: 0;
+}
+
+/* Client profile */
+.back-btn { color: #C9657A; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 14px; display: inline-flex; align-items: center; gap: 5px; }
+.profile-card {
+  background: white; border-radius: 16px; padding: 20px;
+  text-align: center; margin-bottom: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.profile-avatar { width: 70px; height: 70px; background: linear-gradient(135deg, #F8C8D8, #E8A0BF); border-radius: 50%; margin: 0 auto 11px; display: flex; align-items: center; justify-content: center; font-size: 30px; }
+.profile-name  { font-size: 20px; font-weight: 700; }
+.profile-phone { font-size: 14px; color: #888; margin-top: 4px; }
+.profile-note  { background: #FFF0F5; border-radius: 10px; padding: 7px 12px; margin-top: 10px; font-size: 12px; color: #C9657A; }
+
+.action-row { display: flex; gap: 10px; margin-bottom: 12px; }
+.btn {
+  flex: 1; padding: 12px; border-radius: 12px; border: none;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.btn-primary  { background: linear-gradient(135deg, #E8A0BF, #C9657A); color: white; }
+.btn-secondary{ background: white; color: #C9657A; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.btn-danger   { background: #fff0f0; color: #e05555; }
+.btn-full     { width: 100%; margin-top: 8px; }
+
+.section-title { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+.history-item {
+  background: white; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between;
+}
+.history-proc { font-size: 14px; font-weight: 600; }
+.history-date { font-size: 12px; color: #999; margin-top: 2px; }
+.history-price{ font-size: 14px; font-weight: 700; color: #C9657A; }
+
+/* Stats */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.stat-card { background: white; border-radius: 14px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.stat-value{ font-size: 28px; font-weight: 800; color: #C9657A; }
+.stat-label{ font-size: 12px; color: #999; margin-top: 4px; }
+.stat-wide {
+  background: linear-gradient(135deg, #E8A0BF, #C9657A);
+  border-radius: 14px; padding: 18px; text-align: center; margin-bottom: 12px;
+  box-shadow: 0 4px 16px rgba(200,100,120,0.25);
+}
+.stat-wide .amount  { font-size: 34px; font-weight: 800; color: white; }
+.stat-wide .sublabel{ font-size: 13px; color: rgba(255,255,255,0.85); margin-top: 4px; }
+.top-list { background: white; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.top-title{ font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+.top-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.top-medal{ font-size: 20px; width: 28px; }
+.top-name { flex: 1; font-size: 13px; font-weight: 500; }
+.top-count{ font-size: 13px; font-weight: 700; color: #C9657A; }
+
+/* Form */
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block; color: #555; }
+.form-input {
+  width: 100%; padding: 12px 14px; border-radius: 12px;
+  border: 1.5px solid #f0d0e0; background: white; font-size: 14px;
+  outline: none; transition: border-color 0.2s;
+}
+.form-input:focus { border-color: #C9657A; }
+
+/* Bottom nav */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: white; padding: 8px 20px 14px;
+  display: flex; justify-content: space-around;
+  border-top: 1px solid #F5E0E8; z-index: 100;
+}
+.nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; }
+.nav-icon { font-size: 22px; }
+.nav-label{ font-size: 10px; color: #bbb; font-weight: 500; }
+.nav-item.active .nav-label { color: #C9657A; }
+
+/* Loading & empty */
+.loading { text-align: center; padding: 40px 20px; color: #aaa; font-size: 14px; }
+.empty   { text-align: center; padding: 30px 20px; color: #aaa; }
+.empty .emoji { font-size: 40px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<div class="header" id="header">
+  <h1>✨ Beauty Book</h1>
+  <p id="header-sub">Загрузка...</p>
+</div>
+
+<!-- ГЛАВНАЯ -->
+<div class="screen active" id="screen-home">
+  <div class="menu-grid">
+    <button class="menu-card accent" onclick="showClients()">
+      <div class="icon">👥</div>
+      <div class="label">Клиенты</div>
+      <div class="sub" id="clients-count">...</div>
+    </button>
+    <button class="menu-card" onclick="showAddClient()">
+      <div class="icon">➕</div>
+      <div class="label">Новый клиент</div>
+      <div class="sub">добавить</div>
+    </button>
+    <button class="menu-card" onclick="showInactive()">
+      <div class="icon">🔔</div>
+      <div class="label">Не приходили</div>
+      <div class="sub" id="inactive-count">...</div>
+    </button>
+    <button class="menu-card" onclick="showStats()">
+      <div class="icon">📊</div>
+      <div class="label">Статистика</div>
+      <div class="sub">за месяц</div>
+    </button>
+  </div>
+</div>
+
+<!-- КЛИЕНТЫ -->
+<div class="screen" id="screen-clients">
+  <div class="search-bar">
+    <span>🔍</span>
+    <input type="text" id="search-input" placeholder="Найти клиента..." oninput="filterClients(this.value)">
+  </div>
+  <div id="clients-list"><div class="loading">Загрузка...</div></div>
+  <button class="btn btn-primary btn-full" onclick="showAddClient()">➕ Новый клиент</button>
+</div>
+
+<!-- КАРТОЧКА КЛИЕНТА -->
+<div class="screen" id="screen-client">
+  <div class="back-btn" onclick="showClients()">← Назад</div>
+  <div class="profile-card">
+    <div class="profile-avatar">👤</div>
+    <div class="profile-name" id="client-name">—</div>
+    <div class="profile-phone" id="client-phone">—</div>
+    <div class="profile-note" id="client-note" style="display:none"></div>
+  </div>
+  <div class="action-row">
+    <button class="btn btn-primary" onclick="showAddAppointment()">📅 Записать</button>
+    <button class="btn btn-secondary" onclick="showEditClient()">✏️ Изменить</button>
+  </div>
+  <div class="section-title">📋 История процедур</div>
+  <div id="client-history"><div class="loading">Загрузка...</div></div>
+</div>
+
+<!-- СТАТИСТИКА -->
+<div class="screen" id="screen-stats">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value" id="stat-clients">—</div>
+      <div class="stat-label">клиентов</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-appointments">—</div>
+      <div class="stat-label">процедур</div>
+    </div>
+  </div>
+  <div class="stat-wide">
+    <div class="sublabel">Выручка за месяц</div>
+    <div class="amount" id="stat-month">—</div>
+  </div>
+  <div class="stat-wide" style="background:linear-gradient(135deg,#d4a0c0,#a06080)">
+    <div class="sublabel">Общая выручка</div>
+    <div class="amount" id="stat-total">—</div>
+  </div>
+  <div class="top-list" id="top-procedures"></div>
+</div>
+
+<!-- ФОРМА: ДОБАВИТЬ КЛИЕНТА -->
+<div class="screen" id="screen-add-client">
+  <div class="back-btn" onclick="goBack()">← Назад</div>
+  <div class="section-title">➕ Новый клиент</div>
+  <div class="form-group">
+    <label class="form-label">Имя</label>
+    <input class="form-input" id="new-name" placeholder="Например: Маша Иванова">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Телефон</label>
+    <input class="form-input" id="new-phone" type="tel" placeholder="+79001234567">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Заметка (необязательно)</label>
+    <input class="form-input" id="new-notes" placeholder="Например: аллергия на лак">
+  </div>
+  <button class="btn btn-primary btn-full" onclick="saveNewClient()">✅ Сохранить</button>
+</div>
+
+<!-- ФОРМА: ДОБАВИТЬ ЗАПИСЬ -->
+<div class="screen" id="screen-add-appointment">
+  <div class="back-btn" onclick="showClient(currentClientId)">← Назад</div>
+  <div class="section-title">📅 Новая запись</div>
+  <div class="form-group">
+    <label class="form-label">Процедура</label>
+    <input class="form-input" id="appt-procedure" placeholder="Маникюр с покрытием">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Дата</label>
+    <input class="form-input" id="appt-date" type="date">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Стоимость (₽)</label>
+    <input class="form-input" id="appt-price" type="number" placeholder="0">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Заметка (необязательно)</label>
+    <input class="form-input" id="appt-notes" placeholder="">
+  </div>
+  <button class="btn btn-primary btn-full" onclick="saveAppointment()">✅ Сохранить</button>
+</div>
+
+<!-- НЕ ПРИХОДИЛИ -->
+<div class="screen" id="screen-inactive">
+  <div class="back-btn" onclick="showHome()">← Назад</div>
+  <div class="section-title">🔔 Давно не приходили</div>
+  <div id="inactive-list"><div class="loading">Загрузка...</div></div>
+</div>
+
+<!-- Нижняя навигация -->
+<div class="bottom-nav">
+  <div class="nav-item active" id="nav-home" onclick="showHome()">
+    <div class="nav-icon">🏠</div><div class="nav-label">Главная</div>
+  </div>
+  <div class="nav-item" id="nav-clients" onclick="showClients()">
+    <div class="nav-icon">👥</div><div class="nav-label">Клиенты</div>
+  </div>
+  <div class="nav-item" id="nav-stats" onclick="showStats()">
+    <div class="nav-icon">📊</div><div class="nav-label">Статистика</div>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+// ── Auth headers ─────────────────────────────────────────────────
+function authHeaders() {
+  if (tg.initData) {
+    return { 'x-init-data': tg.initData, 'Content-Type': 'application/json' };
+  }
+  // dev fallback
+  return { 'x-dev-telegram-id': '123456789', 'x-dev-username': 'dev', 'Content-Type': 'application/json' };
+}
+
+// ── API ──────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: authHeaders(),
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// ── State ─────────────────────────────────────────────────────────
+let allClients = [];
+let currentClientId = null;
+let previousScreen = 'home';
+
+// ── Navigation ────────────────────────────────────────────────────
+function showScreen(id, navId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (navId) document.getElementById('nav-' + navId)?.classList.add('active');
+}
+
+function goBack() {
+  if (previousScreen === 'client') showClient(currentClientId);
+  else showHome();
+}
+
+// ── Home ──────────────────────────────────────────────────────────
+async function showHome() {
+  showScreen('home', 'home');
+  const user = tg.initDataUnsafe?.user;
+  document.getElementById('header-sub').textContent =
+    user ? `Привет, ${user.first_name}! 👋` : 'Добро пожаловать!';
+  try {
+    const clients = await api('GET', '/api/clients');
+    allClients = clients;
+    document.getElementById('clients-count').textContent = clients.length + ' человек';
+    const inactive = await api('GET', '/api/inactive');
+    const cnt = inactive.clients?.length || 0;
+    document.getElementById('inactive-count').textContent = cnt > 0 ? cnt + ' клиентов' : 'все активны';
+  } catch (e) { console.error(e); }
+}
+
+// ── Clients ───────────────────────────────────────────────────────
+async function showClients() {
+  showScreen('clients', 'clients');
+  document.getElementById('search-input').value = '';
+  try {
+    allClients = await api('GET', '/api/clients');
+    renderClients(allClients);
+  } catch (e) {
+    document.getElementById('clients-list').innerHTML = '<div class="loading">Ошибка загрузки</div>';
+  }
+}
+
+function renderClients(list) {
+  const el = document.getElementById('clients-list');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty"><div class="emoji">👥</div><div>Клиентов пока нет</div></div>';
+    return;
+  }
+  el.innerHTML = list.map(c => `
+    <div class="client-card" onclick="showClient(${c.id})">
+      <div class="client-avatar">💅</div>
+      <div class="client-info">
+        <div class="client-name">${c.name}</div>
+        <div class="client-meta">${c.last_visit ? 'Визит: ' + formatDate(c.last_visit) : 'Нет визитов'}</div>
+      </div>
+      <div class="client-badge">→</div>
+    </div>
+  `).join('');
+}
+
+function filterClients(q) {
+  const filtered = q ? allClients.filter(c => c.name.toLowerCase().includes(q.toLowerCase())) : allClients;
+  renderClients(filtered);
+}
+
+// ── Client card ───────────────────────────────────────────────────
+async function showClient(id) {
+  currentClientId = id;
+  showScreen('client', 'clients');
+  document.getElementById('client-name').textContent = '...';
+  document.getElementById('client-history').innerHTML = '<div class="loading">Загрузка...</div>';
+  try {
+    const c = await api('GET', `/api/clients/${id}`);
+    document.getElementById('client-name').textContent = c.name;
+    document.getElementById('client-phone').textContent = '📱 ' + c.phone;
+    const noteEl = document.getElementById('client-note');
+    if (c.notes) { noteEl.textContent = '📝 ' + c.notes; noteEl.style.display = ''; }
+    else noteEl.style.display = 'none';
+
+    const hist = document.getElementById('client-history');
+    if (!c.history?.length) {
+      hist.innerHTML = '<div class="empty"><div class="emoji">📋</div><div>Процедур пока нет</div></div>';
+    } else {
+      hist.innerHTML = c.history.map(h => `
+        <div class="history-item">
+          <div>
+            <div class="history-proc">${h.procedure}</div>
+            <div class="history-date">${formatDate(h.date)}</div>
+          </div>
+          <div class="history-price">${h.price ? h.price + ' ₽' : '—'}</div>
+        </div>
+      `).join('');
+    }
+  } catch (e) { console.error(e); }
+}
+
+// ── Add client ────────────────────────────────────────────────────
+function showAddClient() {
+  previousScreen = 'clients';
+  showScreen('add-client', 'clients');
+  document.getElementById('new-name').value = '';
+  document.getElementById('new-phone').value = '';
+  document.getElementById('new-notes').value = '';
+}
+
+async function saveNewClient() {
+  const name  = document.getElementById('new-name').value.trim();
+  const phone = document.getElementById('new-phone').value.trim();
+  const notes = document.getElementById('new-notes').value.trim();
+  if (!name || !phone) { tg.showAlert('Введи имя и телефон'); return; }
+  try {
+    const res = await api('POST', '/api/clients', { name, phone, notes });
+    tg.showAlert('✅ Клиент добавлен!');
+    showClient(res.id);
+  } catch (e) { tg.showAlert('Ошибка: ' + e.message); }
+}
+
+// ── Add appointment ───────────────────────────────────────────────
+function showAddAppointment() {
+  previousScreen = 'client';
+  showScreen('add-appointment', null);
+  document.getElementById('appt-procedure').value = '';
+  document.getElementById('appt-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('appt-price').value = '';
+  document.getElementById('appt-notes').value = '';
+}
+
+async function saveAppointment() {
+  const procedure = document.getElementById('appt-procedure').value.trim();
+  const date      = document.getElementById('appt-date').value;
+  const price     = parseInt(document.getElementById('appt-price').value) || 0;
+  const notes     = document.getElementById('appt-notes').value.trim();
+  if (!procedure || !date) { tg.showAlert('Введи процедуру и дату'); return; }
+  try {
+    await api('POST', '/api/appointments', {
+      client_id: currentClientId,
+      procedure, appointment_date: date, price, notes,
+    });
+    tg.showAlert('✅ Запись сохранена!');
+    showClient(currentClientId);
+  } catch (e) { tg.showAlert('Ошибка: ' + e.message); }
+}
+
+// ── Edit client ───────────────────────────────────────────────────
+function showEditClient() {
+  tg.showAlert('Редактирование пока в боте (нажми ✏️ Изменить в меню)');
+}
+
+// ── Stats ─────────────────────────────────────────────────────────
+async function showStats() {
+  showScreen('stats', 'stats');
+  try {
+    const s = await api('GET', '/api/stats');
+    document.getElementById('stat-clients').textContent      = s.total_clients;
+    document.getElementById('stat-appointments').textContent = s.total_appointments;
+    document.getElementById('stat-month').textContent = formatMoney(s.month_earnings);
+    document.getElementById('stat-total').textContent = formatMoney(s.total_earnings);
+    const medals = ['🥇','🥈','🥉'];
+    document.getElementById('top-procedures').innerHTML =
+      '<div class="top-title">🏆 Топ процедуры</div>' +
+      (s.top_procedures?.length
+        ? s.top_procedures.map((p, i) => `
+            <div class="top-item">
+              <div class="top-medal">${medals[i]}</div>
+              <div class="top-name">${p[0]}</div>
+              <div class="top-count">${p[1]} раз</div>
+            </div>`).join('')
+        : '<div style="color:#aaa;font-size:13px">Пока нет данных</div>');
+  } catch (e) { console.error(e); }
+}
+
+// ── Inactive ──────────────────────────────────────────────────────
+async function showInactive() {
+  showScreen('inactive', null);
+  try {
+    const data = await api('GET', '/api/inactive');
+    const list = data.clients || [];
+    const el = document.getElementById('inactive-list');
+    if (!list.length) {
+      el.innerHTML = '<div class="empty"><div class="emoji">✨</div><div>Все клиенты активны!</div></div>';
+    } else {
+      el.innerHTML = list.map(c => `
+        <div class="client-card" onclick="showClient(${c.id})">
+          <div class="client-avatar">💅</div>
+          <div class="client-info">
+            <div class="client-name">${c.name}</div>
+            <div class="client-meta">Не приходила ${c.days_ago} дней</div>
+          </div>
+          <div class="client-badge" style="background:#fff3e0;color:#e67e22">${c.days_ago}д</div>
+        </div>
+      `).join('');
+    }
+  } catch (e) { console.error(e); }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
+function formatDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function formatMoney(n) {
+  return (n || 0).toLocaleString('ru-RU') + ' ₽';
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+showHome();
+</script>
+</body>
+</html>

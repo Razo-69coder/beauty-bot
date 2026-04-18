@@ -1,9 +1,15 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
+from config import WEBHOOK_URL
+
+WEBAPP_URL = f"{WEBHOOK_URL}/app" if WEBHOOK_URL else ""
 
 
 # ─── Главное меню ───────────────────────────────────────────────
 def main_menu() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
+    rows = []
+    if WEBAPP_URL:
+        rows.append([InlineKeyboardButton(text="💅 Открыть Beauty Book", web_app={"url": WEBAPP_URL})])
+    rows += [
         [
             InlineKeyboardButton(text="👥 Мои клиенты", callback_data="clients_list"),
             InlineKeyboardButton(text="➕ Новый клиент", callback_data="client_add"),
@@ -22,7 +28,8 @@ def main_menu() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton(text="💡 Помощь", callback_data="help"),
         ],
-    ])
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 # ─── Список клиентов ─────────────────────────────────────────────
