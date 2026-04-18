@@ -149,6 +149,49 @@ body {
 .empty   { text-align: center; padding: 30px 20px; color: #aaa; }
 .empty .emoji { font-size: 40px; margin-bottom: 10px; }
 
+/* Schedule */
+.date-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  background: white; border-radius: 14px; padding: 10px 14px;
+  margin-bottom: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.date-nav-btn {
+  background: #FFF0F5; border: none; color: #C9657A; font-size: 18px;
+  font-weight: 700; width: 36px; height: 36px; border-radius: 10px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.date-nav-label { font-size: 15px; font-weight: 700; text-align: center; flex: 1; }
+.date-nav-sub   { font-size: 11px; color: #999; text-align: center; }
+
+.appt-card {
+  background: white; border-radius: 14px; padding: 14px 15px;
+  margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.appt-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.appt-time { font-size: 18px; font-weight: 800; color: #C9657A; }
+.appt-status {
+  font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
+}
+.appt-status.pending   { background: #FFF3CD; color: #B8860B; }
+.appt-status.confirmed { background: #E8F8E8; color: #2D7A2D; }
+.appt-status.cancelled { background: #FFE8E8; color: #C04040; }
+.appt-client { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+.appt-proc   { font-size: 13px; color: #888; margin-bottom: 8px; }
+.appt-phone  { font-size: 13px; color: #C9657A; }
+.appt-actions { display: flex; gap: 8px; margin-top: 10px; }
+.appt-btn {
+  flex: 1; padding: 9px; border-radius: 10px; border: none;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.appt-btn-confirm { background: #E8F8E8; color: #2D7A2D; }
+.appt-btn-cancel  { background: #FFE8E8; color: #C04040; }
+
+.today-btn {
+  background: #FFF0F5; border: none; color: #C9657A; font-size: 12px;
+  font-weight: 600; padding: 5px 12px; border-radius: 20px; cursor: pointer;
+  margin-left: 8px;
+}
+
 /* Themes */
 body.theme-gold .header        { background: linear-gradient(135deg, #F0C060, #C8962A); }
 body.theme-gold .menu-card.accent { background: linear-gradient(135deg, #F0C060, #C8962A); }
@@ -304,6 +347,22 @@ body.theme-lavender .form-input:focus { border-color: #9060C0; }
   <button class="btn btn-primary btn-full" onclick="saveAppointment()">✅ Сохранить</button>
 </div>
 
+<!-- РАСПИСАНИЕ -->
+<div class="screen" id="screen-schedule">
+  <div class="date-nav">
+    <button class="date-nav-btn" onclick="scheduleDay(-1)">‹</button>
+    <div>
+      <div class="date-nav-label" id="schedule-date-label">—</div>
+      <div class="date-nav-sub" id="schedule-date-sub"></div>
+    </div>
+    <div style="display:flex;align-items:center">
+      <button class="today-btn" onclick="scheduleToday()">Сегодня</button>
+      <button class="date-nav-btn" style="margin-left:6px" onclick="scheduleDay(+1)">›</button>
+    </div>
+  </div>
+  <div id="schedule-list"><div class="loading">Загрузка...</div></div>
+</div>
+
 <!-- НЕ ПРИХОДИЛИ -->
 <div class="screen" id="screen-inactive">
   <div class="section-title">🔔 Давно не приходили</div>
@@ -352,8 +411,8 @@ body.theme-lavender .form-input:focus { border-color: #9060C0; }
   <div class="nav-item" id="nav-clients" onclick="showClients()">
     <div class="nav-icon">👥</div><div class="nav-label">Клиенты</div>
   </div>
-  <div class="nav-item" id="nav-inactive" onclick="showInactive()">
-    <div class="nav-icon">🔔</div><div class="nav-label">Напомнить</div>
+  <div class="nav-item" id="nav-schedule" onclick="showSchedule()">
+    <div class="nav-icon">📅</div><div class="nav-label">Расписание</div>
   </div>
   <div class="nav-item" id="nav-stats" onclick="showStats()">
     <div class="nav-icon">📊</div><div class="nav-label">Статистика</div>
@@ -627,6 +686,85 @@ async function saveReminderDays() {
     await api('PUT', '/api/settings/reminder', { days });
     tg.showAlert('✅ Сохранено!');
   } catch (e) { tg.showAlert('Ошибка: ' + e.message); }
+}
+
+// ── Schedule ──────────────────────────────────────────────────────────
+const MONTHS_SHORT = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+const DAYS_FULL = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
+
+let scheduleDate = new Date();
+scheduleDate.setHours(0,0,0,0);
+
+async function showSchedule() {
+  showScreen('schedule', 'schedule');
+  await loadSchedule();
+}
+
+function scheduleToday() {
+  scheduleDate = new Date();
+  scheduleDate.setHours(0,0,0,0);
+  loadSchedule();
+}
+
+function scheduleDay(delta) {
+  scheduleDate = new Date(scheduleDate);
+  scheduleDate.setDate(scheduleDate.getDate() + delta);
+  loadSchedule();
+}
+
+async function loadSchedule() {
+  const dateStr = scheduleDate.toISOString().slice(0, 10);
+  const today   = new Date(); today.setHours(0,0,0,0);
+  const diff    = Math.round((scheduleDate - today) / 86400000);
+
+  const dayLabel = diff === 0 ? 'Сегодня' : diff === 1 ? 'Завтра' : diff === -1 ? 'Вчера' :
+    DAYS_FULL[scheduleDate.getDay()];
+  document.getElementById('schedule-date-label').textContent =
+    `${scheduleDate.getDate()} ${MONTHS_SHORT[scheduleDate.getMonth()]}`;
+  document.getElementById('schedule-date-sub').textContent = dayLabel;
+
+  const el = document.getElementById('schedule-list');
+  el.innerHTML = '<div class="loading">Загрузка...</div>';
+  try {
+    const appts = await api('GET', `/api/schedule?date=${dateStr}`);
+    renderSchedule(appts);
+  } catch (e) {
+    el.innerHTML = '<div class="loading">Ошибка загрузки</div>';
+  }
+}
+
+function renderSchedule(appts) {
+  const el = document.getElementById('schedule-list');
+  if (!appts.length) {
+    el.innerHTML = '<div class="empty"><div class="emoji">📅</div><div>Записей нет</div></div>';
+    return;
+  }
+  const STATUS_LABEL = { pending: 'Ожидает', confirmed: 'Подтверждено', cancelled: 'Отменено' };
+  el.innerHTML = appts.map(a => `
+    <div class="appt-card" id="appt-${a.id}">
+      <div class="appt-top">
+        <div class="appt-time">${a.time || '—'}</div>
+        <div class="appt-status ${a.status}">${STATUS_LABEL[a.status] || a.status}</div>
+      </div>
+      <div class="appt-client">${a.client_name}</div>
+      <div class="appt-proc">${a.procedure}</div>
+      ${a.phone && a.phone !== '—' ? `<div class="appt-phone">📱 ${a.phone}</div>` : ''}
+      ${a.status !== 'cancelled' ? `
+      <div class="appt-actions">
+        ${a.status === 'pending' ? `<button class="appt-btn appt-btn-confirm" onclick="setApptStatus(${a.id},'confirmed')">✅ Подтвердить</button>` : ''}
+        <button class="appt-btn appt-btn-cancel" onclick="setApptStatus(${a.id},'cancelled')">❌ Отменить</button>
+      </div>` : ''}
+    </div>
+  `).join('');
+}
+
+async function setApptStatus(apptId, status) {
+  try {
+    await api('PATCH', `/api/appointments/${apptId}/status`, { status });
+    await loadSchedule();
+  } catch (e) {
+    tg?.showAlert('Ошибка: ' + e.message);
+  }
 }
 
 // ── Init ──────────────────────────────────────────────────────────
