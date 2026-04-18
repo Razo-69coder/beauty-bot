@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: beauty-book-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    plan: free
+
+    envVars:
+      - key: BOT_TOKEN
+        sync: false        # вводишь вручную в Render Dashboard
+
+      - key: WEBHOOK_URL
+        fromService:
+          type: web
+          name: beauty-book-bot
+          property: host
+          format: "https://{host}"
+
+      - key: WEBHOOK_SECRET
+        generateValue: true
+
+      - key: DB_PATH
+        value: /data/beauty_bot.db
+
+    disk:
+      name: beauty-data
+      mountPath: /data
+      sizeGB: 1
