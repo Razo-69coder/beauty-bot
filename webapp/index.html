@@ -290,6 +290,12 @@ body {
   <div class="nav-item" id="nav-clients" onclick="showClients()">
     <div class="nav-icon">👥</div><div class="nav-label">Клиенты</div>
   </div>
+  <div class="nav-item" id="nav-add" onclick="showAddClient()">
+    <div class="nav-icon">➕</div><div class="nav-label">Добавить</div>
+  </div>
+  <div class="nav-item" id="nav-inactive" onclick="showInactive()">
+    <div class="nav-icon">🔔</div><div class="nav-label">Напомнить</div>
+  </div>
   <div class="nav-item" id="nav-stats" onclick="showStats()">
     <div class="nav-icon">📊</div><div class="nav-label">Статистика</div>
   </div>
@@ -423,7 +429,7 @@ async function showClient(id) {
 // ── Add client ────────────────────────────────────────────────────
 function showAddClient() {
   previousScreen = 'clients';
-  showScreen('add-client', 'clients');
+  showScreen('add-client', 'add');
   document.getElementById('new-name').value = '';
   document.getElementById('new-phone').value = '';
   document.getElementById('new-notes').value = '';
@@ -497,7 +503,7 @@ async function showStats() {
 
 // ── Inactive ──────────────────────────────────────────────────────
 async function showInactive() {
-  showScreen('inactive', null);
+  showScreen('inactive', 'inactive');
   try {
     const data = await api('GET', '/api/inactive');
     const list = data.clients || [];

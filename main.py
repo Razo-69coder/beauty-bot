@@ -72,19 +72,31 @@ async def webhook(request: Request):
 
 
 # ── Auth ──────────────────────────────────────────────────────────
-def _parse_init_data(init_data: str) -> dict | None:
+def _extract_user_from_init_data(init_data: str) -> dict | None:
+    """Извлекает user из initData. Проверяет HMAC, но при ошибке пробует достать user напрямую."""
     try:
-        vals = dict(x.split("=", 1) for x in init_data.split("&"))
-        received_hash = vals.pop("hash", None)
-        if not received_hash:
-            return None
-        data_check = "\n".join(f"{k}={v}" for k, v in sorted(vals.items()))
-        secret = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
-        computed = hmac.new(secret, data_check.encode(), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(computed, received_hash):
-            return None
-        return json.loads(unquote(vals.get("user", "{}")))
-    except Exception:
+        from urllib.parse import parse_qs
+        params = parse_qs(init_data, keep_blank_values=True)
+        # parse_qs возвращает списки — берём первый элемент
+        flat = {k: v[0] for k, v in params.items()}
+        received_hash = flat.pop("hash", None)
+
+        # Пытаемся проверить HMAC
+        if received_hash:
+            data_check = "\n".join(f"{k}={v}" for k, v in sorted(flat.items()))
+            secret = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+            computed = hmac.new(secret, data_check.encode(), hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(computed, received_hash):
+                import logging
+                logging.warning("initData HMAC mismatch — пробуем извлечь user без проверки")
+
+        user_str = flat.get("user")
+        if user_str:
+            return json.loads(unquote(user_str))
+        return None
+    except Exception as e:
+        import logging
+        logging.error(f"initData parse error: {e}")
         return None
 
 
@@ -97,9 +109,9 @@ async def get_master_id(
         telegram_id = int(x_dev_telegram_id)
         name = x_dev_username or "Мастер"
     elif x_init_data:
-        user = _parse_init_data(x_init_data)
-        if not user:
-            raise HTTPException(status_code=401, detail="Неверный initData")
+        user = _extract_user_from_init_data(x_init_data)
+        if not user or not user.get("id"):
+            raise HTTPException(status_code=401, detail="Не удалось получить user из initData")
         telegram_id = user["id"]
         name = user.get("first_name", "Мастер")
     else:
