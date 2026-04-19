@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Beauty Book — Личный кабинет</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -833,12 +836,21 @@ async function requestCode() {
   if (!tgUserId) return;
   document.getElementById('login-state-sending').style.display = '';
   document.getElementById('login-state-code').style.display = 'none';
+  document.getElementById('login-state-manual').style.display = 'none';
   try {
-    await fetch(API + '/api/auth/request-code', {
+    const r = await fetch(API + '/api/auth/request-code', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({telegram_id: tgUserId}),
     });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      document.getElementById('login-state-sending').style.display = 'none';
+      document.getElementById('login-state-manual').style.display = '';
+      document.getElementById('code-err-manual').textContent = d.detail || 'Ошибка. Сначала запустите бота командой /start';
+      document.getElementById('code-err-manual').style.display = '';
+      return;
+    }
     document.getElementById('login-state-sending').style.display = 'none';
     document.getElementById('login-state-code').style.display = '';
     document.getElementById('inp-code').focus();
