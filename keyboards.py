@@ -2,7 +2,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime
 from config import WEBHOOK_URL
 
-WEBAPP_URL = f"{WEBHOOK_URL}/app/dashboard.html" if WEBHOOK_URL else ""
+WEBAPP_URL = f"{WEBHOOK_URL}/app/dashboard.html?v=3" if WEBHOOK_URL else ""
 
 DAYS_SHORT = {0: "Пн", 1: "Вт", 2: "Ср", 3: "Чт", 4: "Пт", 5: "Сб", 6: "Вс"}
 
