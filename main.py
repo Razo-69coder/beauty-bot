@@ -503,5 +503,15 @@ async def dash_payment(body: _PaymentUpdate, master_id: int = Depends(get_jwt_ma
     return {"ok": True}
 
 
-# ── Статика (webapp) ──────────────────────────────────────────────────
+# ── dashboard.html отдаётся без кеша (Telegram кеширует WebApp агрессивно) ──
+@app.get("/app/dashboard.html")
+async def serve_dashboard():
+    from fastapi.responses import FileResponse
+    return FileResponse("webapp/dashboard.html", headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    })
+
+# ── Остальная статика (webapp) ────────────────────────────────────────
 app.mount("/app", StaticFiles(directory="webapp", html=True), name="webapp")
