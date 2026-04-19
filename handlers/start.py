@@ -4,7 +4,7 @@ from aiogram.filters import CommandStart
 from aiogram.filters.command import CommandObject
 from aiogram.fsm.context import FSMContext
 
-from database import get_or_create_master
+from database import get_or_create_master, create_login_code
 from keyboards import main_menu
 
 router = Router()
@@ -67,6 +67,20 @@ async def cb_cancel(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.message.edit_text(
         WELCOME_TEXT, reply_markup=main_menu(), parse_mode="Markdown"
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "get_login_code")
+async def cb_get_login_code(callback: CallbackQuery):
+    tg_id = callback.from_user.id
+    code = await create_login_code(tg_id)
+    await callback.message.answer(
+        f"🔑 *Ваш код входа в Beauty Book*\n\n"
+        f"`{code}`\n\n"
+        f"Введите этот код на странице входа.\n"
+        f"_Код действует 10 минут._",
+        parse_mode="Markdown"
     )
     await callback.answer()
 

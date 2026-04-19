@@ -552,6 +552,20 @@ async def verify_login_code(telegram_id: int, code: str) -> bool:
     return True
 
 
+async def verify_login_code_by_code(code: str) -> int | None:
+    """Проверяет код без telegram_id, возвращает telegram_id мастера или None."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, telegram_id FROM login_codes WHERE code=$1 AND expires_at > NOW() AND used=0",
+            code
+        )
+        if not row:
+            return None
+        await conn.execute("UPDATE login_codes SET used=1 WHERE id=$1", row['id'])
+    return row['telegram_id']
+
+
 # ── Веб-панель: настройки мастера ─────────────────────────────────────
 
 async def get_master_full(master_id: int) -> dict | None:

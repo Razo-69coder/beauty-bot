@@ -13,12 +13,13 @@
   --primary-mid: #F8C8D8;
   --accent: #E8A0BF;
   --bg: #FAF0F4;
-  --card: #ffffff;
+  --card: rgba(255,255,255,0.9);
   --text: #3D2B2B;
   --text-muted: #999;
   --border: #F0D0E0;
   --shadow: rgba(200, 100, 120, 0.12);
   --shadow-strong: rgba(200, 100, 120, 0.22);
+  --bg-image: url('https://images.unsplash.com/photo-1604654894610-df63bc536371?w=900&q=70');
 }
 [data-theme="peach"] {
   --primary: #C8845A;
@@ -27,12 +28,13 @@
   --primary-mid: #F5D5B8;
   --accent: #F0C09A;
   --bg: #FAF2EE;
-  --card: #ffffff;
+  --card: rgba(255,255,255,0.9);
   --text: #3D2B1B;
   --text-muted: #a08070;
   --border: #F0D8C0;
   --shadow: rgba(200, 130, 80, 0.12);
   --shadow-strong: rgba(200, 130, 80, 0.22);
+  --bg-image: url('https://images.unsplash.com/photo-1560066984-138dadb4c035?w=900&q=70');
 }
 
 /* ── Сброс ────────────────────────────────────────────────────── */
@@ -49,7 +51,7 @@ body {
 body::before {
   content: '';
   position: fixed; inset: 0;
-  background-image: url('https://images.unsplash.com/photo-1595475207225-428b62bda831?w=900&q=70');
+  background-image: var(--bg-image);
   background-size: cover;
   background-position: center;
   filter: blur(7px);
@@ -57,6 +59,7 @@ body::before {
   opacity: 0.45;
   z-index: 0;
   pointer-events: none;
+  transition: background-image 0.4s ease;
 }
 
 /* ── Экраны ───────────────────────────────────────────────────── */
@@ -87,7 +90,7 @@ body::before {
 /* ── Нижняя навигация ─────────────────────────────────────────── */
 .nav-bar {
   position: fixed; bottom: 0; left: 0; right: 0;
-  background: var(--card); border-top: 1px solid var(--border);
+  background: #fff; border-top: 1px solid var(--border);
   display: flex; z-index: 100;
   box-shadow: 0 -2px 16px var(--shadow);
 }
@@ -105,6 +108,8 @@ body::before {
   background: var(--card); border-radius: 18px;
   box-shadow: 0 2px 14px var(--shadow);
   overflow: hidden;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 .content { padding: 16px; }
 
@@ -204,6 +209,8 @@ body::before {
 .stat-card {
   background: var(--card); border-radius: 16px; padding: 16px;
   box-shadow: 0 2px 12px var(--shadow);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 .stat-card .stat-icon  { font-size: 24px; margin-bottom: 8px; }
 .stat-card .stat-value { font-size: 26px; font-weight: 900; color: var(--primary); }
@@ -213,6 +220,8 @@ body::before {
   background: var(--card); border-radius: 16px; padding: 14px 16px;
   margin-bottom: 12px; box-shadow: 0 2px 10px var(--shadow);
   display: flex; align-items: center; gap: 12px;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 .booking-link-icon { font-size: 26px; flex-shrink: 0; }
 .booking-link-text { flex: 1; min-width: 0; }
@@ -245,6 +254,8 @@ body::before {
   background: var(--card); padding: 12px 8px; display: flex;
   overflow-x: auto; gap: 6px; scrollbar-width: none;
   box-shadow: 0 2px 8px var(--shadow); margin-bottom: 2px;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 .week-strip::-webkit-scrollbar { display: none; }
 .day-pill {
@@ -264,6 +275,8 @@ body::before {
   background: var(--card); border-radius: 14px; padding: 14px;
   margin-bottom: 10px; box-shadow: 0 2px 8px var(--shadow);
   display: flex; gap: 12px; align-items: flex-start;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 .appt-time-col { text-align: center; flex-shrink: 0; }
 .appt-time { font-size: 16px; font-weight: 900; color: var(--primary); }
@@ -287,6 +300,8 @@ body::before {
   background: var(--card); border-radius: 14px; padding: 10px 14px;
   display: flex; align-items: center; gap: 9px;
   box-shadow: 0 2px 8px var(--shadow); margin-bottom: 12px;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 .search-wrap input { border: none; outline: none; background: none; font-size: 14px; flex: 1; color: var(--text); }
 
@@ -295,6 +310,8 @@ body::before {
   margin-bottom: 10px; box-shadow: 0 2px 8px var(--shadow);
   display: flex; align-items: center; gap: 12px; cursor: pointer;
   transition: transform 0.1s;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 .client-row:active { transform: scale(0.98); }
 .client-ava {
@@ -317,6 +334,8 @@ body::before {
 .settings-section {
   background: var(--card); border-radius: 18px;
   box-shadow: 0 2px 12px var(--shadow); margin-bottom: 14px; overflow: hidden;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 .settings-row {
   display: flex; align-items: center; justify-content: space-between;
@@ -345,7 +364,7 @@ body::before {
 }
 .overlay.open { display: flex; }
 .overlay-sheet {
-  background: var(--card); border-radius: 22px 22px 0 0;
+  background: #fff; border-radius: 22px 22px 0 0;
   padding: 20px 16px 32px; width: 100%; animation: slideUp 0.25s ease;
 }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -375,39 +394,29 @@ body::before {
     <div class="login-sub">Личный кабинет мастера</div>
 
     <div class="card login-card" style="padding: 24px;">
-      <!-- Шаг 1: ввод Telegram ID -->
-      <div class="login-step active" id="lstep-1">
-        <div class="field">
-          <label>Ваш Telegram ID</label>
-          <input id="inp-tgid" type="number" placeholder="123456789"
-            inputmode="numeric" oninput="checkTgId()">
-        </div>
-        <div id="login-err" class="alert alert-error" style="display:none"></div>
-        <button class="btn btn-primary" id="btn-get-code" disabled onclick="requestCode()">
-          Получить код в Telegram
-        </button>
-        <div class="code-hint" style="margin-top:10px">
-          Узнать свой ID: напишите <b>@userinfobot</b> в Telegram
+      <!-- Инструкция как получить код -->
+      <div style="text-align:center; margin-bottom:20px;">
+        <div style="font-size:13px; color:var(--text-muted); line-height:1.7; text-align:left;">
+          <b>Как войти:</b><br>
+          1️⃣ Откройте бота в Telegram<br>
+          2️⃣ Нажмите кнопку <b>🔑 Войти в личный кабинет</b><br>
+          3️⃣ Скопируйте 6-значный код из сообщения<br>
+          4️⃣ Введите код ниже
         </div>
       </div>
 
-      <!-- Шаг 2: ввод кода -->
-      <div class="login-step" id="lstep-2">
-        <div style="text-align:center; margin-bottom:16px;">
-          <div style="font-size:36px">📱</div>
-          <div style="font-size:15px; font-weight:700; margin-top:8px">Введите код из Telegram</div>
-          <div style="font-size:13px; color:var(--text-muted); margin-top:4px">Код отправлен на аккаунт <span id="tg-id-display"></span></div>
-        </div>
-        <div class="field">
-          <input id="inp-code" class="code-input" type="text" maxlength="6"
-            placeholder="000000" inputmode="numeric" oninput="checkCode()">
-        </div>
-        <div id="code-err" class="alert alert-error" style="display:none"></div>
-        <button class="btn btn-primary" id="btn-verify" disabled onclick="verifyCode()">
-          Войти
-        </button>
-        <div class="switch-step" onclick="backToStep1()">← Изменить Telegram ID</div>
+      <!-- Ввод кода -->
+      <div style="text-align:center; margin-bottom:16px;">
+        <div style="font-size:15px; font-weight:700;">Введите код из Telegram</div>
       </div>
+      <div class="field">
+        <input id="inp-code" class="code-input" type="text" maxlength="6"
+          placeholder="000000" inputmode="numeric" oninput="checkCode()">
+      </div>
+      <div id="code-err" class="alert alert-error" style="display:none"></div>
+      <button class="btn btn-primary" id="btn-verify" disabled onclick="verifyCode()">
+        Войти
+      </button>
     </div>
   </div>
 </div>
@@ -798,45 +807,12 @@ function setTheme(t) {
 
 // ─── Вход ──────────────────────────────────────────────────────────
 
-function checkTgId() {
-  const v = document.getElementById('inp-tgid').value.trim();
-  document.getElementById('btn-get-code').disabled = !(v.length >= 5);
-}
-
-async function requestCode() {
-  const tgId = parseInt(document.getElementById('inp-tgid').value.trim());
-  const btn = document.getElementById('btn-get-code');
-  const errEl = document.getElementById('login-err');
-  errEl.style.display = 'none';
-  btn.disabled = true;
-  btn.textContent = 'Отправляем...';
-  try {
-    await fetch(API + '/api/auth/request-code', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({telegram_id: tgId}),
-    }).then(async r => {
-      if (!r.ok) { const d = await r.json(); throw new Error(d.detail); }
-    });
-    document.getElementById('tg-id-display').textContent = tgId;
-    document.getElementById('lstep-1').classList.remove('active');
-    document.getElementById('lstep-2').classList.add('active');
-    document.getElementById('inp-code').focus();
-  } catch (e) {
-    errEl.textContent = e.message;
-    errEl.style.display = '';
-    btn.disabled = false;
-    btn.textContent = 'Получить код в Telegram';
-  }
-}
-
 function checkCode() {
   const v = document.getElementById('inp-code').value.trim();
   document.getElementById('btn-verify').disabled = v.length < 6;
 }
 
 async function verifyCode() {
-  const tgId = parseInt(document.getElementById('inp-tgid').value.trim());
   const code = document.getElementById('inp-code').value.trim();
   const btn = document.getElementById('btn-verify');
   const errEl = document.getElementById('code-err');
@@ -844,10 +820,10 @@ async function verifyCode() {
   btn.disabled = true;
   btn.textContent = 'Входим...';
   try {
-    const data = await fetch(API + '/api/auth/verify', {
+    const data = await fetch(API + '/api/auth/verify-code', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({telegram_id: tgId, code}),
+      body: JSON.stringify({code}),
     }).then(async r => {
       if (!r.ok) { const d = await r.json(); throw new Error(d.detail); }
       return r.json();
@@ -865,13 +841,6 @@ async function verifyCode() {
   }
 }
 
-function backToStep1() {
-  document.getElementById('lstep-2').classList.remove('active');
-  document.getElementById('lstep-1').classList.add('active');
-  document.getElementById('inp-code').value = '';
-  document.getElementById('code-err').style.display = 'none';
-}
-
 function afterLogin() {
   document.getElementById('nav-bar').style.display = 'flex';
   goScreen('dash');
@@ -885,12 +854,8 @@ function logout() {
   document.getElementById('nav-bar').style.display = 'none';
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-login').classList.add('active');
-  // сброс формы
-  document.getElementById('inp-tgid').value = '';
   document.getElementById('inp-code').value = '';
-  document.getElementById('lstep-1').classList.add('active');
-  document.getElementById('lstep-2').classList.remove('active');
-  document.getElementById('btn-get-code').disabled = true;
+  document.getElementById('btn-verify').disabled = true;
 }
 
 // ─── Дашборд ───────────────────────────────────────────────────────

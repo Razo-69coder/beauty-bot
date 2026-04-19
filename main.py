@@ -28,7 +28,7 @@ from database import (
     get_reminder_days_by_master, update_reminder_days_by_master,
     get_master_info, get_master_info_by_telegram, get_available_slots,
     get_master_schedule, update_appointment_status,
-    create_login_code, verify_login_code,
+    create_login_code, verify_login_code, verify_login_code_by_code,
     get_master_full, update_master_full_settings, update_master_payment,
     search_clients,
 )
@@ -398,6 +398,9 @@ class _VerifyCode(BaseModel):
     telegram_id: int
     code: str
 
+class _VerifyCodeOnly(BaseModel):
+    code: str
+
 class _MasterSettings(BaseModel):
     name: str
     work_start: int = 10
@@ -427,6 +430,20 @@ async def auth_verify(body: _VerifyCode):
     m = await get_master_info_by_telegram(body.telegram_id)
     full = await get_master_full(m["id"])
     token = _create_jwt(body.telegram_id, m["id"])
+    return {"token": token, "master": full}
+
+
+@app.post("/api/auth/verify-code")
+async def auth_verify_code(body: _VerifyCodeOnly):
+    """Новый вход: только код, без ввода Telegram ID."""
+    tg_id = await verify_login_code_by_code(body.code)
+    if not tg_id:
+        raise HTTPException(400, "Неверный или устаревший код")
+    m = await get_master_info_by_telegram(tg_id)
+    if not m:
+        raise HTTPException(404, "Мастер не найден")
+    full = await get_master_full(m["id"])
+    token = _create_jwt(tg_id, m["id"])
     return {"token": token, "master": full}
 
 
