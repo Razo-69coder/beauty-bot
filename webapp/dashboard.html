@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Beauty Book — Личный кабинет</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 /* ── Переменные тем ───────────────────────────────────────────── */
 :root {
@@ -394,29 +395,48 @@ body::before {
     <div class="login-sub">Личный кабинет мастера</div>
 
     <div class="card login-card" style="padding: 24px;">
-      <!-- Инструкция как получить код -->
-      <div style="text-align:center; margin-bottom:20px;">
-        <div style="font-size:13px; color:var(--text-muted); line-height:1.7; text-align:left;">
-          <b>Как войти:</b><br>
-          1️⃣ Откройте бота в Telegram<br>
-          2️⃣ Нажмите кнопку <b>🔑 Войти в личный кабинет</b><br>
-          3️⃣ Скопируйте 6-значный код из сообщения<br>
-          4️⃣ Введите код ниже
+
+      <!-- Состояние: отправляем код -->
+      <div id="login-state-sending" style="text-align:center; padding: 20px 0;">
+        <div class="spinner" style="margin: 0 auto 12px;"></div>
+        <div style="font-size:14px; color:var(--text-muted);">Отправляем код в Telegram...</div>
+      </div>
+
+      <!-- Состояние: ввод кода -->
+      <div id="login-state-code" style="display:none">
+        <div style="text-align:center; margin-bottom:20px;">
+          <div style="font-size:32px; margin-bottom:8px;">📩</div>
+          <div style="font-size:15px; font-weight:700;">Код отправлен в Telegram</div>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:4px;">Введите 6-значный код из бота</div>
+        </div>
+        <div class="field">
+          <input id="inp-code" class="code-input" type="text" maxlength="6"
+            placeholder="000000" inputmode="numeric" oninput="checkCode()">
+        </div>
+        <div id="code-err" class="alert alert-error" style="display:none"></div>
+        <button class="btn btn-primary" id="btn-verify" disabled onclick="verifyCode()">Войти</button>
+        <div style="text-align:center; margin-top:12px;">
+          <span style="font-size:13px; color:var(--primary); cursor:pointer; text-decoration:underline;"
+            onclick="requestCode()">Отправить код повторно</span>
         </div>
       </div>
 
-      <!-- Ввод кода -->
-      <div style="text-align:center; margin-bottom:16px;">
-        <div style="font-size:15px; font-weight:700;">Введите код из Telegram</div>
+      <!-- Состояние: ошибка (не из бота) -->
+      <div id="login-state-manual" style="display:none">
+        <div style="font-size:13px; color:var(--text-muted); line-height:1.7; margin-bottom:16px;">
+          <b>Как войти:</b><br>
+          1️⃣ Откройте бота в Telegram<br>
+          2️⃣ Нажмите кнопку <b>🔑 Войти в личный кабинет</b><br>
+          3️⃣ Введите 6-значный код ниже
+        </div>
+        <div class="field">
+          <input id="inp-code-manual" class="code-input" type="text" maxlength="6"
+            placeholder="000000" inputmode="numeric" oninput="checkCodeManual()">
+        </div>
+        <div id="code-err-manual" class="alert alert-error" style="display:none"></div>
+        <button class="btn btn-primary" id="btn-verify-manual" disabled onclick="verifyCodeManual()">Войти</button>
       </div>
-      <div class="field">
-        <input id="inp-code" class="code-input" type="text" maxlength="6"
-          placeholder="000000" inputmode="numeric" oninput="checkCode()">
-      </div>
-      <div id="code-err" class="alert alert-error" style="display:none"></div>
-      <button class="btn btn-primary" id="btn-verify" disabled onclick="verifyCode()">
-        Войти
-      </button>
+
     </div>
   </div>
 </div>
@@ -807,15 +827,43 @@ function setTheme(t) {
 
 // ─── Вход ──────────────────────────────────────────────────────────
 
+let tgUserId = null;  // Telegram ID из WebApp, если доступен
+
+async function requestCode() {
+  if (!tgUserId) return;
+  document.getElementById('login-state-sending').style.display = '';
+  document.getElementById('login-state-code').style.display = 'none';
+  try {
+    await fetch(API + '/api/auth/request-code', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({telegram_id: tgUserId}),
+    });
+    document.getElementById('login-state-sending').style.display = 'none';
+    document.getElementById('login-state-code').style.display = '';
+    document.getElementById('inp-code').focus();
+  } catch (e) {
+    showManualLogin();
+  }
+}
+
+function showManualLogin() {
+  document.getElementById('login-state-sending').style.display = 'none';
+  document.getElementById('login-state-code').style.display = 'none';
+  document.getElementById('login-state-manual').style.display = '';
+}
+
 function checkCode() {
   const v = document.getElementById('inp-code').value.trim();
   document.getElementById('btn-verify').disabled = v.length < 6;
 }
 
-async function verifyCode() {
-  const code = document.getElementById('inp-code').value.trim();
-  const btn = document.getElementById('btn-verify');
-  const errEl = document.getElementById('code-err');
+function checkCodeManual() {
+  const v = document.getElementById('inp-code-manual').value.trim();
+  document.getElementById('btn-verify-manual').disabled = v.length < 6;
+}
+
+async function _doVerify(code, errEl, btn) {
   errEl.style.display = 'none';
   btn.disabled = true;
   btn.textContent = 'Входим...';
@@ -839,6 +887,22 @@ async function verifyCode() {
     btn.disabled = false;
     btn.textContent = 'Войти';
   }
+}
+
+async function verifyCode() {
+  await _doVerify(
+    document.getElementById('inp-code').value.trim(),
+    document.getElementById('code-err'),
+    document.getElementById('btn-verify')
+  );
+}
+
+async function verifyCodeManual() {
+  await _doVerify(
+    document.getElementById('inp-code-manual').value.trim(),
+    document.getElementById('code-err-manual'),
+    document.getElementById('btn-verify-manual')
+  );
 }
 
 function afterLogin() {
@@ -1213,6 +1277,18 @@ document.querySelectorAll('.overlay').forEach(o => {
   // Если уже залогинен — открываем дашборд
   if (token && master) {
     afterLogin();
+    return;
+  }
+
+  // Считываем Telegram ID из WebApp автоматически
+  const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+  if (tgUser?.id) {
+    tgUserId = tgUser.id;
+    window.Telegram.WebApp.ready();
+    requestCode();  // сразу отправляем код, пользователь ничего не вводит
+  } else {
+    // Открыто не из Telegram — показываем ручной режим
+    showManualLogin();
   }
 })();
 </script>
