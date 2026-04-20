@@ -7,8 +7,9 @@ from datetime import datetime, timedelta
 from database import (
     get_master_info_by_telegram, get_available_slots,
     get_client_by_telegram, add_client_with_telegram, add_appointment,
+    get_master_deposit_settings, get_client_type, update_appointment_deposit,
 )
-from keyboards import dates_keyboard, slots_keyboard, booking_confirm_keyboard
+from keyboards import dates_keyboard, slots_keyboard, booking_confirm_keyboard, deposit_client_keyboard
 
 router = Router()
 
@@ -127,6 +128,7 @@ async def cb_select_time(callback: CallbackQuery, state: FSMContext):
     if client:
         client_id = client["id"]
         client_name = client["name"]
+        is_new_client = (await get_client_type(client_id)) == "new"
     else:
         client_name = callback.from_user.full_name or "Клиент"
         client_id = await add_client_with_telegram(
@@ -135,6 +137,11 @@ async def cb_select_time(callback: CallbackQuery, state: FSMContext):
             phone="—",
             telegram_id=callback.from_user.id,
         )
+        is_new_client = True
+
+    # Проверяем настройки предоплаты
+    deposit_cfg = await get_master_deposit_settings(data["master_id"])
+    needs_deposit = deposit_cfg["deposit_enabled"] and is_new_client
 
     appt_id = await add_appointment(
         client_id=client_id,
@@ -150,7 +157,38 @@ async def cb_select_time(callback: CallbackQuery, state: FSMContext):
     date_fmt = datetime.strptime(data["date"], "%Y-%m-%d").strftime("%d.%m.%Y")
     day_name = DAYS_RU[datetime.strptime(data["date"], "%Y-%m-%d").weekday()]
 
-    # Уведомляем мастера
+    if needs_deposit:
+        # Рассчитываем сумму предоплаты (базово от 500 руб. если цена не указана)
+        deposit_pct = deposit_cfg["deposit_percent"]
+        card = deposit_cfg.get("payment_card") or "уточните у мастера"
+        # Сохраняем статус ожидания предоплаты
+        await update_appointment_deposit(appt_id, "pending_payment", 0)
+
+        await callback.message.edit_text(
+            f"💳 *Требуется предоплата*\n\n"
+            f"Для первичной записи необходима предоплата *{deposit_pct}%*.\n\n"
+            f"📅 {date_fmt} ({day_name}) в {time}\n\n"
+            f"Реквизиты для оплаты:\n`{card}`\n\n"
+            f"После оплаты нажмите кнопку ниже — мастер подтвердит получение.",
+            reply_markup=deposit_client_keyboard(appt_id),
+            parse_mode="Markdown",
+        )
+        await callback.answer()
+
+        # Уведомляем мастера о новой записи с предоплатой
+        try:
+            await callback.bot.send_message(
+                data["master_telegram_id"],
+                f"🔔 *Новая запись (ожидает предоплату)*\n\n"
+                f"👤 Клиент: {client_name} _(новый)_\n"
+                f"📅 {date_fmt} ({day_name}), {time}",
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+        return
+
+    # Уведомляем мастера (обычная запись без предоплаты)
     try:
         await callback.bot.send_message(
             data["master_telegram_id"],

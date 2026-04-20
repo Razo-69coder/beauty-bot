@@ -90,7 +90,12 @@ async def init_db():
         # Миграции для существующих баз
         for sql in [
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS payment_card TEXT DEFAULT ''",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS deposit_enabled BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS deposit_percent INTEGER DEFAULT 30",
+            "ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_type TEXT DEFAULT 'new'",
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS review_sent INTEGER DEFAULT 0",
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS deposit_status TEXT DEFAULT 'not_required'",
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS deposit_amount INTEGER DEFAULT 0",
         ]:
             try:
                 await conn.execute(sql)
@@ -686,6 +691,76 @@ async def get_clients_with_telegram(master_id: int) -> list:
         """, master_id)
     return [(r[0], r[1], r[2], r[3], r[4]) for r in rows]
 
+
+# ── Предоплата ────────────────────────────────────────────────────────
+
+async def get_master_deposit_settings(master_id: int) -> dict:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT deposit_enabled, deposit_percent, COALESCE(payment_card,'') as payment_card "
+            "FROM masters WHERE id=$1",
+            master_id
+        )
+    if not row:
+        return {"deposit_enabled": False, "deposit_percent": 30, "payment_card": ""}
+    return {
+        "deposit_enabled": bool(row["deposit_enabled"]),
+        "deposit_percent": row["deposit_percent"] or 30,
+        "payment_card": row["payment_card"],
+    }
+
+
+async def update_master_deposit_settings(master_id: int, enabled: bool, percent: int):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE masters SET deposit_enabled=$1, deposit_percent=$2 WHERE id=$3",
+            enabled, percent, master_id
+        )
+
+
+async def get_client_type(client_id: int) -> str:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        val = await conn.fetchval("SELECT client_type FROM clients WHERE id=$1", client_id)
+    return val or "new"
+
+
+async def mark_client_regular(client_id: int):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE clients SET client_type='regular' WHERE id=$1", client_id)
+
+
+async def update_appointment_deposit(appointment_id: int, deposit_status: str, deposit_amount: int = 0):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE appointments SET deposit_status=$1, deposit_amount=$2 WHERE id=$3",
+            deposit_status, deposit_amount, appointment_id
+        )
+
+
+async def get_appointment_with_client(appointment_id: int) -> dict | None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT a.id, a.master_id, a.client_id, a.procedure,
+                   a.appointment_date, a.time, a.deposit_status, a.deposit_amount,
+                   c.name as client_name, c.telegram_id as client_tg_id,
+                   m.telegram_id as master_tg_id, m.name as master_name
+            FROM appointments a
+            JOIN clients c ON c.id = a.client_id
+            JOIN masters m ON m.id = a.master_id
+            WHERE a.id=$1
+        """, appointment_id)
+    if not row:
+        return None
+    return dict(row)
+
+
+# ── Шаблоны сообщений ─────────────────────────────────────────────────
 
 async def get_clients_inactive_range(master_id: int, min_days: int, max_days: int | None) -> list:
     """Неактивные клиенты с telegram_id в диапазоне дней."""

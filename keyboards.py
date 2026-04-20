@@ -145,6 +145,7 @@ def settings_keyboard(current_days: int) -> InlineKeyboardMarkup:
         row,
         [InlineKeyboardButton(text="🕐 Рабочее время", callback_data="settings_work_hours")],
         [InlineKeyboardButton(text="🔗 Ссылка для записи", callback_data="settings_booking_link")],
+        [InlineKeyboardButton(text="💳 Предоплата", callback_data="settings_deposit")],
         [InlineKeyboardButton(text="💌 Шаблоны сообщений", callback_data="tpl_templates")],
         [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")],
     ])
@@ -293,6 +294,42 @@ def cancel_keyboard() -> InlineKeyboardMarkup:
 def back_to_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")]
+    ])
+
+
+# ─── Предоплата ──────────────────────────────────────────────────────
+def deposit_client_keyboard(appointment_id: int) -> InlineKeyboardMarkup:
+    """Клиент видит это после выбора времени — если нужна предоплата."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Я оплатил(а)", callback_data=f"deposit_paid:{appointment_id}")],
+        [InlineKeyboardButton(text="❌ Отменить запись", callback_data=f"deposit_cancel:{appointment_id}")],
+    ])
+
+
+def deposit_master_keyboard(appointment_id: int) -> InlineKeyboardMarkup:
+    """Мастер подтверждает или отклоняет оплату клиента."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Оплата получена", callback_data=f"deposit_confirm:{appointment_id}"),
+            InlineKeyboardButton(text="❌ Не оплачено", callback_data=f"deposit_reject:{appointment_id}"),
+        ]
+    ])
+
+
+def deposit_settings_keyboard(enabled: bool, percent: int) -> InlineKeyboardMarkup:
+    status = "✅ Включена" if enabled else "❌ Выключена"
+    toggle = "deposit_disable" if enabled else "deposit_enable"
+    percents = [10, 20, 30, 50]
+    prow = [
+        InlineKeyboardButton(
+            text=f"{'✅ ' if p == percent else ''}{p}%",
+            callback_data=f"deposit_pct:{p}"
+        ) for p in percents
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"Предоплата: {status}", callback_data=toggle)],
+        prow,
+        [InlineKeyboardButton(text="◀️ Назад к настройкам", callback_data="settings")],
     ])
 
 
