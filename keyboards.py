@@ -145,6 +145,7 @@ def settings_keyboard(current_days: int) -> InlineKeyboardMarkup:
         row,
         [InlineKeyboardButton(text="🕐 Рабочее время", callback_data="settings_work_hours")],
         [InlineKeyboardButton(text="🔗 Ссылка для записи", callback_data="settings_booking_link")],
+        [InlineKeyboardButton(text="💌 Шаблоны сообщений", callback_data="tpl_templates")],
         [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")],
     ])
 
@@ -293,3 +294,33 @@ def back_to_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")]
     ])
+
+
+# ─── Шаблоны сообщений ───────────────────────────────────────────────
+def templates_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔄 Приглашение на коррекцию (14–30 дн.)", callback_data="tpl_send:correction")],
+        [InlineKeyboardButton(text="💔 «Скучаем по вам» (30+ дн.)", callback_data="tpl_send:miss_you")],
+        [InlineKeyboardButton(text="🎉 Поздравление (все клиенты)", callback_data="tpl_send:congrats")],
+        [InlineKeyboardButton(text="◀️ Назад к настройкам", callback_data="settings")],
+    ])
+
+
+def tpl_confirm_keyboard(tpl_type: str, count: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=f"✅ Отправить {count} клиентам",
+            callback_data=f"tpl_confirm:{tpl_type}"
+        )],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="tpl_templates")],
+    ])
+
+
+# ─── Отзывы ──────────────────────────────────────────────────────────
+def review_rating_keyboard(appointment_id: int) -> InlineKeyboardMarkup:
+    stars = ["⭐", "⭐⭐", "⭐⭐⭐", "⭐⭐⭐⭐", "⭐⭐⭐⭐⭐"]
+    row = [
+        InlineKeyboardButton(text=s, callback_data=f"review_rating:{appointment_id}:{i + 1}")
+        for i, s in enumerate(stars)
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=[row])

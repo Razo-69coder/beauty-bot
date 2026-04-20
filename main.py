@@ -35,7 +35,7 @@ from database import (
 
 from scheduler import setup_scheduler
 from handlers import start, clients, appointments, settings, stats
-from handlers import booking, schedule, subscriptions
+from handlers import booking, schedule, subscriptions, templates, reviews
 
 
 # ── Dispatcher ────────────────────────────────────────────────────────
@@ -49,6 +49,8 @@ def build_dispatcher() -> Dispatcher:
     dp.include_router(appointments.router)
     dp.include_router(settings.router)
     dp.include_router(stats.router)
+    dp.include_router(templates.router)
+    dp.include_router(reviews.router)
     return dp
 
 

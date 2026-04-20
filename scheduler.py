@@ -7,6 +7,7 @@ from database import (
     get_appointments_for_reminder_24h, get_appointments_for_reminder_2h,
     mark_reminder_sent,
     get_appointments_for_correction_reminder, mark_correction_reminder_sent,
+    get_appointments_for_review, mark_review_sent,
 )
 
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
@@ -109,6 +110,31 @@ async def send_correction_reminders(bot: Bot):
             pass
 
 
+async def send_review_requests(bot: Bot):
+    """Каждые 30 минут — просит клиента оценить визит через ~2 часа после окончания."""
+    now = now_msk()
+    target = now - timedelta(hours=2)
+    target_date = target.strftime("%Y-%m-%d")
+    time_from = (target - timedelta(minutes=15)).strftime("%H:%M")
+    time_to = (target + timedelta(minutes=15)).strftime("%H:%M")
+
+    appointments = await get_appointments_for_review(target_date, time_from, time_to)
+
+    for appt_id, client_tg_id, client_id, master_id, client_name, master_name, procedure in appointments:
+        from keyboards import review_rating_keyboard
+        try:
+            await bot.send_message(
+                client_tg_id,
+                f"💅 *{client_name}, как прошёл визит?*\n\n"
+                f"Оцените процедуру «{procedure}» у мастера {master_name}:",
+                reply_markup=review_rating_keyboard(appt_id),
+                parse_mode="Markdown",
+            )
+            await mark_review_sent(appt_id)
+        except Exception:
+            pass
+
+
 def setup_scheduler(bot: Bot):
     # Напоминание мастеру о неактивных клиентах
     scheduler.add_job(send_inactive_reminders, "cron", hour=10, minute=0, args=[bot])
@@ -121,5 +147,8 @@ def setup_scheduler(bot: Bot):
 
     # Напоминание о коррекции через 3 недели
     scheduler.add_job(send_correction_reminders, "cron", hour=12, minute=0, args=[bot])
+
+    # Запрос отзыва через 2 часа после визита
+    scheduler.add_job(send_review_requests, "interval", minutes=30, args=[bot])
 
     scheduler.start()

@@ -77,9 +77,20 @@ async def init_db():
                 used INTEGER DEFAULT 0
             )
         """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS reviews (
+                id SERIAL PRIMARY KEY,
+                appointment_id INTEGER REFERENCES appointments(id),
+                client_id INTEGER REFERENCES clients(id),
+                master_id INTEGER REFERENCES masters(id),
+                rating INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         # Миграции для существующих баз
         for sql in [
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS payment_card TEXT DEFAULT ''",
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS review_sent INTEGER DEFAULT 0",
         ]:
             try:
                 await conn.execute(sql)
@@ -604,3 +615,104 @@ async def update_master_payment(master_id: int, payment_card: str):
         await conn.execute(
             "UPDATE masters SET payment_card=$1 WHERE id=$2", payment_card, master_id
         )
+
+
+# ── Отзывы ────────────────────────────────────────────────────────────
+
+async def get_appointments_for_review(target_date: str, time_from: str, time_to: str) -> list:
+    """Записи, завершившиеся ~2 часа назад — просим оценку."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT a.id, c.telegram_id, c.id as client_id, a.master_id,
+                   c.name, m.name as master_name, a.procedure
+            FROM appointments a
+            JOIN clients c ON c.id = a.client_id
+            JOIN masters m ON m.id = a.master_id
+            WHERE a.appointment_date = $1
+              AND a.time BETWEEN $2 AND $3
+              AND a.status = 'confirmed'
+              AND a.review_sent = 0
+              AND c.telegram_id IS NOT NULL
+        """, target_date, time_from, time_to)
+    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
+
+
+async def mark_review_sent(appointment_id: int):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE appointments SET review_sent=1 WHERE id=$1", appointment_id)
+
+
+async def save_review(appointment_id: int, client_id: int, master_id: int, rating: int):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO reviews (appointment_id, client_id, master_id, rating) VALUES ($1,$2,$3,$4)",
+            appointment_id, client_id, master_id, rating
+        )
+
+
+async def get_master_reviews(master_id: int, limit: int = 20) -> list:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT r.rating, c.name, a.procedure, a.appointment_date, r.created_at
+            FROM reviews r
+            JOIN clients c ON c.id = r.client_id
+            JOIN appointments a ON a.id = r.appointment_id
+            WHERE r.master_id = $1
+            ORDER BY r.created_at DESC
+            LIMIT $2
+        """, master_id, limit)
+    return [(r[0], r[1], r[2], r[3], r[4]) for r in rows]
+
+
+# ── Шаблоны сообщений ─────────────────────────────────────────────────
+
+async def get_clients_with_telegram(master_id: int) -> list:
+    """Клиенты с telegram_id (могут получать сообщения)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT c.id, c.name, c.telegram_id,
+                   MAX(a.appointment_date) as last_visit,
+                   (CURRENT_DATE - MAX(a.appointment_date::date))::INTEGER as days_ago
+            FROM clients c
+            LEFT JOIN appointments a ON a.client_id = c.id
+            WHERE c.master_id = $1 AND c.telegram_id IS NOT NULL
+            GROUP BY c.id, c.name, c.telegram_id
+            ORDER BY c.name
+        """, master_id)
+    return [(r[0], r[1], r[2], r[3], r[4]) for r in rows]
+
+
+async def get_clients_inactive_range(master_id: int, min_days: int, max_days: int | None) -> list:
+    """Неактивные клиенты с telegram_id в диапазоне дней."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        if max_days is None:
+            rows = await conn.fetch("""
+                SELECT c.id, c.name, c.telegram_id, MAX(a.appointment_date) as last_visit,
+                       (CURRENT_DATE - MAX(a.appointment_date::date))::INTEGER as days_ago
+                FROM clients c
+                LEFT JOIN appointments a ON a.client_id = c.id
+                WHERE c.master_id = $1 AND c.telegram_id IS NOT NULL
+                GROUP BY c.id, c.name, c.telegram_id
+                HAVING MAX(a.appointment_date) IS NOT NULL
+                   AND (CURRENT_DATE - MAX(a.appointment_date::date))::INTEGER >= $2
+                ORDER BY days_ago DESC
+            """, master_id, min_days)
+        else:
+            rows = await conn.fetch("""
+                SELECT c.id, c.name, c.telegram_id, MAX(a.appointment_date) as last_visit,
+                       (CURRENT_DATE - MAX(a.appointment_date::date))::INTEGER as days_ago
+                FROM clients c
+                LEFT JOIN appointments a ON a.client_id = c.id
+                WHERE c.master_id = $1 AND c.telegram_id IS NOT NULL
+                GROUP BY c.id, c.name, c.telegram_id
+                HAVING MAX(a.appointment_date) IS NOT NULL
+                   AND (CURRENT_DATE - MAX(a.appointment_date::date))::INTEGER BETWEEN $2 AND $3
+                ORDER BY days_ago DESC
+            """, master_id, min_days, max_days)
+    return [(r[0], r[1], r[2], r[3], r[4]) for r in rows]
