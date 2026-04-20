@@ -147,6 +147,32 @@ async def get_master_id(
     return await get_or_create_master(telegram_id, name)
 
 
+# ── JWT утилиты (определены здесь — до всех JWT-эндпоинтов) ──────────
+
+def _jwt_secret() -> str:
+    return BOT_TOKEN or "beauty_fallback_secret"
+
+def _create_jwt(telegram_id: int, master_id: int) -> str:
+    return jwt.encode(
+        {"tg": telegram_id, "mid": master_id, "exp": _dt.utcnow() + _td(days=30)},
+        _jwt_secret(), algorithm="HS256"
+    )
+
+def _decode_jwt(token: str) -> dict | None:
+    try:
+        return jwt.decode(token, _jwt_secret(), algorithms=["HS256"])
+    except jwt.InvalidTokenError:
+        return None
+
+async def get_jwt_master_id(authorization: str = Header(None)) -> int:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Требуется авторизация")
+    payload = _decode_jwt(authorization[7:])
+    if not payload:
+        raise HTTPException(401, "Неверный или устаревший токен")
+    return int(payload["mid"])
+
+
 # ── Pydantic models ───────────────────────────────────────────────────
 class ClientCreate(BaseModel):
     name: str
@@ -359,30 +385,6 @@ async def api_public_book(body: PublicBooking):
 
 
 # ── WebApp static ─────────────────────────────────────────────────────
-# ── JWT утилиты ───────────────────────────────────────────────────────
-
-def _jwt_secret() -> str:
-    return BOT_TOKEN or "beauty_fallback_secret"
-
-def _create_jwt(telegram_id: int, master_id: int) -> str:
-    return jwt.encode(
-        {"tg": telegram_id, "mid": master_id, "exp": _dt.utcnow() + _td(days=30)},
-        _jwt_secret(), algorithm="HS256"
-    )
-
-def _decode_jwt(token: str) -> dict | None:
-    try:
-        return jwt.decode(token, _jwt_secret(), algorithms=["HS256"])
-    except jwt.InvalidTokenError:
-        return None
-
-async def get_jwt_master_id(authorization: str = Header(None)) -> int:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(401, "Требуется авторизация")
-    payload = _decode_jwt(authorization[7:])
-    if not payload:
-        raise HTTPException(401, "Неверный или устаревший токен")
-    return int(payload["mid"])
 
 async def _send_tg(chat_id: int, text: str):
     if not BOT_TOKEN:
