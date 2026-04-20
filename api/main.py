@@ -21,7 +21,7 @@ from database import (
     get_master_public_info, get_available_dates, get_available_slots,
     public_book, create_login_code, verify_login_code,
     get_master_full, update_master_settings, update_master_payment,
-    get_schedule,
+    get_schedule, get_all_masters,
 )
 from models import (
     ClientCreate, ClientUpdate, AppointmentCreate, ReminderUpdate,
@@ -32,7 +32,8 @@ from models import (
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "")  # https://your-site.com
+WEBAPP_URL = os.getenv("WEBAPP_URL", "")
+ADMIN_TG_ID = 550421233  # Telegram ID администратора
 
 
 @asynccontextmanager
@@ -82,6 +83,22 @@ async def get_jwt_master_id(authorization: str = Header(None)) -> int:
     if not payload:
         raise HTTPException(401, "Неверный или устаревший токен")
     return int(payload["mid"])
+
+
+def _get_jwt_payload(authorization: str = Header(None)) -> dict:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Требуется авторизация")
+    payload = decode_jwt(authorization[7:])
+    if not payload:
+        raise HTTPException(401, "Неверный или устаревший токен")
+    return payload
+
+
+async def require_admin(authorization: str = Header(None)) -> int:
+    """Возвращает master_id цели — либо из query-параметра (для админа), либо свой."""
+    payload = _get_jwt_payload(authorization)
+    if int(payload["tg"]) != ADMIN_TG_ID:
+        raise HTTPException(403, "Доступ запрещён")
 
 
 # ─── Telegram утилита (отправка сообщения боту) ───────────────────────
@@ -209,6 +226,25 @@ async def auth_verify(body: VerifyCode):
             "payment_card": master_full["payment_card"],
         },
     }
+
+
+# ─── Админ-эндпоинты ──────────────────────────────────────────────────
+
+@app.get("/api/admin/masters")
+async def admin_list_masters(authorization: str = Header(None)):
+    await require_admin(authorization)
+    return {"masters": await get_all_masters()}
+
+
+@app.get("/api/admin/master/{master_id}/data")
+async def admin_master_data(master_id: int, authorization: str = Header(None)):
+    await require_admin(authorization)
+    master = await get_master_full(master_id)
+    if not master:
+        raise HTTPException(404, "Мастер не найден")
+    stats = await get_statistics(master_id)
+    clients, total = await get_clients_page(master_id, 0, 10000)
+    return {"master": master, "stats": stats, "clients": clients, "total_clients": total}
 
 
 # ─── Дашборд (JWT авторизация) ────────────────────────────────────────

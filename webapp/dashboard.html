@@ -592,6 +592,22 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
     </div>
   </div>
 
+  <!-- Панель администратора (видна только admin) -->
+  <div id="admin-panel" style="display:none;padding:10px 16px 0">
+    <div class="card" style="padding:12px 14px;border:1.5px solid var(--accent,#FF69B4)">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:700">👑 Режим администратора</span>
+        <select id="admin-master-select" style="flex:1;min-width:140px;padding:5px 8px;border-radius:8px;border:1px solid #ccc;font-size:13px" onchange="adminSwitchMaster()">
+          <option value="">— выберите мастера —</option>
+        </select>
+        <button class="btn-sm" onclick="adminResetMaster()" style="font-size:12px;padding:5px 10px">Вернуть свой</button>
+      </div>
+      <div id="admin-viewing" style="font-size:12px;opacity:0.7;margin-top:6px;display:none">
+        📋 Просмотр: <b id="admin-viewing-name"></b>
+      </div>
+    </div>
+  </div>
+
   <div class="content">
     <!-- Статистика -->
     <div class="stats-grid" id="stats-grid">
@@ -1160,7 +1176,7 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
 // ═══════════════════════════════════════════════════════════════════
 //  Состояние
 // ═══════════════════════════════════════════════════════════════════
-const API = '';  // пустая строка = тот же origin  // v=9
+const API = '';  // пустая строка = тот же origin  // v=10
 
 let token = localStorage.getItem('bb_token') || '';
 let master = JSON.parse(localStorage.getItem('bb_master') || 'null');
@@ -1310,10 +1326,84 @@ async function verifyCodeManual() {
   );
 }
 
+const ADMIN_TG_ID = 550421233;
+let _realMasterId = null;  // master_id администратора (его собственный)
+
 function afterLogin() {
   document.getElementById('nav-bar').style.display = 'flex';
+  _checkAdminMode();
   goScreen('dash');
   loadServicesCount();
+}
+
+async function _checkAdminMode() {
+  if (!master) return;
+  // Определяем telegram_id из JWT-токена
+  let tgId = null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    tgId = payload.tg;
+  } catch(e) { return; }
+  if (tgId !== ADMIN_TG_ID) return;
+
+  // Показываем панель и загружаем список мастеров
+  document.getElementById('admin-panel').style.display = '';
+  _realMasterId = null;  // сбросим — сейчас смотрим свой аккаунт
+
+  try {
+    const data = await api('GET', '/api/admin/masters');
+    const sel = document.getElementById('admin-master-select');
+    // Очищаем и заполняем
+    sel.innerHTML = '<option value="">— выберите мастера —</option>';
+    data.masters.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = `${m.name} (tg: ${m.telegram_id})`;
+      sel.appendChild(opt);
+    });
+  } catch(e) {
+    console.warn('Не удалось загрузить список мастеров', e);
+  }
+}
+
+async function adminSwitchMaster() {
+  const sel = document.getElementById('admin-master-select');
+  const masterId = sel.value;
+  if (!masterId) { adminResetMaster(); return; }
+
+  try {
+    const data = await api('GET', `/api/admin/master/${masterId}/data`);
+    const m = data.master;
+
+    // Запоминаем реальный master_id если ещё не сохранён
+    if (_realMasterId === null) _realMasterId = master.id || null;
+
+    // Показываем чьи данные смотрим
+    document.getElementById('admin-viewing').style.display = '';
+    document.getElementById('admin-viewing-name').textContent =
+      `${m.name} (id:${m.id}, tg:${m.telegram_id})`;
+
+    // Отображаем статистику этого мастера на дашборде
+    const s = data.stats;
+    document.getElementById('dash-greeting').textContent = `👁 Мастер: ${m.name}`;
+    document.getElementById('s-clients').textContent = fmt(s.total_clients);
+    document.getElementById('s-month').textContent = fmt(s.month_earnings) + ' ₽';
+    document.getElementById('s-total').textContent = fmt(s.total_appointments);
+    document.getElementById('s-earnings').textContent = fmt(s.total_earnings) + ' ₽';
+  } catch(e) {
+    alert('Ошибка: ' + e.message);
+  }
+}
+
+function adminResetMaster() {
+  document.getElementById('admin-master-select').value = '';
+  document.getElementById('admin-viewing').style.display = 'none';
+  _realMasterId = null;
+  // Перезагружаем свой дашборд
+  const today = new Date();
+  const MONTHS = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  document.getElementById('dash-greeting').textContent = `Привет, ${master?.name || 'Мастер'}! ✨`;
+  loadDash();
 }
 
 function logout() {
