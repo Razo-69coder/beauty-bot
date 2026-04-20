@@ -279,6 +279,19 @@ body::after {
 /* ════════════════════════════════════════════════════════════════
    ЭКРАН: РАСПИСАНИЕ
 ═══════════════════════════════════════════════════════════════ */
+.month-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; background: var(--card); border-bottom: 1px solid var(--border);
+}
+.month-nav-btn {
+  background: var(--primary-light); border: none; border-radius: 10px;
+  color: var(--primary); font-size: 16px; font-weight: 700;
+  padding: 6px 14px; cursor: pointer; transition: background 0.15s;
+}
+.month-nav-btn:active { background: var(--primary-mid); }
+.month-nav-label {
+  font-size: 15px; font-weight: 700; color: var(--text);
+}
 .week-strip {
   background: var(--card); padding: 12px 8px; display: flex;
   overflow-x: auto; gap: 6px; scrollbar-width: none;
@@ -567,6 +580,12 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
     <p id="sched-date-title">Сегодня</p>
   </div>
 
+  <div class="month-nav" id="month-nav">
+    <button class="month-nav-btn" onclick="changeSchedMonth(-1)">◀</button>
+    <span class="month-nav-label" id="month-nav-label"></span>
+    <button class="month-nav-btn" onclick="changeSchedMonth(1)">▶</button>
+  </div>
+
   <div class="week-strip" id="week-strip"></div>
 
   <div class="content" id="sched-content">
@@ -734,6 +753,21 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
       <div class="theme-toggle">
         <button class="theme-btn active" id="theme-pink" onclick="setTheme('pink')">💅 Розовая</button>
         <button class="theme-btn" id="theme-peach" onclick="setTheme('peach')">🪙 Платина</button>
+      </div>
+    </div>
+
+    <!-- Добавить на экран -->
+    <div class="section-title">Быстрый доступ</div>
+    <div class="settings-section">
+      <div class="settings-row" onclick="addToHomeScreen()">
+        <div class="row-left">
+          <span class="row-icon">📱</span>
+          <div>
+            <div class="row-title">Добавить на главный экран</div>
+            <div class="row-sub">Открывать Beauty Book без поиска в чатах</div>
+          </div>
+        </div>
+        <span class="row-arrow">›</span>
       </div>
     </div>
 
@@ -988,6 +1022,7 @@ let token = localStorage.getItem('bb_token') || '';
 let master = JSON.parse(localStorage.getItem('bb_master') || 'null');
 let bookingLink = '';
 let schedDate = todayStr();
+let schedMonth = todayStr().slice(0, 7); // YYYY-MM
 let clientPage = 0;
 let searchTimer = null;
 
@@ -1201,28 +1236,62 @@ function copyBookingLink() {
 const DAYS_SHORT = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
 const MONTHS_SHORT = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 
+const MONTHS_FULL = ['Январь','Февраль','Март','Апрель','Май','Июнь',
+                     'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
 function initSched() {
+  schedMonth = schedDate.slice(0, 7);
+  renderWeekStrip();
+  loadSchedule(schedDate);
+}
+
+function changeSchedMonth(delta) {
+  const [y, m] = schedMonth.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  schedMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  // Не уходим раньше текущего месяца
+  const todayMonth = todayStr().slice(0, 7);
+  if (schedMonth < todayMonth) schedMonth = todayMonth;
+  // При смене месяца выбираем 1-е число (или сегодня, если текущий)
+  const firstDay = schedMonth === todayMonth ? todayStr() : schedMonth + '-01';
+  schedDate = firstDay;
   renderWeekStrip();
   loadSchedule(schedDate);
 }
 
 function renderWeekStrip() {
-  const strip = document.getElementById('week-strip');
+  const [y, m] = schedMonth.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const todayMonth = todayStr().slice(0, 7);
   const today = new Date();
+
+  // Заголовок месяца
+  document.getElementById('month-nav-label').textContent =
+    `${MONTHS_FULL[m-1]} ${y}`;
+  // Скрываем стрелку назад если текущий месяц
+  document.querySelector('.month-nav-btn').style.opacity =
+    schedMonth === todayMonth ? '0.3' : '1';
+
+  const strip = document.getElementById('week-strip');
   let html = '';
-  for (let i = 0; i < 14; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
+  const startDay = schedMonth === todayMonth ? today.getDate() : 1;
+  for (let day = startDay; day <= daysInMonth; day++) {
+    const d = new Date(y, m - 1, day);
     const ds = d.toISOString().split('T')[0];
-    const isToday = i === 0;
+    const isToday = ds === todayStr();
     const isSelected = ds === schedDate;
-    html += `<div class="day-pill ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}"
+    html += `<div class="day-pill ${isToday?'today':''} ${isSelected?'selected':''}"
       onclick="selectSchedDay('${ds}', this)">
       <div class="dp-name">${DAYS_SHORT[d.getDay()]}</div>
-      <div class="dp-num">${d.getDate()}</div>
+      <div class="dp-num">${day}</div>
     </div>`;
   }
   strip.innerHTML = html;
+  // Скроллим к выбранному дню
+  setTimeout(() => {
+    const sel = strip.querySelector('.selected');
+    if (sel) sel.scrollIntoView({inline:'center', behavior:'smooth'});
+  }, 50);
 }
 
 function selectSchedDay(ds, el) {
@@ -1230,6 +1299,15 @@ function selectSchedDay(ds, el) {
   document.querySelectorAll('.day-pill').forEach(p => p.classList.remove('selected'));
   el.classList.add('selected');
   loadSchedule(ds);
+}
+
+function addToHomeScreen() {
+  const tg = window.Telegram?.WebApp;
+  if (tg && typeof tg.addToHomeScreen === 'function') {
+    tg.addToHomeScreen();
+  } else {
+    alert('📱 Как добавить на главный экран:\n\niOS Safari: нажмите «Поделиться» → «На экран Домой»\n\nAndroid Chrome: меню ⋮ → «Добавить на главный экран»\n\nИли просто закрепи бота в избранных чатах Telegram 💅');
+  }
 }
 
 async function loadSchedule(dateStr) {
