@@ -29,8 +29,9 @@
   --overlay-bg: #1E0D30;
   --glow: 0 0 18px rgba(255, 105, 180, 0.55);
   --btn-radius: 20px;
-  --bg-opacity: 0.22;
-  --bg-image: url('https://images.unsplash.com/photo-1604654894610-df63bc536371?w=900&q=70');
+  --doll-image: url('/app/images/bratz-doll-1.png');
+  --doll-opacity: 0.15;
+  --bg-image: none;
 }
 [data-theme="peach"] {
   /* 🌸 ПЕРСИКОВАЯ — элегантная, светлая */
@@ -51,8 +52,9 @@
   --overlay-bg: #FFFFFF;
   --glow: none;
   --btn-radius: 16px;
-  --bg-opacity: 0.45;
-  --bg-image: url('https://images.unsplash.com/photo-1560066984-138dadb4c035?w=900&q=70');
+  --doll-image: url('/app/images/bratz-doll-2.png');
+  --doll-opacity: 0.13;
+  --bg-image: none;
 }
 
 /* ── Сброс ────────────────────────────────────────────────────── */
@@ -65,19 +67,22 @@ body {
   padding-bottom: 72px;
 }
 
-/* ── Фоновое beauty-фото ─────────────────────────────────────── */
-body::before {
+/* ── Кукла-силуэт на фоне ────────────────────────────────────── */
+body::after {
   content: '';
-  position: fixed; inset: 0;
-  background-image: var(--bg-image);
-  background-size: cover;
-  background-position: center;
-  filter: blur(7px);
-  transform: scale(1.02);
-  opacity: var(--bg-opacity);
+  position: fixed;
+  bottom: 60px;
+  right: -10px;
+  width: 240px;
+  height: 320px;
+  background-image: var(--doll-image);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: bottom right;
+  opacity: var(--doll-opacity);
   z-index: 0;
   pointer-events: none;
-  transition: background-image 0.4s ease;
+  transition: opacity 0.4s ease, background-image 0.3s ease;
 }
 
 /* ── Экраны ───────────────────────────────────────────────────── */
