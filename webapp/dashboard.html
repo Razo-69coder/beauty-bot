@@ -1176,7 +1176,7 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
 // ═══════════════════════════════════════════════════════════════════
 //  Состояние
 // ═══════════════════════════════════════════════════════════════════
-const API = '';  // пустая строка = тот же origin  // v=10
+const API = '';  // пустая строка = тот же origin  // v=11
 
 let token = localStorage.getItem('bb_token') || '';
 let master = JSON.parse(localStorage.getItem('bb_master') || 'null');
@@ -1852,15 +1852,28 @@ async function saveSettings(body) {
 
 // ─── Оверлеи ───────────────────────────────────────────────────────
 
+const _overlayStack = [];
+
 function openOverlay(id) {
-  document.getElementById(id).classList.add('open');
+  const el = document.getElementById(id);
+  // Назначаем z-index выше предыдущего
+  const base = 200;
+  el.style.zIndex = base + _overlayStack.length * 10;
+  el.classList.add('open');
+  _overlayStack.push(id);
 }
 
 function closeOverlay() {
-  document.querySelectorAll('.overlay.open').forEach(o => o.classList.remove('open'));
+  if (!_overlayStack.length) return;
+  const id = _overlayStack.pop();
+  document.getElementById(id).classList.remove('open');
 }
 
-// Закрытие по клику на фон
+function closeAllOverlays() {
+  while (_overlayStack.length) closeOverlay();
+}
+
+// Закрытие по клику на фон — только верхний оверлей
 document.querySelectorAll('.overlay').forEach(o => {
   o.addEventListener('click', e => { if (e.target === o) closeOverlay(); });
 });
