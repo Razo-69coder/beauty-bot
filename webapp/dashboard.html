@@ -11,33 +11,47 @@
 <style>
 /* ── Переменные тем ───────────────────────────────────────────── */
 :root {
-  --primary: #C9657A;
-  --primary-grad: linear-gradient(135deg, #E8A0BF, #C9657A);
-  --primary-light: #FFF0F5;
-  --primary-mid: #F8C8D8;
-  --accent: #E8A0BF;
-  --bg: #FAF0F4;
-  --card: rgba(255,255,255,0.9);
-  --text: #3D2B2B;
-  --text-muted: #999;
-  --border: #F0D0E0;
-  --shadow: rgba(200, 100, 120, 0.12);
-  --shadow-strong: rgba(200, 100, 120, 0.22);
+  /* 💅 РОЗОВАЯ — Bratz, тёмная, неоновая */
+  --primary: #FF69B4;
+  --primary-grad: linear-gradient(135deg, #FF69B4, #9370DB);
+  --primary-light: rgba(255, 105, 180, 0.15);
+  --primary-mid: rgba(255, 105, 180, 0.3);
+  --accent: #9370DB;
+  --bg: #150D20;
+  --card: rgba(28, 12, 48, 0.92);
+  --card-border: rgba(255, 105, 180, 0.35);
+  --text: #FFFFFF;
+  --text-muted: #C090C8;
+  --border: rgba(255, 105, 180, 0.25);
+  --shadow: rgba(255, 105, 180, 0.2);
+  --shadow-strong: rgba(255, 105, 180, 0.45);
+  --nav-bg: rgba(21, 10, 35, 0.97);
+  --overlay-bg: #1E0D30;
+  --glow: 0 0 18px rgba(255, 105, 180, 0.55);
+  --btn-radius: 20px;
+  --bg-opacity: 0.22;
   --bg-image: url('https://images.unsplash.com/photo-1604654894610-df63bc536371?w=900&q=70');
 }
 [data-theme="peach"] {
-  --primary: #C8845A;
-  --primary-grad: linear-gradient(135deg, #F0C09A, #C8845A);
-  --primary-light: #FFF5EE;
-  --primary-mid: #F5D5B8;
-  --accent: #F0C09A;
-  --bg: #FAF2EE;
-  --card: rgba(255,255,255,0.9);
-  --text: #3D2B1B;
-  --text-muted: #a08070;
-  --border: #F0D8C0;
-  --shadow: rgba(200, 130, 80, 0.12);
-  --shadow-strong: rgba(200, 130, 80, 0.22);
+  /* 🌸 ПЕРСИКОВАЯ — элегантная, светлая */
+  --primary: #FF7F50;
+  --primary-grad: linear-gradient(135deg, #FFA07A, #FF7F50);
+  --primary-light: #FFF0E8;
+  --primary-mid: #FFD5C0;
+  --accent: #FFA07A;
+  --bg: #FFF5EC;
+  --card: rgba(255, 255, 255, 1);
+  --card-border: transparent;
+  --text: #4A4A4A;
+  --text-muted: #9A8070;
+  --border: #F0C8B0;
+  --shadow: rgba(200, 100, 60, 0.1);
+  --shadow-strong: rgba(200, 100, 60, 0.2);
+  --nav-bg: #FFFFFF;
+  --overlay-bg: #FFFFFF;
+  --glow: none;
+  --btn-radius: 16px;
+  --bg-opacity: 0.45;
   --bg-image: url('https://images.unsplash.com/photo-1560066984-138dadb4c035?w=900&q=70');
 }
 
@@ -60,7 +74,7 @@ body::before {
   background-position: center;
   filter: blur(7px);
   transform: scale(1.02);
-  opacity: 0.45;
+  opacity: var(--bg-opacity);
   z-index: 0;
   pointer-events: none;
   transition: background-image 0.4s ease;
@@ -94,7 +108,7 @@ body::before {
 /* ── Нижняя навигация ─────────────────────────────────────────── */
 .nav-bar {
   position: fixed; bottom: 0; left: 0; right: 0;
-  background: #fff; border-top: 1px solid var(--border);
+  background: var(--nav-bg); border-top: 1px solid var(--border);
   display: flex; z-index: 100;
   box-shadow: 0 -2px 16px var(--shadow);
 }
@@ -111,6 +125,7 @@ body::before {
 .card {
   background: var(--card); border-radius: 18px;
   box-shadow: 0 2px 14px var(--shadow);
+  border: 1px solid var(--card-border);
   overflow: hidden;
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
@@ -119,13 +134,13 @@ body::before {
 
 /* ── Кнопки ────────────────────────────────────────────────────── */
 .btn {
-  padding: 14px 20px; border-radius: 14px; border: none;
+  padding: 14px 20px; border-radius: var(--btn-radius); border: none;
   font-size: 15px; font-weight: 700; cursor: pointer;
   transition: opacity 0.15s, transform 0.1s; display: inline-flex;
   align-items: center; justify-content: center; gap: 7px;
 }
 .btn:active { opacity: 0.82; transform: scale(0.98); }
-.btn-primary { background: var(--primary-grad); color: white; width: 100%; }
+.btn-primary { background: var(--primary-grad); color: white; width: 100%; box-shadow: var(--glow); }
 .btn-secondary {
   background: var(--card); color: var(--primary);
   box-shadow: 0 2px 8px var(--shadow); width: 100%;
@@ -368,8 +383,9 @@ body::before {
 }
 .overlay.open { display: flex; }
 .overlay-sheet {
-  background: #fff; border-radius: 22px 22px 0 0;
+  background: var(--overlay-bg); border-radius: 22px 22px 0 0;
   padding: 20px 16px 32px; width: 100%; animation: slideUp 0.25s ease;
+  border-top: 1px solid var(--border);
 }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .overlay-handle {
