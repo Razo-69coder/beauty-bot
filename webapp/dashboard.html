@@ -586,6 +586,9 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
       <input id="client-search" placeholder="Поиск по имени..."
         oninput="searchClients()" autocomplete="off">
     </div>
+    <button class="btn btn-primary" style="margin-bottom:14px; width:100%" onclick="openAddClientOverlay()">
+      ➕ Добавить клиента
+    </button>
     <div id="clients-list">
       <div class="loader"><div class="spinner"></div>Загружаем...</div>
     </div>
@@ -830,6 +833,62 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
   </div>
 </div>
 
+<!-- Добавить клиента -->
+<div class="overlay" id="overlay-add-client">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">Новый клиент</div>
+    <div class="field">
+      <label>Имя клиента *</label>
+      <input id="new-client-name" type="text" placeholder="Анна Иванова">
+    </div>
+    <div class="field">
+      <label>Телефон</label>
+      <input id="new-client-phone" type="tel" placeholder="+79001234567">
+    </div>
+    <div class="field">
+      <label>Услуга</label>
+      <input id="new-client-service" type="text" placeholder="Маникюр, наращивание ресниц...">
+    </div>
+    <div class="field">
+      <label>Заметки</label>
+      <input id="new-client-notes" type="text" placeholder="Аллергия на лак...">
+    </div>
+    <button class="btn btn-primary" onclick="saveNewClient()">Добавить клиента</button>
+    <button class="btn btn-secondary" style="margin-top:8px" onclick="closeOverlay()">Отмена</button>
+  </div>
+</div>
+
+<!-- Записать клиента -->
+<div class="overlay" id="overlay-book-client">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title" id="book-client-title">Записать клиента</div>
+    <div class="field">
+      <label>Процедура *</label>
+      <input id="book-procedure" type="text" placeholder="Маникюр, педикюр...">
+    </div>
+    <div class="field">
+      <label>Дата *</label>
+      <input id="book-date" type="date">
+    </div>
+    <div class="field">
+      <label>Время</label>
+      <input id="book-time" type="time">
+    </div>
+    <div class="field">
+      <label>Стоимость (₽)</label>
+      <input id="book-price" type="number" placeholder="0" min="0">
+    </div>
+    <div class="field">
+      <label>Заметка</label>
+      <input id="book-notes" type="text" placeholder="Необязательно">
+    </div>
+    <button class="btn btn-primary" onclick="saveNewAppointment()">Записать</button>
+    <button class="btn btn-secondary" style="margin-top:8px" onclick="closeOverlay()">Отмена</button>
+  </div>
+</div>
+
 <!-- История клиента -->
 <div class="overlay" id="overlay-client-history">
   <div class="overlay-sheet" style="max-height:80vh; overflow-y:auto">
@@ -838,7 +897,8 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
     <div id="client-history-body">
       <div class="loader"><div class="spinner"></div>Загружаем...</div>
     </div>
-    <button class="btn btn-secondary" style="margin-top:12px" onclick="closeOverlay()">Закрыть</button>
+    <button class="btn btn-primary" style="margin-top:14px" onclick="openBookClientOverlay()">✏️ Записать на процедуру</button>
+    <button class="btn btn-secondary" style="margin-top:8px" onclick="closeOverlay()">Закрыть</button>
   </div>
 </div>
 
@@ -1289,9 +1349,70 @@ async function loadInactive() {
   }
 }
 
+// ─── Добавление клиента ─────────────────────────────────────────────
+
+function openAddClientOverlay() {
+  ['new-client-name','new-client-phone','new-client-service','new-client-notes']
+    .forEach(id => document.getElementById(id).value = '');
+  openOverlay('overlay-add-client');
+}
+
+async function saveNewClient() {
+  const name = document.getElementById('new-client-name').value.trim();
+  const phone = document.getElementById('new-client-phone').value.trim() || '—';
+  const service = document.getElementById('new-client-service').value.trim();
+  const notesRaw = document.getElementById('new-client-notes').value.trim();
+  if (!name) { alert('Введите имя клиента'); return; }
+  const notesParts = [];
+  if (service) notesParts.push(`💅 Услуга: ${service}`);
+  if (notesRaw) notesParts.push(notesRaw);
+  try {
+    await api('POST', '/api/dashboard/clients', { name, phone, notes: notesParts.join('\n') });
+    closeOverlay();
+    loadClients(0);
+  } catch(e) { alert(e.message); }
+}
+
+// ─── Запись клиента ──────────────────────────────────────────────────
+
+let currentClientId = null;
+let currentClientName = '';
+
+function openBookClientOverlay() {
+  if (!currentClientId) return;
+  document.getElementById('book-client-title').textContent = `Записать: ${currentClientName}`;
+  document.getElementById('book-procedure').value = '';
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById('book-date').value = tomorrow.toISOString().slice(0, 10);
+  document.getElementById('book-time').value = '';
+  document.getElementById('book-price').value = '';
+  document.getElementById('book-notes').value = '';
+  openOverlay('overlay-book-client');
+}
+
+async function saveNewAppointment() {
+  const procedure = document.getElementById('book-procedure').value.trim();
+  const date = document.getElementById('book-date').value;
+  const time = document.getElementById('book-time').value;
+  const price = parseInt(document.getElementById('book-price').value) || 0;
+  const notes = document.getElementById('book-notes').value.trim();
+  if (!procedure) { alert('Введите процедуру'); return; }
+  if (!date) { alert('Выберите дату'); return; }
+  try {
+    await api('POST', '/api/dashboard/appointments', {
+      client_id: currentClientId, procedure, appointment_date: date,
+      time: time || '', price, notes,
+    });
+    document.querySelectorAll('.overlay.open').forEach(o => o.classList.remove('open'));
+    alert(`✅ ${currentClientName} записан${currentClientName.slice(-1)==='а'?'а':''} на ${procedure}`);
+  } catch(e) { alert(e.message); }
+}
+
 // ─── История клиента ────────────────────────────────────────────────
 
 async function openClientHistory(clientId, clientName) {
+  currentClientId = clientId;
+  currentClientName = clientName;
   document.getElementById('client-history-title').textContent = `${clientName} — история`;
   document.getElementById('client-history-body').innerHTML =
     '<div class="loader"><div class="spinner"></div>Загружаем...</div>';

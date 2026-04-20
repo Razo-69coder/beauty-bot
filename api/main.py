@@ -26,6 +26,7 @@ from database import (
 from models import (
     ClientCreate, ClientUpdate, AppointmentCreate, ReminderUpdate,
     PublicBooking, RequestCode, VerifyCode, MasterSettings, PaymentUpdate,
+    DashboardAppointmentCreate,
 )
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
@@ -245,6 +246,27 @@ async def dashboard_clients(
         return {"clients": results, "total": len(results)}
     clients, total = await get_clients_page(master_id, page, PAGE_SIZE)
     return {"clients": clients, "total": total, "page": page}
+
+
+@app.post("/api/dashboard/clients", status_code=201)
+async def dashboard_create_client(
+    body: ClientCreate,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    client_id = await add_client(master_id, body.name, body.phone, body.notes)
+    return {"id": client_id}
+
+
+@app.post("/api/dashboard/appointments", status_code=201)
+async def dashboard_create_appointment(
+    body: DashboardAppointmentCreate,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    appt_id = await add_appointment(
+        body.client_id, master_id, body.procedure,
+        body.appointment_date, body.price, body.notes, "", body.time,
+    )
+    return {"id": appt_id}
 
 
 @app.put("/api/dashboard/settings")

@@ -60,3 +60,12 @@ class MasterSettings(BaseModel):
 
 class PaymentUpdate(BaseModel):
     payment_card: str
+
+
+class DashboardAppointmentCreate(BaseModel):
+    client_id: int
+    procedure: str
+    appointment_date: str
+    time: str = ""
+    price: int = 0
+    notes: str = ""
