@@ -357,58 +357,6 @@ async def api_public_book(body: PublicBooking):
     return {"id": appt_id, "ok": True}
 
 
-# ── API: Услуги мастера ───────────────────────────────────────────────
-
-class ServiceCreate(BaseModel):
-    name: str
-    price_default: int = 0
-
-@app.get("/api/services")
-async def api_get_services(master_id: int = Depends(get_jwt_master_id)):
-    rows = await get_services(master_id)
-    return [{"id": r[0], "name": r[1], "price_default": r[2]} for r in rows]
-
-@app.post("/api/services", status_code=201)
-async def api_add_service(body: ServiceCreate, master_id: int = Depends(get_jwt_master_id)):
-    svc_id = await add_service(master_id, body.name, body.price_default)
-    return {"id": svc_id}
-
-@app.delete("/api/services/{svc_id}")
-async def api_delete_service(svc_id: int, master_id: int = Depends(get_jwt_master_id)):
-    ok = await delete_service(svc_id, master_id)
-    if not ok:
-        raise HTTPException(status_code=404)
-    return {"ok": True}
-
-
-# ── API: Расширенная статистика ───────────────────────────────────────
-
-@app.get("/api/stats/period")
-async def api_stats_period(
-    date_from: str, date_to: str,
-    master_id: int = Depends(get_jwt_master_id)
-):
-    data = await get_earnings_by_period(master_id, date_from, date_to)
-    by_svc = await get_earnings_by_service(master_id, date_from, date_to)
-    data["by_service"] = [{"procedure": r[0], "count": r[1], "total": r[2]} for r in by_svc]
-    return data
-
-@app.get("/api/stats/by-service")
-async def api_stats_by_service(master_id: int = Depends(get_jwt_master_id)):
-    rows = await get_earnings_by_service(master_id)
-    return [{"procedure": r[0], "count": r[1], "total": r[2]} for r in rows]
-
-@app.get("/api/stats/by-client")
-async def api_stats_by_client(master_id: int = Depends(get_jwt_master_id)):
-    rows = await get_earnings_by_client(master_id)
-    return [{"name": r[0], "count": r[1], "total": r[2]} for r in rows]
-
-@app.get("/api/stats/chart")
-async def api_stats_chart(days: int = 30, master_id: int = Depends(get_jwt_master_id)):
-    rows = await get_earnings_by_day(master_id, days)
-    return [{"date": r[0], "total": r[1]} for r in rows]
-
-
 # ── WebApp static ─────────────────────────────────────────────────────
 # ── JWT утилиты ───────────────────────────────────────────────────────
 
@@ -504,6 +452,58 @@ async def auth_verify_code(body: _VerifyCodeOnly):
     full = await get_master_full(m["id"])
     token = _create_jwt(tg_id, m["id"])
     return {"token": token, "master": full}
+
+
+# ── API: Услуги мастера ───────────────────────────────────────────────
+
+class ServiceCreate(BaseModel):
+    name: str
+    price_default: int = 0
+
+@app.get("/api/services")
+async def api_get_services(master_id: int = Depends(get_jwt_master_id)):
+    rows = await get_services(master_id)
+    return [{"id": r[0], "name": r[1], "price_default": r[2]} for r in rows]
+
+@app.post("/api/services", status_code=201)
+async def api_add_service(body: ServiceCreate, master_id: int = Depends(get_jwt_master_id)):
+    svc_id = await add_service(master_id, body.name, body.price_default)
+    return {"id": svc_id}
+
+@app.delete("/api/services/{svc_id}")
+async def api_delete_service(svc_id: int, master_id: int = Depends(get_jwt_master_id)):
+    ok = await delete_service(svc_id, master_id)
+    if not ok:
+        raise HTTPException(status_code=404)
+    return {"ok": True}
+
+
+# ── API: Расширенная статистика ───────────────────────────────────────
+
+@app.get("/api/stats/period")
+async def api_stats_period(
+    date_from: str, date_to: str,
+    master_id: int = Depends(get_jwt_master_id)
+):
+    data = await get_earnings_by_period(master_id, date_from, date_to)
+    by_svc = await get_earnings_by_service(master_id, date_from, date_to)
+    data["by_service"] = [{"procedure": r[0], "count": r[1], "total": r[2]} for r in by_svc]
+    return data
+
+@app.get("/api/stats/by-service")
+async def api_stats_by_service(master_id: int = Depends(get_jwt_master_id)):
+    rows = await get_earnings_by_service(master_id)
+    return [{"procedure": r[0], "count": r[1], "total": r[2]} for r in rows]
+
+@app.get("/api/stats/by-client")
+async def api_stats_by_client(master_id: int = Depends(get_jwt_master_id)):
+    rows = await get_earnings_by_client(master_id)
+    return [{"name": r[0], "count": r[1], "total": r[2]} for r in rows]
+
+@app.get("/api/stats/chart")
+async def api_stats_chart(days: int = 30, master_id: int = Depends(get_jwt_master_id)):
+    rows = await get_earnings_by_day(master_id, days)
+    return [{"date": r[0], "total": r[1]} for r in rows]
 
 
 # ── Дашборд (JWT) ─────────────────────────────────────────────────────
