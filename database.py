@@ -937,6 +937,8 @@ async def get_earnings_by_client(master_id: int, date_from: str = None, date_to:
 
 
 async def get_earnings_by_day(master_id: int, days: int = 30) -> list:
+    from datetime import date, timedelta
+    cutoff = (date.today() - timedelta(days=days)).isoformat()
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
@@ -944,9 +946,9 @@ async def get_earnings_by_day(master_id: int, days: int = 30) -> list:
             FROM appointments
             WHERE master_id=$1
               AND status != 'cancelled'
-              AND appointment_date::date >= CURRENT_DATE - $2
+              AND appointment_date >= $2
             GROUP BY day ORDER BY day
-        """, master_id, days)
+        """, master_id, cutoff)
     return [(str(r['day']), int(r['total'])) for r in rows]
 
 

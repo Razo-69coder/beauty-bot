@@ -265,6 +265,12 @@ async def api_inactive(master_id: int = Depends(get_master_id)):
     rows = await get_inactive_clients(master_id, days)
     return {"clients": [{"id": r[0], "name": r[1], "phone": r[2], "last_visit": r[3], "days_ago": r[4]} for r in rows]}
 
+@app.get("/api/dashboard/inactive")
+async def dash_inactive(master_id: int = Depends(get_jwt_master_id)):
+    days = await get_reminder_days_by_master(master_id)
+    rows = await get_inactive_clients(master_id, days)
+    return {"clients": [{"id": r[0], "name": r[1], "phone": r[2], "last_visit": str(r[3])[:10] if r[3] else None, "days_ago": r[4]} for r in rows]}
+
 
 @app.put("/api/settings/reminder")
 async def api_set_reminder(body: ReminderUpdate, master_id: int = Depends(get_master_id)):

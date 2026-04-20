@@ -1546,7 +1546,7 @@ async function loadInactive() {
   const listEl = document.getElementById('inactive-list');
   listEl.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
   try {
-    const data = await api('GET', '/api/inactive');
+    const data = await api('GET', '/api/dashboard/inactive');
     const clients = data.clients || [];
     document.getElementById('inactive-count-sub').textContent =
       clients.length ? `${clients.length} клиентов` : 'Все активны 🎉';
