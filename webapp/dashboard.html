@@ -378,6 +378,20 @@ body::before {
 }
 .overlay-title { font-size: 17px; font-weight: 800; margin-bottom: 16px; }
 
+/* Toggle switch */
+.toggle-switch { position:relative; display:inline-block; width:44px; height:26px; flex-shrink:0; }
+.toggle-switch input { opacity:0; width:0; height:0; }
+.toggle-slider {
+  position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
+  background:#ddd; border-radius:26px; transition:0.2s;
+}
+.toggle-slider:before {
+  position:absolute; content:""; height:20px; width:20px; left:3px; bottom:3px;
+  background:white; border-radius:50%; transition:0.2s; box-shadow:0 1px 4px rgba(0,0,0,0.2);
+}
+input:checked + .toggle-slider { background: var(--primary); }
+input:checked + .toggle-slider:before { transform:translateX(18px); }
+
 /* Ссылка для копирования */
 .link-box {
   background: var(--primary-light); border-radius: 12px; padding: 12px 14px;
@@ -650,6 +664,41 @@ body::before {
       </div>
     </div>
 
+    <!-- Инструменты -->
+    <div class="section-title">Инструменты</div>
+    <div class="settings-section">
+      <div class="settings-row" onclick="openDepositOverlay()">
+        <div class="row-left">
+          <span class="row-icon">💳</span>
+          <div>
+            <div class="row-title">Предоплата</div>
+            <div class="row-sub" id="set-deposit-sub">Загружаем...</div>
+          </div>
+        </div>
+        <span class="row-arrow">›</span>
+      </div>
+      <div class="settings-row" onclick="openTemplatesOverlay()">
+        <div class="row-left">
+          <span class="row-icon">💌</span>
+          <div>
+            <div class="row-title">Шаблоны сообщений</div>
+            <div class="row-sub">Рассылка клиентам</div>
+          </div>
+        </div>
+        <span class="row-arrow">›</span>
+      </div>
+      <div class="settings-row" onclick="openReviewsOverlay()">
+        <div class="row-left">
+          <span class="row-icon">⭐</span>
+          <div>
+            <div class="row-title">Отзывы клиентов</div>
+            <div class="row-sub" id="set-reviews-sub">—</div>
+          </div>
+        </div>
+        <span class="row-arrow">›</span>
+      </div>
+    </div>
+
     <!-- Оформление -->
     <div class="section-title">Тема оформления</div>
     <div class="settings-section" style="padding:14px 16px">
@@ -767,6 +816,82 @@ body::before {
   </div>
 </div>
 
+<!-- Предоплата -->
+<div class="overlay" id="overlay-deposit">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">Предоплата для новых клиентов</div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding:4px 0">
+      <span style="font-size:14px; font-weight:600">Включить предоплату</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="deposit-enabled" onchange="saveDeposit()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="field">
+      <label>Процент предоплаты</label>
+      <select id="deposit-percent" onchange="saveDeposit()">
+        <option value="10">10%</option>
+        <option value="20">20%</option>
+        <option value="30">30%</option>
+        <option value="50">50%</option>
+      </select>
+    </div>
+    <div class="alert alert-info" style="font-size:13px; margin-bottom:14px">
+      Реквизиты для оплаты берутся из раздела «Реквизиты» выше. Новые клиенты увидят их при онлайн-записи.
+    </div>
+    <button class="btn btn-secondary" onclick="closeOverlay()">Закрыть</button>
+  </div>
+</div>
+
+<!-- Шаблоны сообщений -->
+<div class="overlay" id="overlay-templates">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">Шаблоны сообщений</div>
+    <div id="tpl-state-list">
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:14px">Выберите шаблон для рассылки:</div>
+      <button class="btn btn-secondary" style="margin-bottom:10px" onclick="previewTemplate('correction')">
+        🔄 Приглашение на коррекцию <span style="font-size:11px; opacity:0.7">(14–30 дн.)</span>
+      </button>
+      <button class="btn btn-secondary" style="margin-bottom:10px" onclick="previewTemplate('miss_you')">
+        💔 «Скучаем по вам» <span style="font-size:11px; opacity:0.7">(30+ дн.)</span>
+      </button>
+      <button class="btn btn-secondary" style="margin-bottom:10px" onclick="previewTemplate('congrats')">
+        🎉 Поздравление всем клиентам
+      </button>
+      <button class="btn btn-ghost" style="width:100%; margin-top:4px" onclick="closeOverlay()">Закрыть</button>
+    </div>
+    <div id="tpl-state-preview" style="display:none">
+      <div id="tpl-preview-text" style="font-size:13px; background:var(--primary-light); border-radius:12px; padding:12px; margin-bottom:12px; line-height:1.6; white-space:pre-wrap"></div>
+      <div id="tpl-recipient-count" style="font-size:13px; color:var(--text-muted); margin-bottom:14px; font-weight:600"></div>
+      <button class="btn btn-primary" onclick="sendTemplate()">Отправить</button>
+      <button class="btn btn-secondary" style="margin-top:8px" onclick="showTplList()">← Назад</button>
+    </div>
+    <div id="tpl-state-sending" style="display:none; text-align:center; padding:24px 0">
+      <div class="spinner" style="margin:0 auto 12px"></div>
+      <div style="font-size:14px; color:var(--text-muted)">Отправляем сообщения...</div>
+    </div>
+    <div id="tpl-state-done" style="display:none">
+      <div class="alert alert-success" id="tpl-done-msg" style="margin-bottom:14px"></div>
+      <button class="btn btn-secondary" style="margin-bottom:8px" onclick="showTplList()">Отправить ещё</button>
+      <button class="btn btn-ghost" style="width:100%" onclick="closeOverlay()">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- Отзывы -->
+<div class="overlay" id="overlay-reviews">
+  <div class="overlay-sheet" style="max-height:80vh; overflow-y:auto">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">Отзывы клиентов</div>
+    <div id="reviews-body">
+      <div class="loader"><div class="spinner"></div>Загружаем...</div>
+    </div>
+    <button class="btn btn-secondary" style="margin-top:12px" onclick="closeOverlay()">Закрыть</button>
+  </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
 //  Состояние
@@ -816,7 +941,7 @@ function goScreen(id) {
   if (id === 'sched')    initSched();
   if (id === 'clients')  loadClients(0);
   if (id === 'inactive') loadInactive();
-  if (id === 'settings') fillSettings();
+  if (id === 'settings') { fillSettings(); loadDepositStatus(); }
 }
 
 // ─── Тема ──────────────────────────────────────────────────────────
@@ -1276,6 +1401,123 @@ function closeOverlay() {
 document.querySelectorAll('.overlay').forEach(o => {
   o.addEventListener('click', e => { if (e.target === o) closeOverlay(); });
 });
+
+// ─── Предоплата ────────────────────────────────────────────────────
+
+async function openDepositOverlay() {
+  openOverlay('overlay-deposit');
+  try {
+    const data = await api('GET', '/api/dashboard/deposit');
+    document.getElementById('deposit-enabled').checked = data.deposit_enabled;
+    document.getElementById('deposit-percent').value = data.deposit_percent;
+  } catch(e) {}
+}
+
+async function saveDeposit() {
+  const enabled = document.getElementById('deposit-enabled').checked;
+  const percent = parseInt(document.getElementById('deposit-percent').value);
+  try {
+    await api('PUT', '/api/dashboard/deposit', { deposit_enabled: enabled, deposit_percent: percent });
+    document.getElementById('set-deposit-sub').textContent =
+      enabled ? `Включена, ${percent}%` : 'Выключена';
+  } catch(e) { alert(e.message); }
+}
+
+async function loadDepositStatus() {
+  try {
+    const data = await api('GET', '/api/dashboard/deposit');
+    document.getElementById('set-deposit-sub').textContent =
+      data.deposit_enabled ? `Включена, ${data.deposit_percent}%` : 'Выключена';
+    document.getElementById('deposit-enabled').checked = data.deposit_enabled;
+    document.getElementById('deposit-percent').value = data.deposit_percent;
+  } catch(e) {
+    document.getElementById('set-deposit-sub').textContent = '—';
+  }
+}
+
+// ─── Шаблоны ───────────────────────────────────────────────────────
+
+let currentTplType = null;
+const TPL_PREVIEWS = {
+  correction: '🔄 Привет, Анна!\n\nПрошло около 2–3 недель после вашего визита — самое время записаться на коррекцию! Жду вас 🗓',
+  miss_you:   '💔 Анна, мы по вам скучаем!\n\nДавно не видели вас. Запишитесь на процедуру — будем рады встрече! ✨',
+  congrats:   '🎉 Привет, Анна!\n\nСпасибо, что выбираете нас. Вы — лучшие клиенты! Ждём вас снова 💅',
+};
+
+function openTemplatesOverlay() {
+  showTplList();
+  openOverlay('overlay-templates');
+}
+
+function showTplList() {
+  currentTplType = null;
+  document.getElementById('tpl-state-list').style.display = '';
+  document.getElementById('tpl-state-preview').style.display = 'none';
+  document.getElementById('tpl-state-sending').style.display = 'none';
+  document.getElementById('tpl-state-done').style.display = 'none';
+}
+
+async function previewTemplate(type) {
+  currentTplType = type;
+  document.getElementById('tpl-preview-text').textContent = TPL_PREVIEWS[type];
+  document.getElementById('tpl-recipient-count').textContent = 'Считаем получателей...';
+  document.getElementById('tpl-state-list').style.display = 'none';
+  document.getElementById('tpl-state-preview').style.display = '';
+  try {
+    const data = await api('GET', `/api/dashboard/templates/count?type=${type}`);
+    document.getElementById('tpl-recipient-count').textContent =
+      data.count ? `Получателей: ${data.count} чел.` : 'Нет подходящих клиентов';
+  } catch(e) {
+    document.getElementById('tpl-recipient-count').textContent = '';
+  }
+}
+
+async function sendTemplate() {
+  if (!currentTplType) return;
+  document.getElementById('tpl-state-preview').style.display = 'none';
+  document.getElementById('tpl-state-sending').style.display = '';
+  try {
+    const data = await api('POST', '/api/dashboard/templates/send', { template_type: currentTplType });
+    document.getElementById('tpl-state-sending').style.display = 'none';
+    document.getElementById('tpl-state-done').style.display = '';
+    document.getElementById('tpl-done-msg').textContent = `✅ Отправлено ${data.sent} из ${data.total} клиентов`;
+  } catch(e) {
+    document.getElementById('tpl-state-sending').style.display = 'none';
+    showTplList();
+    alert(e.message);
+  }
+}
+
+// ─── Отзывы ────────────────────────────────────────────────────────
+
+async function openReviewsOverlay() {
+  openOverlay('overlay-reviews');
+  const body = document.getElementById('reviews-body');
+  body.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
+  try {
+    const data = await api('GET', '/api/dashboard/reviews');
+    const reviews = data.reviews || [];
+    if (!reviews.length) {
+      body.innerHTML = `<div class="empty-state"><div class="emoji">⭐</div>
+        <h3>Отзывов пока нет</h3>
+        <p>Клиенты смогут оценить визит автоматически через 2 часа после записи.</p></div>`;
+      document.getElementById('set-reviews-sub').textContent = 'Нет отзывов';
+      return;
+    }
+    const avg = (reviews.reduce((s,r) => s + r.rating, 0) / reviews.length).toFixed(1);
+    document.getElementById('set-reviews-sub').textContent = `★ ${avg} (${reviews.length} отзывов)`;
+    body.innerHTML = reviews.map(r => `
+      <div style="padding:11px 0; border-bottom:1px solid var(--border)">
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <div style="font-size:14px; font-weight:700">${r.client_name}</div>
+          <div style="font-size:15px">${'⭐'.repeat(r.rating)}</div>
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:3px">${r.procedure || '—'} · ${r.date}</div>
+      </div>`).join('');
+  } catch(e) {
+    body.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  Инициализация

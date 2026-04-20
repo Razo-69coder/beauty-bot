@@ -12,25 +12,9 @@ def main_menu() -> InlineKeyboardMarkup:
     if WEBAPP_URL:
         return InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="💅 Открыть Beauty Book", web_app={"url": WEBAPP_URL})],
-            [InlineKeyboardButton(text="🔑 Войти в личный кабинет", callback_data="get_login_code")],
-            [
-                InlineKeyboardButton(text="👥 Клиенты", callback_data="clients_list"),
-                InlineKeyboardButton(text="📅 Расписание", callback_data="my_schedule"),
-            ],
-            [
-                InlineKeyboardButton(text="⚙️ Настройки", callback_data="settings"),
-            ],
         ])
     return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="👥 Мои клиенты", callback_data="clients_list"),
-            InlineKeyboardButton(text="➕ Новый клиент", callback_data="client_add"),
-        ],
-        [
-            InlineKeyboardButton(text="📅 Расписание", callback_data="my_schedule"),
-            InlineKeyboardButton(text="📊 Статистика", callback_data="stats"),
-        ],
-        [InlineKeyboardButton(text="⚙️ Настройки", callback_data="settings")],
+        [InlineKeyboardButton(text="🔑 Войти в личный кабинет", callback_data="get_login_code")],
     ])
 
 

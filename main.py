@@ -452,6 +452,23 @@ async def auth_verify_code(body: _VerifyCodeOnly):
 
 # ── Дашборд (JWT) ─────────────────────────────────────────────────────
 
+_TEMPLATES_TEXT = {
+    "correction": "🔄 Привет, {name}!\n\nПрошло около 2–3 недель после вашего визита — самое время записаться на коррекцию! Жду вас 🗓",
+    "miss_you":   "💔 {name}, мы по вам скучаем!\n\nДавно не видели вас. Запишитесь на процедуру — будем рады встрече! ✨",
+    "congrats":   "🎉 Привет, {name}!\n\nСпасибо, что выбираете нас. Вы — лучшие клиенты! Ждём вас снова 💅",
+}
+
+async def _template_clients(tpl_type: str, master_id: int):
+    from database import get_clients_inactive_range, get_clients_with_telegram
+    if tpl_type == "congrats":
+        return await get_clients_with_telegram(master_id)
+    if tpl_type == "correction":
+        return await get_clients_inactive_range(master_id, 14, 30)
+    if tpl_type == "miss_you":
+        return await get_clients_inactive_range(master_id, 30, None)
+    return []
+
+
 @app.get("/api/me")
 async def dash_me(master_id: int = Depends(get_jwt_master_id)):
     full = await get_master_full(master_id)
@@ -504,6 +521,64 @@ async def dash_settings(body: _MasterSettings, master_id: int = Depends(get_jwt_
 async def dash_payment(body: _PaymentUpdate, master_id: int = Depends(get_jwt_master_id)):
     await update_master_payment(master_id, body.payment_card)
     return {"ok": True}
+
+
+# ── Предоплата ────────────────────────────────────────────────────────
+
+class _DepositSettings(BaseModel):
+    deposit_enabled: bool
+    deposit_percent: int
+
+@app.get("/api/dashboard/deposit")
+async def dash_get_deposit(master_id: int = Depends(get_jwt_master_id)):
+    from database import get_master_deposit_settings
+    return await get_master_deposit_settings(master_id)
+
+@app.put("/api/dashboard/deposit")
+async def dash_update_deposit(body: _DepositSettings, master_id: int = Depends(get_jwt_master_id)):
+    from database import update_master_deposit_settings
+    await update_master_deposit_settings(master_id, body.deposit_enabled, body.deposit_percent)
+    return {"ok": True}
+
+
+# ── Шаблоны рассылки ──────────────────────────────────────────────────
+
+@app.get("/api/dashboard/templates/count")
+async def dash_template_count(type: str, master_id: int = Depends(get_jwt_master_id)):
+    if type not in _TEMPLATES_TEXT:
+        raise HTTPException(400, "Unknown template type")
+    clients = await _template_clients(type, master_id)
+    return {"count": len(clients)}
+
+class _SendTemplateBody(BaseModel):
+    template_type: str
+
+@app.post("/api/dashboard/templates/send")
+async def dash_send_template(body: _SendTemplateBody, master_id: int = Depends(get_jwt_master_id)):
+    if body.template_type not in _TEMPLATES_TEXT:
+        raise HTTPException(400, "Unknown template type")
+    clients = await _template_clients(body.template_type, master_id)
+    text_tpl = _TEMPLATES_TEXT[body.template_type]
+    sent = 0
+    for client_id, name, telegram_id, *_ in clients:
+        try:
+            await bot.send_message(telegram_id, text_tpl.format(name=name), parse_mode="Markdown")
+            sent += 1
+        except Exception:
+            pass
+    return {"sent": sent, "total": len(clients)}
+
+
+# ── Отзывы ────────────────────────────────────────────────────────────
+
+@app.get("/api/dashboard/reviews")
+async def dash_reviews(master_id: int = Depends(get_jwt_master_id)):
+    from database import get_master_reviews
+    rows = await get_master_reviews(master_id, 20)
+    return {"reviews": [
+        {"rating": r[0], "client_name": r[1], "procedure": r[2], "date": str(r[3])[:10]}
+        for r in rows
+    ]}
 
 
 # ── dashboard.html отдаётся без кеша (Telegram кеширует WebApp агрессивно) ──
