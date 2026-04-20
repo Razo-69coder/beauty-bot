@@ -548,6 +548,9 @@ async def dash_schedule(date: str, master_id: int = Depends(get_jwt_master_id)):
     }
 
 
+def _serialize_clients(rows):
+    return [{"id": r[0], "name": r[1], "phone": r[2], "notes": r[3], "last_visit": str(r[4])[:10] if r[4] else None} for r in rows]
+
 @app.get("/api/dashboard/clients")
 async def dash_clients(
     page: int = 0,
@@ -556,12 +559,21 @@ async def dash_clients(
 ):
     if search:
         rows = await search_clients(master_id, search)
-        return {"clients": rows, "total": len(rows)}
+        return {"clients": _serialize_clients(rows), "total": len(rows)}
     rows = await get_clients(master_id)
     total = len(rows)
     page_size = 20
     paged = rows[page * page_size: (page + 1) * page_size]
-    return {"clients": paged, "total": total}
+    return {"clients": _serialize_clients(paged), "total": total}
+
+@app.get("/api/dashboard/clients/{client_id}")
+async def dash_client(client_id: int, master_id: int = Depends(get_jwt_master_id)):
+    client = await get_client(client_id)
+    if not client:
+        raise HTTPException(status_code=404)
+    history = await get_client_history(client_id)
+    hist = [{"procedure": h[0], "date": str(h[1])[:10], "price": h[2], "notes": h[3]} for h in history]
+    return {**client, "history": hist}
 
 
 @app.post("/api/dashboard/clients", status_code=201)

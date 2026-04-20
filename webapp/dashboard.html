@@ -1644,7 +1644,7 @@ async function openClientHistory(clientId, clientName) {
     '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
   openOverlay('overlay-client-history');
   try {
-    const data = await api('GET', `/api/clients/${clientId}`);
+    const data = await api('GET', `/api/dashboard/clients/${clientId}`);
     const hist = data.history || [];
     if (!hist.length) {
       document.getElementById('client-history-body').innerHTML =
