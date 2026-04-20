@@ -97,6 +97,7 @@ async def init_db():
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS deposit_status TEXT DEFAULT 'not_required'",
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS deposit_amount INTEGER DEFAULT 0",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'pink'",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS payment_reminder_enabled BOOLEAN DEFAULT TRUE",
         ]:
             try:
                 await conn.execute(sql)
@@ -811,3 +812,41 @@ async def set_master_theme(telegram_id: int, theme: str) -> None:
         await conn.execute(
             "UPDATE masters SET theme=$1 WHERE telegram_id=$2", theme, telegram_id
         )
+
+
+# ── Напоминание об оплате ─────────────────────────────────────────────
+
+async def get_payment_reminder_enabled(telegram_id: int) -> bool:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        val = await conn.fetchval(
+            "SELECT payment_reminder_enabled FROM masters WHERE telegram_id=$1", telegram_id
+        )
+    return bool(val) if val is not None else True
+
+
+async def set_payment_reminder_enabled(telegram_id: int, enabled: bool) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE masters SET payment_reminder_enabled=$1 WHERE telegram_id=$2", enabled, telegram_id
+        )
+
+
+async def get_appointments_pending_deposit_24h(target_date: str) -> list:
+    """Записи завтра с невнесённой предоплатой, у мастеров с включённым напоминанием."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT a.id, c.telegram_id, c.name, m.telegram_id,
+                   a.appointment_date, a.time, m.deposit_percent
+            FROM appointments a
+            JOIN clients c ON c.id = a.client_id
+            JOIN masters m ON m.id = a.master_id
+            WHERE a.appointment_date = $1
+              AND a.deposit_status = 'pending_payment'
+              AND a.status != 'cancelled'
+              AND c.telegram_id IS NOT NULL
+              AND COALESCE(m.payment_reminder_enabled, TRUE) = TRUE
+        """, target_date)
+    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]

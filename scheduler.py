@@ -8,6 +8,7 @@ from database import (
     mark_reminder_sent,
     get_appointments_for_correction_reminder, mark_correction_reminder_sent,
     get_appointments_for_review, mark_review_sent,
+    get_appointments_pending_deposit_24h,
 )
 
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
@@ -135,6 +136,27 @@ async def send_review_requests(bot: Bot):
             pass
 
 
+async def send_payment_reminders_24h(bot: Bot):
+    """Ежедневно в 19:00 — напоминает клиентам о невнесённой предоплате за 24 часа до визита."""
+    tomorrow = (now_msk() + timedelta(days=1)).strftime("%Y-%m-%d")
+    appointments = await get_appointments_pending_deposit_24h(tomorrow)
+
+    for appt_id, client_tg_id, client_name, master_tg_id, date, time, deposit_pct in appointments:
+        date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
+        time_str = f" в *{time}*" if time else ""
+        try:
+            await bot.send_message(
+                client_tg_id,
+                f"⚠️ *Напоминание об оплате*\n\n"
+                f"Завтра, *{date_fmt}*{time_str} у вас запись.\n\n"
+                f"Для подтверждения необходима предоплата *{deposit_pct}%*.\n\n"
+                f"Пожалуйста, внесите оплату — мастер ждёт подтверждения 💳",
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+
+
 def setup_scheduler(bot: Bot):
     # Напоминание мастеру о неактивных клиентах
     scheduler.add_job(send_inactive_reminders, "cron", hour=10, minute=0, args=[bot])
@@ -150,5 +172,8 @@ def setup_scheduler(bot: Bot):
 
     # Запрос отзыва через 2 часа после визита
     scheduler.add_job(send_review_requests, "interval", minutes=30, args=[bot])
+
+    # Напоминание об оплате за 24 часа до визита (в 19:00)
+    scheduler.add_job(send_payment_reminders_24h, "cron", hour=19, minute=0, args=[bot])
 
     scheduler.start()

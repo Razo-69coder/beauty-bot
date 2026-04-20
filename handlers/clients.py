@@ -21,6 +21,7 @@ router = Router()
 class AddClientForm(StatesGroup):
     name = State()
     phone = State()
+    service = State()
     notes = State()
 
 
@@ -168,6 +169,20 @@ async def process_client_name(message: Message, state: FSMContext):
 @router.message(AddClientForm.phone)
 async def process_client_phone(message: Message, state: FSMContext):
     await state.update_data(phone=message.text.strip())
+    await state.set_state(AddClientForm.service)
+    await message.answer(
+        "💅 Какую услугу обычно берёт клиент?\n\n"
+        "_Например: Маникюр, Наращивание ресниц, Коррекция бровей_\n\n"
+        "Или напиши *-* чтобы пропустить",
+        reply_markup=cancel_keyboard(),
+        parse_mode="Markdown"
+    )
+
+
+@router.message(AddClientForm.service)
+async def process_client_service(message: Message, state: FSMContext):
+    service = "" if message.text.strip() == "-" else message.text.strip()
+    await state.update_data(service=service)
     await state.set_state(AddClientForm.notes)
     await message.answer(
         "📝 Хочешь добавить заметку о клиенте?\n\n"
@@ -181,7 +196,16 @@ async def process_client_phone(message: Message, state: FSMContext):
 @router.message(AddClientForm.notes)
 async def process_client_notes(message: Message, state: FSMContext):
     data = await state.get_data()
-    notes = "" if message.text.strip() == "-" else message.text.strip()
+    notes_raw = "" if message.text.strip() == "-" else message.text.strip()
+    service = data.get("service", "")
+
+    # Объединяем услугу и заметку в поле notes
+    notes_parts = []
+    if service:
+        notes_parts.append(f"💅 Услуга: {service}")
+    if notes_raw:
+        notes_parts.append(notes_raw)
+    notes = "\n".join(notes_parts)
 
     master_id = await get_or_create_master(
         message.from_user.id, message.from_user.full_name
@@ -194,8 +218,10 @@ async def process_client_notes(message: Message, state: FSMContext):
         f"💅 {data['name']}\n"
         f"📱 {data['phone']}\n"
     )
-    if notes:
-        text += f"📝 {notes}\n"
+    if service:
+        text += f"💼 Услуга: {service}\n"
+    if notes_raw:
+        text += f"📝 {notes_raw}\n"
 
     await message.answer(text, reply_markup=client_card_keyboard(client_id), parse_mode="Markdown")
 

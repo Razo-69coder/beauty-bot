@@ -6,8 +6,9 @@ from database import (
     get_or_create_master, get_reminder_days, update_reminder_days,
     get_master_info, update_master_work_hours,
     get_master_theme, set_master_theme,
+    get_payment_reminder_enabled, set_payment_reminder_enabled,
 )
-from keyboards import settings_keyboard, work_hours_keyboard, back_to_menu, theme_keyboard
+from keyboards import settings_keyboard, work_hours_keyboard, back_to_menu, theme_keyboard, payment_reminder_keyboard
 from themes import get_theme
 
 router = Router()
@@ -177,6 +178,36 @@ async def cb_settings_theme(callback: CallbackQuery):
     )
     await callback.message.edit_text(text, reply_markup=theme_keyboard(theme_key), parse_mode="Markdown")
     await callback.answer()
+
+
+@router.callback_query(F.data == "settings_payment_reminder")
+async def cb_payment_reminder(callback: CallbackQuery):
+    enabled = await get_payment_reminder_enabled(callback.from_user.id)
+    await callback.message.edit_text(
+        "💳 *Напоминание об оплате*\n\n"
+        "Бот отправляет клиенту напоминание за 24 часа до визита, "
+        "если предоплата ещё не внесена.\n\n"
+        f"Статус: {'✅ Включено' if enabled else '❌ Выключено'}",
+        reply_markup=payment_reminder_keyboard(enabled),
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.in_({"payment_reminder_enable", "payment_reminder_disable"}))
+async def cb_toggle_payment_reminder(callback: CallbackQuery):
+    enabled = callback.data == "payment_reminder_enable"
+    await set_payment_reminder_enabled(callback.from_user.id, enabled)
+    status = "✅ Включено" if enabled else "❌ Выключено"
+    await callback.message.edit_text(
+        "💳 *Напоминание об оплате*\n\n"
+        "Бот отправляет клиенту напоминание за 24 часа до визита, "
+        "если предоплата ещё не внесена.\n\n"
+        f"Статус: {status}",
+        reply_markup=payment_reminder_keyboard(enabled),
+        parse_mode="Markdown"
+    )
+    await callback.answer(status)
 
 
 @router.callback_query(F.data.startswith("set_theme:"))

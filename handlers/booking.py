@@ -9,7 +9,7 @@ from database import (
     get_client_by_telegram, add_client_with_telegram, add_appointment,
     get_master_deposit_settings, get_client_type, update_appointment_deposit,
 )
-from keyboards import dates_keyboard, slots_keyboard, booking_confirm_keyboard, deposit_client_keyboard
+from keyboards import calendar_month_keyboard, slots_keyboard, booking_confirm_keyboard, deposit_client_keyboard
 
 router = Router()
 
@@ -37,32 +37,38 @@ async def start_booking_flow(message: Message, state: FSMContext, master_telegra
         slot_duration=master["slot_duration"],
     )
 
-    # Собираем ближайшие 7 дней, у которых есть свободные слоты
+    # Собираем ближайшие 90 дней, группируем по месяцам
     today = datetime.now().date()
-    available_dates = []
-    for i in range(1, 8):
+    dates_by_month: dict[str, list[str]] = {}
+    for i in range(1, 91):
         d = today + timedelta(days=i)
         date_str = d.strftime("%Y-%m-%d")
+        month = d.strftime("%Y-%m")
         slots = await get_available_slots(
             master["id"], date_str,
             master["work_start"], master["work_end"], master["slot_duration"]
         )
         if slots:
-            available_dates.append(date_str)
+            dates_by_month.setdefault(month, []).append(date_str)
 
-    if not available_dates:
+    if not dates_by_month:
         await message.answer(
-            f"😔 У мастера *{master['name']}* нет свободных слотов на ближайшую неделю.\n\n"
+            f"😔 У мастера *{master['name']}* нет свободных слотов на ближайшие 3 месяца.\n\n"
             f"Свяжитесь с мастером напрямую.",
             parse_mode="Markdown"
         )
         return
 
+    await state.update_data(dates_by_month=dates_by_month)
+    months = sorted(dates_by_month.keys())
+    first_month = months[0]
+    next_month = months[1] if len(months) > 1 else None
+
     await state.set_state(BookingForm.date)
     await message.answer(
         f"💅 *Запись к мастеру {master['name']}*\n\n"
         f"Выберите удобную дату:",
-        reply_markup=dates_keyboard(available_dates),
+        reply_markup=calendar_month_keyboard(dates_by_month[first_month], first_month, None, next_month),
         parse_mode="Markdown"
     )
 
@@ -97,24 +103,37 @@ async def cb_select_date(callback: CallbackQuery, state: FSMContext):
 async def cb_back_to_dates(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     await state.set_state(BookingForm.date)
-
-    today = datetime.now().date()
-    available_dates = []
-    for i in range(1, 8):
-        d = today + timedelta(days=i)
-        date_str = d.strftime("%Y-%m-%d")
-        slots = await get_available_slots(
-            data["master_id"], date_str,
-            data["work_start"], data["work_end"], data["slot_duration"]
-        )
-        if slots:
-            available_dates.append(date_str)
-
+    dates_by_month = data.get("dates_by_month", {})
+    months = sorted(dates_by_month.keys())
+    first_month = months[0] if months else None
+    next_month = months[1] if len(months) > 1 else None
     await callback.message.edit_text(
         f"💅 *Запись к мастеру {data['master_name']}*\n\nВыберите удобную дату:",
-        reply_markup=dates_keyboard(available_dates),
+        reply_markup=calendar_month_keyboard(dates_by_month.get(first_month, []), first_month, None, next_month),
         parse_mode="Markdown"
     )
+    await callback.answer()
+
+
+@router.callback_query(BookingForm.date, F.data.startswith("book_month:"))
+async def cb_select_month(callback: CallbackQuery, state: FSMContext):
+    month = callback.data.split(":", 1)[1]
+    data = await state.get_data()
+    dates_by_month = data.get("dates_by_month", {})
+    months = sorted(dates_by_month.keys())
+    idx = months.index(month) if month in months else 0
+    prev_month = months[idx - 1] if idx > 0 else None
+    next_month = months[idx + 1] if idx < len(months) - 1 else None
+    await callback.message.edit_text(
+        f"💅 *Запись к мастеру {data['master_name']}*\n\nВыберите удобную дату:",
+        reply_markup=calendar_month_keyboard(dates_by_month[month], month, prev_month, next_month),
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "noop")
+async def cb_noop(callback: CallbackQuery):
     await callback.answer()
 
 
@@ -216,22 +235,13 @@ async def cb_select_time(callback: CallbackQuery, state: FSMContext):
 async def cb_back_from_time(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     await state.set_state(BookingForm.date)
-
-    today = datetime.now().date()
-    available_dates = []
-    for i in range(1, 8):
-        d = today + timedelta(days=i)
-        date_str = d.strftime("%Y-%m-%d")
-        slots = await get_available_slots(
-            data["master_id"], date_str,
-            data["work_start"], data["work_end"], data["slot_duration"]
-        )
-        if slots:
-            available_dates.append(date_str)
-
+    dates_by_month = data.get("dates_by_month", {})
+    months = sorted(dates_by_month.keys())
+    first_month = months[0] if months else None
+    next_month = months[1] if len(months) > 1 else None
     await callback.message.edit_text(
         f"💅 *Запись к мастеру {data['master_name']}*\n\nВыберите удобную дату:",
-        reply_markup=dates_keyboard(available_dates),
+        reply_markup=calendar_month_keyboard(dates_by_month.get(first_month, []), first_month, None, next_month),
         parse_mode="Markdown"
     )
     await callback.answer()

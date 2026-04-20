@@ -3,9 +3,14 @@ from datetime import datetime
 from config import WEBHOOK_URL
 from themes import get_theme, THEMES
 
-WEBAPP_URL = f"{WEBHOOK_URL}/app/dashboard.html?v=5" if WEBHOOK_URL else ""
+WEBAPP_URL = f"{WEBHOOK_URL}/app/dashboard.html?v=6" if WEBHOOK_URL else ""
 
 DAYS_SHORT = {0: "Пн", 1: "Вт", 2: "Ср", 3: "Чт", 4: "Пт", 5: "Сб", 6: "Вс"}
+MONTHS_RU = {
+    1: "Январь", 2: "Февраль", 3: "Март", 4: "Апрель",
+    5: "Май", 6: "Июнь", 7: "Июль", 8: "Август",
+    9: "Сентябрь", 10: "Октябрь", 11: "Ноябрь", 12: "Декабрь",
+}
 
 
 # ─── Главное меню ────────────────────────────────────────────────────
@@ -49,7 +54,40 @@ def schedule_keyboard(date: str, prev_date: str, next_date: str, appointments: l
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-# ─── Онлайн-запись: выбор даты ───────────────────────────────────────
+# ─── Онлайн-запись: календарь с навигацией по месяцам ───────────────
+def calendar_month_keyboard(
+    month_dates: list[str], current_month: str,
+    prev_month: str | None, next_month: str | None
+) -> InlineKeyboardMarkup:
+    dt_month = datetime.strptime(current_month + "-01", "%Y-%m-%d")
+    month_label = f"{MONTHS_RU[dt_month.month]} {dt_month.year}"
+
+    nav = []
+    nav.append(
+        InlineKeyboardButton(text="◀️", callback_data=f"book_month:{prev_month}")
+        if prev_month else InlineKeyboardButton(text=" ", callback_data="noop")
+    )
+    nav.append(InlineKeyboardButton(text=month_label, callback_data="noop"))
+    nav.append(
+        InlineKeyboardButton(text="▶️", callback_data=f"book_month:{next_month}")
+        if next_month else InlineKeyboardButton(text=" ", callback_data="noop")
+    )
+
+    buttons = [nav]
+    row = []
+    for date_str in month_dates:
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        label = f"{dt.day} {DAYS_SHORT[dt.weekday()]}"
+        row.append(InlineKeyboardButton(text=label, callback_data=f"book_date:{date_str}"))
+        if len(row) == 4:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+# ─── Онлайн-запись: выбор даты (legacy, не используется) ─────────────
 def dates_keyboard(dates: list[str]) -> InlineKeyboardMarkup:
     buttons = []
     row = []
@@ -134,6 +172,7 @@ def settings_keyboard(current_days: int, theme_key: str = "pink") -> InlineKeybo
         [InlineKeyboardButton(text=f"{t['icon_deposit']} Предоплата", callback_data="settings_deposit")],
         [InlineKeyboardButton(text=f"{t['icon_template']} Шаблоны сообщений", callback_data="tpl_templates")],
         [InlineKeyboardButton(text=f"{t['icon_theme']} Тема оформления", callback_data="settings_theme")],
+        [InlineKeyboardButton(text="💳 Напоминание об оплате", callback_data="settings_payment_reminder")],
         [InlineKeyboardButton(text=f"{t['icon_home']} Главное меню", callback_data="main_menu")],
     ])
 
@@ -349,6 +388,16 @@ def tpl_confirm_keyboard(tpl_type: str, count: int) -> InlineKeyboardMarkup:
             callback_data=f"tpl_confirm:{tpl_type}"
         )],
         [InlineKeyboardButton(text="❌ Отмена", callback_data="tpl_templates")],
+    ])
+
+
+# ─── Напоминание об оплате ───────────────────────────────────────────
+def payment_reminder_keyboard(enabled: bool) -> InlineKeyboardMarkup:
+    status = "✅ Включено" if enabled else "❌ Выключено"
+    toggle_cb = "payment_reminder_disable" if enabled else "payment_reminder_enable"
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"Напоминание об оплате: {status}", callback_data=toggle_cb)],
+        [InlineKeyboardButton(text="◀️ Назад к настройкам", callback_data="settings")],
     ])
 
 

@@ -1,3 +1,4 @@
+import re
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
@@ -15,6 +16,7 @@ class AddAppointmentForm(StatesGroup):
     client_id = State()
     procedure = State()
     date = State()
+    time = State()
     price = State()
     notes = State()
     photo = State()
@@ -97,9 +99,35 @@ async def process_date(message: Message, state: FSMContext):
     # Сохраняем в формате ГГГГ-ММ-ДД для сортировки
     dt = datetime.strptime(date_str, "%d.%m.%Y")
     await state.update_data(date=dt.strftime("%Y-%m-%d"))
-    await state.set_state(AddAppointmentForm.price)
+    await state.set_state(AddAppointmentForm.time)
     await message.answer(
         f"✅ Дата: *{date_str}*\n\n"
+        f"🕐 Введи время визита:\n\n"
+        f"_Формат: ЧЧ:ММ — например 14:30_\n"
+        f"Или напиши *-* чтобы пропустить",
+        reply_markup=cancel_keyboard(),
+        parse_mode="Markdown"
+    )
+
+
+@router.message(AddAppointmentForm.time)
+async def process_time(message: Message, state: FSMContext):
+    text = message.text.strip()
+    if text == "-":
+        time_val = ""
+    elif re.match(r'^\d{1,2}:\d{2}$', text):
+        time_val = text
+    else:
+        await message.answer(
+            "❌ Неверный формат. Введи время как *ЧЧ:ММ*\n_Например: 14:30_\n\nИли напиши *-* чтобы пропустить",
+            reply_markup=cancel_keyboard(),
+            parse_mode="Markdown"
+        )
+        return
+    await state.update_data(time=time_val)
+    await state.set_state(AddAppointmentForm.price)
+    await message.answer(
+        f"✅ Время: *{time_val if time_val else 'не указано'}*\n\n"
         f"💰 Сколько стоила процедура?\n\n"
         f"_Введи сумму в рублях или напиши *-* чтобы пропустить_",
         reply_markup=cancel_keyboard(),
@@ -170,7 +198,8 @@ async def _save_appointment(message: Message, state: FSMContext, photo_id: str):
         appointment_date=data["date"],
         price=data.get("price", 0),
         notes=data.get("notes", ""),
-        photo_id=photo_id
+        photo_id=photo_id,
+        time=data.get("time", ""),
     )
     await state.clear()
 
@@ -181,6 +210,8 @@ async def _save_appointment(message: Message, state: FSMContext, photo_id: str):
         f"💅 Процедура: {data['procedure']}\n"
         f"📅 Дата: {date_formatted}\n"
     )
+    if data.get("time"):
+        text += f"🕐 Время: {data['time']}\n"
     if data.get("price"):
         text += f"💰 Стоимость: {data['price']}₽\n"
     if data.get("notes"):
