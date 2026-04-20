@@ -96,6 +96,7 @@ async def init_db():
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS review_sent INTEGER DEFAULT 0",
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS deposit_status TEXT DEFAULT 'not_required'",
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS deposit_amount INTEGER DEFAULT 0",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'pink'",
         ]:
             try:
                 await conn.execute(sql)
@@ -791,3 +792,22 @@ async def get_clients_inactive_range(master_id: int, min_days: int, max_days: in
                 ORDER BY days_ago DESC
             """, master_id, min_days, max_days)
     return [(r[0], r[1], r[2], r[3], r[4]) for r in rows]
+
+
+# ── Тема оформления ───────────────────────────────────────────────────
+
+async def get_master_theme(telegram_id: int) -> str:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT theme FROM masters WHERE telegram_id=$1", telegram_id
+        )
+    return (row['theme'] or 'pink') if row else 'pink'
+
+
+async def set_master_theme(telegram_id: int, theme: str) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE masters SET theme=$1 WHERE telegram_id=$2", theme, telegram_id
+        )

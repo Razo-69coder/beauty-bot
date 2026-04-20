@@ -4,70 +4,59 @@ from aiogram.filters import CommandStart
 from aiogram.filters.command import CommandObject
 from aiogram.fsm.context import FSMContext
 
-from database import get_or_create_master, create_login_code
+from database import get_or_create_master, create_login_code, get_master_theme
 from keyboards import main_menu
+from themes import get_theme
 
 router = Router()
 
-WELCOME_TEXT = """
-✨ *Beauty Book* — твоя CRM для мастера красоты
-
-Нажми кнопку ниже, чтобы открыть приложение 👇
-"""
-
-HELP_TEXT = """
-💡 *Как пользоваться Beauty Book*
-
-*Добавить клиента:*
-Нажми ➕ Новый клиент → введи имя и телефон
-
-*Записать процедуру:*
-Нажми 📅 Записать клиента → выбери клиента → введи процедуру и дату
-
-*Найти потерявшихся клиентов:*
-Нажми 🔔 Кто давно не приходил — бот покажет всех, кто не был больше 40 дней
-
-*История клиента:*
-Выбери клиента из списка → нажми 📋 История процедур
-
-━━━━━━━━━━━━━━━━━━━━
-По вопросам: @your_support
-"""
+HELP_TEXT = (
+    "💡 *Как пользоваться Beauty Book*\n\n"
+    "*Добавить клиента:*\n"
+    "Нажми ➕ Новый клиент → введи имя и телефон\n\n"
+    "*Записать процедуру:*\n"
+    "Нажми 📅 Записать клиента → выбери клиента → введи процедуру и дату\n\n"
+    "*Найти потерявшихся клиентов:*\n"
+    "Нажми 🔔 Кто давно не приходил — бот покажет всех, кто не был больше 40 дней\n\n"
+    "*История клиента:*\n"
+    "Выбери клиента из списка → нажми 📋 История процедур\n\n"
+    "━━━━━━━━━━━━━━━━━━━━\n"
+    "По вопросам: @your\\_support"
+)
 
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, command: CommandObject):
-    # Обрабатываем deep link для онлайн-записи
     if command.args and command.args.startswith("book_"):
         try:
             master_telegram_id = int(command.args.split("_", 1)[1])
         except (ValueError, IndexError):
             await message.answer("Неверная ссылка для записи.")
             return
-
         from handlers.booking import start_booking_flow
         await start_booking_flow(message, state, master_telegram_id)
         return
 
-    # Обычный старт для мастера
     await get_or_create_master(message.from_user.id, message.from_user.full_name)
-    await message.answer(WELCOME_TEXT, reply_markup=main_menu(), parse_mode="Markdown")
+    theme_key = await get_master_theme(message.from_user.id)
+    t = get_theme(theme_key)
+    await message.answer(t["welcome"], reply_markup=main_menu(), parse_mode="Markdown")
 
 
 @router.callback_query(F.data == "main_menu")
 async def cb_main_menu(callback: CallbackQuery):
-    await callback.message.edit_text(
-        WELCOME_TEXT, reply_markup=main_menu(), parse_mode="Markdown"
-    )
+    theme_key = await get_master_theme(callback.from_user.id)
+    t = get_theme(theme_key)
+    await callback.message.edit_text(t["welcome"], reply_markup=main_menu(), parse_mode="Markdown")
     await callback.answer()
 
 
 @router.callback_query(F.data == "cancel")
 async def cb_cancel(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.edit_text(
-        WELCOME_TEXT, reply_markup=main_menu(), parse_mode="Markdown"
-    )
+    theme_key = await get_master_theme(callback.from_user.id)
+    t = get_theme(theme_key)
+    await callback.message.edit_text(t["welcome"], reply_markup=main_menu(), parse_mode="Markdown")
     await callback.answer()
 
 

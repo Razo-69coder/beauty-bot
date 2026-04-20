@@ -1,6 +1,7 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime
 from config import WEBHOOK_URL
+from themes import get_theme, THEMES
 
 WEBAPP_URL = f"{WEBHOOK_URL}/app/dashboard.html?v=3" if WEBHOOK_URL else ""
 
@@ -119,7 +120,8 @@ def work_hours_keyboard(work_start: int, work_end: int, slot_duration: int) -> I
 
 
 # ─── Настройки: главная ──────────────────────────────────────────────
-def settings_keyboard(current_days: int) -> InlineKeyboardMarkup:
+def settings_keyboard(current_days: int, theme_key: str = "pink") -> InlineKeyboardMarkup:
+    t = get_theme(theme_key)
     options = [30, 40, 60, 90]
     row = []
     for days in options:
@@ -127,12 +129,25 @@ def settings_keyboard(current_days: int) -> InlineKeyboardMarkup:
         row.append(InlineKeyboardButton(text=f"{mark}{days} дн.", callback_data=f"set_reminder:{days}"))
     return InlineKeyboardMarkup(inline_keyboard=[
         row,
-        [InlineKeyboardButton(text="🕐 Рабочее время", callback_data="settings_work_hours")],
-        [InlineKeyboardButton(text="🔗 Ссылка для записи", callback_data="settings_booking_link")],
-        [InlineKeyboardButton(text="💳 Предоплата", callback_data="settings_deposit")],
-        [InlineKeyboardButton(text="💌 Шаблоны сообщений", callback_data="tpl_templates")],
-        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")],
+        [InlineKeyboardButton(text=f"{t['icon_time']} Рабочее время", callback_data="settings_work_hours")],
+        [InlineKeyboardButton(text=f"{t['icon_link']} Ссылка для записи", callback_data="settings_booking_link")],
+        [InlineKeyboardButton(text=f"{t['icon_deposit']} Предоплата", callback_data="settings_deposit")],
+        [InlineKeyboardButton(text=f"{t['icon_template']} Шаблоны сообщений", callback_data="tpl_templates")],
+        [InlineKeyboardButton(text=f"{t['icon_theme']} Тема оформления", callback_data="settings_theme")],
+        [InlineKeyboardButton(text=f"{t['icon_home']} Главное меню", callback_data="main_menu")],
     ])
+
+
+# ─── Настройки: выбор темы ───────────────────────────────────────────
+def theme_keyboard(current_theme: str) -> InlineKeyboardMarkup:
+    buttons = []
+    for key, data in THEMES.items():
+        mark = "✅ " if key == current_theme else ""
+        buttons.append([
+            InlineKeyboardButton(text=f"{mark}{data['name']}", callback_data=f"set_theme:{key}")
+        ])
+    buttons.append([InlineKeyboardButton(text="◀️ Назад к настройкам", callback_data="settings")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 # ─── Список клиентов ─────────────────────────────────────────────────

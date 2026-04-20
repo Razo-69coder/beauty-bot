@@ -5,8 +5,10 @@ from aiogram.types import CallbackQuery, Message
 from database import (
     get_or_create_master, get_reminder_days, update_reminder_days,
     get_master_info, update_master_work_hours,
+    get_master_theme, set_master_theme,
 )
-from keyboards import settings_keyboard, work_hours_keyboard, back_to_menu
+from keyboards import settings_keyboard, work_hours_keyboard, back_to_menu, theme_keyboard
+from themes import get_theme
 
 router = Router()
 
@@ -15,14 +17,16 @@ router = Router()
 async def cb_settings(callback: CallbackQuery):
     await get_or_create_master(callback.from_user.id, callback.from_user.full_name)
     days = await get_reminder_days(callback.from_user.id)
+    theme_key = await get_master_theme(callback.from_user.id)
+    t = get_theme(theme_key)
 
     text = (
-        f"⚙️ *Настройки*\n\n"
-        f"🔔 Напоминать о клиентах, которые не приходили:\n"
+        f"{t['header_settings']}\n\n"
+        f"{t['reminder_label']}\n"
         f"Сейчас выбрано: *{days} дней*\n\n"
         f"Выбери интервал:"
     )
-    await callback.message.edit_text(text, reply_markup=settings_keyboard(days), parse_mode="Markdown")
+    await callback.message.edit_text(text, reply_markup=settings_keyboard(days, theme_key), parse_mode="Markdown")
     await callback.answer()
 
 
@@ -30,13 +34,15 @@ async def cb_settings(callback: CallbackQuery):
 async def cb_set_reminder(callback: CallbackQuery):
     days = int(callback.data.split(":")[1])
     await update_reminder_days(callback.from_user.id, days)
+    theme_key = await get_master_theme(callback.from_user.id)
+    t = get_theme(theme_key)
 
     text = (
-        f"⚙️ *Настройки*\n\n"
+        f"{t['header_settings']}\n\n"
         f"✅ Установлено: напоминать через *{days} дней* после последнего визита\n\n"
         f"Выбери интервал:"
     )
-    await callback.message.edit_text(text, reply_markup=settings_keyboard(days), parse_mode="Markdown")
+    await callback.message.edit_text(text, reply_markup=settings_keyboard(days, theme_key), parse_mode="Markdown")
     await callback.answer(f"Установлено: {days} дней")
 
 
@@ -158,3 +164,34 @@ async def cb_booking_link(callback: CallbackQuery):
 
     await callback.message.edit_text(text, reply_markup=back_to_menu(), parse_mode="Markdown")
     await callback.answer()
+
+
+@router.callback_query(F.data == "settings_theme")
+async def cb_settings_theme(callback: CallbackQuery):
+    theme_key = await get_master_theme(callback.from_user.id)
+    t = get_theme(theme_key)
+    text = (
+        f"{t['header_theme']}\n\n"
+        f"Текущая тема: *{t['name']}*\n\n"
+        f"Выбери стиль оформления бота:"
+    )
+    await callback.message.edit_text(text, reply_markup=theme_keyboard(theme_key), parse_mode="Markdown")
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("set_theme:"))
+async def cb_set_theme(callback: CallbackQuery):
+    new_theme = callback.data.split(":")[1]
+    await set_master_theme(callback.from_user.id, new_theme)
+    t = get_theme(new_theme)
+    days = await get_reminder_days(callback.from_user.id)
+
+    text = (
+        f"{t['header_settings']}\n\n"
+        f"🎨 Тема изменена на *{t['name']}*\n\n"
+        f"{t['reminder_label']}\n"
+        f"Сейчас выбрано: *{days} дней*\n\n"
+        f"Выбери интервал:"
+    )
+    await callback.message.edit_text(text, reply_markup=settings_keyboard(days, new_theme), parse_mode="Markdown")
+    await callback.answer(f"Тема: {t['name']}")
