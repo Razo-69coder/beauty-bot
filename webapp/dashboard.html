@@ -62,6 +62,66 @@
   --bg-image: none;
 }
 
+/* ── Табы периода (заработок) ────────────────────────────────── */
+.period-tab {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s;
+}
+.period-tab.active {
+  background: var(--primary-grad);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: var(--glow);
+}
+
+/* ── Строка услуги/клиента в заработке ───────────────────────── */
+.earn-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.earn-row-label { flex: 1; font-size: 14px; font-weight: 600; }
+.earn-row-sub   { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+.earn-row-val   { font-size: 14px; font-weight: 700; color: var(--primary); white-space: nowrap; }
+.earn-bar-wrap  { width: 100%; height: 4px; background: var(--border); border-radius: 4px; margin-top: 4px; }
+.earn-bar       { height: 4px; border-radius: 4px; background: var(--primary-grad); transition: width 0.4s; }
+
+/* ── График ──────────────────────────────────────────────────── */
+.chart-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.chart-date   { width: 42px; color: var(--text-muted); flex-shrink: 0; }
+.chart-bar-w  { flex: 1; height: 12px; background: var(--border); border-radius: 6px; overflow: hidden; }
+.chart-bar-f  { height: 100%; border-radius: 6px; background: var(--primary-grad); transition: width 0.4s; }
+.chart-val    { width: 60px; text-align: right; color: var(--text); font-weight: 600; flex-shrink: 0; }
+
+/* ── Строка в списке услуг (overlay) ─────────────────────────── */
+.svc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.svc-row-name  { flex: 1; font-size: 14px; font-weight: 600; }
+.svc-row-price { font-size: 13px; color: var(--text-muted); }
+.svc-del-btn   { background: none; border: none; font-size: 18px; cursor: pointer; color: #e05; padding: 4px; }
+
 /* ── Сброс ────────────────────────────────────────────────────── */
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 body {
@@ -511,6 +571,10 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
   <button class="nav-item" id="nav-inactive" onclick="goScreen('inactive')">
     <span class="nav-icon">⏰</span>Давно нет
   </button>
+  <button class="nav-item" id="nav-earnings" onclick="goScreen('earnings')">
+    <span class="nav-icon">📊</span>
+    <span class="nav-label">Заработок</span>
+  </button>
   <button class="nav-item" id="nav-settings" onclick="goScreen('settings')">
     <span class="nav-icon">⚙️</span>Настройки
   </button>
@@ -630,6 +694,48 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
 </div>
 
 <!-- ── Настройки ───────────────────────────────────────────────── -->
+<div class="screen" id="screen-earnings">
+  <div class="header">
+    <div class="dash-greeting">📊 Заработок</div>
+    <div class="dash-sub" id="earn-period-label">Этот месяц</div>
+  </div>
+  <div class="content">
+    <!-- Период -->
+    <div style="display:flex; gap:8px; margin-bottom:16px; overflow-x:auto; padding-bottom:4px">
+      <button class="period-tab active" id="ptab-month" onclick="loadEarnings('month')">🗓 Месяц</button>
+      <button class="period-tab" id="ptab-week" onclick="loadEarnings('week')">📆 Неделя</button>
+      <button class="period-tab" id="ptab-day" onclick="loadEarnings('day')">📅 Сегодня</button>
+      <button class="period-tab" id="ptab-year" onclick="loadEarnings('year')">📊 Год</button>
+    </div>
+    <!-- Итоги периода -->
+    <div class="stats-grid" style="margin-bottom:20px">
+      <div class="stat-card">
+        <div class="stat-label">Выручка</div>
+        <div class="stat-value" id="earn-total">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Процедур</div>
+        <div class="stat-value" id="earn-count">—</div>
+      </div>
+    </div>
+    <!-- По услугам -->
+    <div class="section-title">По услугам</div>
+    <div id="earn-by-service" style="margin-bottom:20px">
+      <div class="loader"><div class="spinner"></div>Загружаем...</div>
+    </div>
+    <!-- По клиентам -->
+    <div class="section-title">Топ клиентов</div>
+    <div id="earn-by-client" style="margin-bottom:20px">
+      <div class="loader"><div class="spinner"></div>Загружаем...</div>
+    </div>
+    <!-- График 30 дней -->
+    <div class="section-title">График — последние 30 дней</div>
+    <div id="earn-chart" style="margin-bottom:20px">
+      <div class="loader"><div class="spinner"></div>Загружаем...</div>
+    </div>
+  </div>
+</div>
+
 <div class="screen" id="screen-settings">
   <div class="header">
     <h1>⚙️ Настройки</h1>
@@ -713,6 +819,17 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
     </div>
 
     <!-- Инструменты -->
+    <div class="section-title">Мои услуги</div>
+    <div class="settings-section">
+      <div class="settings-row" onclick="openServicesOverlay()">
+        <div>
+          <div class="row-title">💅 Список услуг</div>
+          <div class="row-sub" id="set-services-sub">Загружаем...</div>
+        </div>
+        <span style="color:var(--text-muted); font-size:18px">›</span>
+      </div>
+    </div>
+
     <div class="section-title">Инструменты</div>
     <div class="settings-section">
       <div class="settings-row" onclick="openDepositOverlay()">
@@ -900,7 +1017,8 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
     <div class="overlay-title" id="book-client-title">Записать клиента</div>
     <div class="field">
       <label>Процедура *</label>
-      <input id="book-procedure" type="text" placeholder="Маникюр, педикюр...">
+      <input id="book-procedure" type="text" list="services-datalist" placeholder="Маникюр, педикюр..." autocomplete="off">
+      <datalist id="services-datalist"></datalist>
     </div>
     <div class="field">
       <label>Дата *</label>
@@ -1012,11 +1130,37 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
   </div>
 </div>
 
+<!-- Мои услуги -->
+<div class="overlay" id="overlay-services">
+  <div class="overlay-sheet" style="max-height:82vh; overflow-y:auto">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">💅 Мои услуги</div>
+    <div style="font-size:13px; color:var(--text-muted); margin-bottom:12px">
+      Услуги появятся как подсказки при записи клиента. Можно добавить цену по умолчанию.
+    </div>
+    <div id="services-list-body">
+      <div class="loader"><div class="spinner"></div>Загружаем...</div>
+    </div>
+    <div style="border-top:1px solid var(--border); margin-top:14px; padding-top:14px">
+      <div class="field" style="margin-bottom:8px">
+        <label>Название услуги</label>
+        <input id="new-svc-name" type="text" placeholder="Маникюр, Педикюр, Брови...">
+      </div>
+      <div class="field" style="margin-bottom:12px">
+        <label>Цена по умолчанию (₽, необязательно)</label>
+        <input id="new-svc-price" type="number" placeholder="0" min="0">
+      </div>
+      <button class="btn btn-primary" onclick="addService()">➕ Добавить услугу</button>
+    </div>
+    <button class="btn btn-secondary" style="margin-top:10px" onclick="closeOverlay()">Закрыть</button>
+  </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
 //  Состояние
 // ═══════════════════════════════════════════════════════════════════
-const API = '';  // пустая строка = тот же origin
+const API = '';  // пустая строка = тот же origin  // v=9
 
 let token = localStorage.getItem('bb_token') || '';
 let master = JSON.parse(localStorage.getItem('bb_master') || 'null');
@@ -1025,6 +1169,8 @@ let schedDate = todayStr();
 let schedMonth = todayStr().slice(0, 7); // YYYY-MM
 let clientPage = 0;
 let searchTimer = null;
+let currentEarnPeriod = 'month';
+let servicesCache = [];
 
 // ─── Утилиты ───────────────────────────────────────────────────────
 
@@ -1062,7 +1208,8 @@ function goScreen(id) {
   if (id === 'sched')    initSched();
   if (id === 'clients')  loadClients(0);
   if (id === 'inactive') loadInactive();
-  if (id === 'settings') { fillSettings(); loadDepositStatus(); }
+  if (id === 'earnings') loadEarnings(currentEarnPeriod || 'month');
+  if (id === 'settings') { fillSettings(); loadDepositStatus(); loadServicesCount(); }
 }
 
 // ─── Тема ──────────────────────────────────────────────────────────
@@ -1166,6 +1313,7 @@ async function verifyCodeManual() {
 function afterLogin() {
   document.getElementById('nav-bar').style.display = 'flex';
   goScreen('dash');
+  loadServicesCount();
 }
 
 function logout() {
@@ -1742,6 +1890,192 @@ async function openReviewsOverlay() {
   } catch(e) {
     body.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
   }
+}
+
+// ─── Заработок ─────────────────────────────────────────────────────
+
+const MONTHS_SHORT2 = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+
+function _periodDates(period) {
+  const today = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const todayIso = iso(today);
+  if (period === 'day') {
+    return { from: todayIso, to: todayIso, label: 'Сегодня' };
+  }
+  if (period === 'week') {
+    const from = new Date(today); from.setDate(today.getDate() - 6);
+    return { from: iso(from), to: todayIso, label: 'Последние 7 дней' };
+  }
+  if (period === 'month') {
+    return { from: `${today.getFullYear()}-${pad(today.getMonth()+1)}-01`, to: todayIso,
+             label: `${MONTHS_SHORT2[today.getMonth()]} ${today.getFullYear()}` };
+  }
+  // year
+  return { from: `${today.getFullYear()}-01-01`, to: todayIso,
+           label: `${today.getFullYear()} год` };
+}
+
+async function loadEarnings(period) {
+  currentEarnPeriod = period;
+  // Табы
+  ['day','week','month','year'].forEach(p => {
+    document.getElementById('ptab-' + p)?.classList.toggle('active', p === period);
+  });
+  const { from, to, label } = _periodDates(period);
+  document.getElementById('earn-period-label').textContent = label;
+  document.getElementById('earn-total').textContent = '…';
+  document.getElementById('earn-count').textContent = '…';
+
+  try {
+    const data = await api('GET', `/api/stats/period?date_from=${from}&date_to=${to}`);
+    document.getElementById('earn-total').textContent = fmt(data.total_earnings) + ' ₽';
+    document.getElementById('earn-count').textContent = data.total_appointments;
+
+    // По услугам
+    const svcEl = document.getElementById('earn-by-service');
+    const byS = data.by_service || [];
+    if (!byS.length) {
+      svcEl.innerHTML = `<div class="empty-state" style="padding:12px 0"><div class="emoji" style="font-size:28px">📋</div><p>Нет данных</p></div>`;
+    } else {
+      const maxS = Math.max(...byS.map(r => r.total)) || 1;
+      svcEl.innerHTML = byS.slice(0, 10).map(r => `
+        <div class="earn-row">
+          <div style="flex:1">
+            <div class="earn-row-label">${r.procedure} <span class="earn-row-sub">· ${r.count} раз</span></div>
+            <div class="earn-bar-wrap"><div class="earn-bar" style="width:${Math.round(r.total/maxS*100)}%"></div></div>
+          </div>
+          <div class="earn-row-val">${fmt(r.total)} ₽</div>
+        </div>`).join('');
+    }
+  } catch(e) {
+    document.getElementById('earn-total').textContent = '—';
+    document.getElementById('earn-count').textContent = '—';
+  }
+
+  // По клиентам (всегда за всё время, независимо от периода)
+  loadEarnByClient();
+  // График
+  loadEarnChart();
+}
+
+async function loadEarnByClient() {
+  const el = document.getElementById('earn-by-client');
+  try {
+    const rows = await api('GET', '/api/stats/by-client');
+    if (!rows.length) {
+      el.innerHTML = `<div style="color:var(--text-muted); font-size:13px; padding:8px 0">Нет данных</div>`;
+      return;
+    }
+    const medals = ['🥇','🥈','🥉'];
+    el.innerHTML = rows.slice(0,10).map((r,i) => `
+      <div class="earn-row">
+        <div style="font-size:18px; width:24px">${medals[i] || (i+1)+'.'}</div>
+        <div style="flex:1">
+          <div class="earn-row-label">${r.name}</div>
+          <div class="earn-row-sub">${r.count} визитов</div>
+        </div>
+        <div class="earn-row-val">${fmt(r.total)} ₽</div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+async function loadEarnChart() {
+  const el = document.getElementById('earn-chart');
+  try {
+    const rows = await api('GET', '/api/stats/chart?days=30');
+    if (!rows.length) {
+      el.innerHTML = `<div style="color:var(--text-muted); font-size:13px; padding:8px 0">Нет данных за последние 30 дней</div>`;
+      return;
+    }
+    const maxV = Math.max(...rows.map(r => r.total)) || 1;
+    el.innerHTML = rows.map(r => {
+      const d = new Date(r.date + 'T00:00:00');
+      const lbl = `${d.getDate()} ${MONTHS_SHORT2[d.getMonth()]}`;
+      const pct = Math.max(Math.round(r.total / maxV * 100), r.total > 0 ? 4 : 0);
+      return `<div class="chart-row">
+        <div class="chart-date">${lbl}</div>
+        <div class="chart-bar-w"><div class="chart-bar-f" style="width:${pct}%"></div></div>
+        <div class="chart-val">${r.total ? fmt(r.total)+'₽' : '—'}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+// ─── Услуги мастера ─────────────────────────────────────────────────
+
+async function loadServices() {
+  const el = document.getElementById('services-list-body');
+  try {
+    const rows = await api('GET', '/api/services');
+    servicesCache = rows;
+    _updateServicesDatalist(rows);
+    if (!rows.length) {
+      el.innerHTML = `<div style="color:var(--text-muted); font-size:13px; padding:8px 0">
+        Список пуст — добавьте первую услугу ниже.</div>`;
+      return;
+    }
+    el.innerHTML = rows.map(s => `
+      <div class="svc-row">
+        <div style="flex:1">
+          <div class="svc-row-name">${s.name}</div>
+          ${s.price_default ? `<div class="svc-row-price">${fmt(s.price_default)} ₽</div>` : ''}
+        </div>
+        <button class="svc-del-btn" onclick="deleteService(${s.id})">🗑</button>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+function _updateServicesDatalist(rows) {
+  const dl = document.getElementById('services-datalist');
+  if (!dl) return;
+  dl.innerHTML = rows.map(s => `<option value="${s.name}">`).join('');
+}
+
+async function openServicesOverlay() {
+  openOverlay('overlay-services');
+  document.getElementById('new-svc-name').value = '';
+  document.getElementById('new-svc-price').value = '';
+  await loadServices();
+}
+
+async function addService() {
+  const name = document.getElementById('new-svc-name').value.trim();
+  const price = parseInt(document.getElementById('new-svc-price').value) || 0;
+  if (!name) { alert('Введите название услуги'); return; }
+  try {
+    await api('POST', '/api/services', { name, price_default: price });
+    document.getElementById('new-svc-name').value = '';
+    document.getElementById('new-svc-price').value = '';
+    await loadServices();
+    loadServicesCount();
+  } catch(e) { alert(e.message); }
+}
+
+async function deleteService(id) {
+  if (!confirm('Удалить услугу?')) return;
+  try {
+    await api('DELETE', `/api/services/${id}`);
+    await loadServices();
+    loadServicesCount();
+  } catch(e) { alert(e.message); }
+}
+
+async function loadServicesCount() {
+  try {
+    const rows = await api('GET', '/api/services');
+    servicesCache = rows;
+    _updateServicesDatalist(rows);
+    const el = document.getElementById('set-services-sub');
+    if (el) el.textContent = rows.length ? `${rows.length} услуг` : 'Нет услуг — нажмите, чтобы добавить';
+  } catch(e) {}
 }
 
 // ═══════════════════════════════════════════════════════════════════

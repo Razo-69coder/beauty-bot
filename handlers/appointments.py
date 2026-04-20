@@ -5,8 +5,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from datetime import datetime
 
-from database import get_or_create_master, get_clients, add_appointment
-from keyboards import select_client_keyboard, cancel_keyboard, client_card_keyboard, back_to_menu
+from database import get_or_create_master, get_clients, add_appointment, get_services, get_service
+from keyboards import select_client_keyboard, cancel_keyboard, client_card_keyboard, back_to_menu, select_service_keyboard
 
 router = Router()
 
@@ -57,11 +57,53 @@ async def cb_appointment_for(callback: CallbackQuery, state: FSMContext):
 
     from database import get_client
     client = await get_client(client_id)
+    master_id = await get_or_create_master(callback.from_user.id, callback.from_user.full_name)
+    services = await get_services(master_id)
 
+    if services:
+        await callback.message.edit_text(
+            f"📅 *Запись для {client['name']}*\n\nВыбери услугу:",
+            reply_markup=select_service_keyboard(services),
+            parse_mode="Markdown"
+        )
+    else:
+        await callback.message.edit_text(
+            f"📅 *Запись для {client['name']}*\n\n"
+            f"Что будем делать?\n\n"
+            f"_Например: Маникюр, Наращивание ресниц, Коррекция бровей_",
+            reply_markup=cancel_keyboard(),
+            parse_mode="Markdown"
+        )
+    await callback.answer()
+
+
+@router.callback_query(AddAppointmentForm.procedure, F.data.startswith("svc_select:"))
+async def cb_svc_select(callback: CallbackQuery, state: FSMContext):
+    svc_id = int(callback.data.split(":")[1])
+    master_id = await get_or_create_master(callback.from_user.id, callback.from_user.full_name)
+    svc = await get_service(svc_id, master_id)
+    if not svc:
+        await callback.answer("Услуга не найдена", show_alert=True)
+        return
+
+    await state.update_data(procedure=svc["name"], price=svc["price_default"])
+    await state.set_state(AddAppointmentForm.date)
+    today = datetime.now().strftime("%d.%m.%Y")
     await callback.message.edit_text(
-        f"📅 *Запись для {client['name']}*\n\n"
-        f"Что будем делать?\n\n"
-        f"_Например: Маникюр, Наращивание ресниц, Коррекция бровей_",
+        f"✅ Услуга: *{svc['name']}*"
+        + (f"  · {svc['price_default']}₽" if svc["price_default"] else "")
+        + f"\n\n📅 Введи дату визита:\n_Формат: ДД.ММ.ГГГГ — например {today}_",
+        reply_markup=cancel_keyboard(),
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+
+@router.callback_query(AddAppointmentForm.procedure, F.data == "svc_custom")
+async def cb_svc_custom(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text(
+        "✏️ *Введи название процедуры:*\n\n"
+        "_Например: Маникюр, Наращивание ресниц, Коррекция бровей_",
         reply_markup=cancel_keyboard(),
         parse_mode="Markdown"
     )
@@ -125,11 +167,15 @@ async def process_time(message: Message, state: FSMContext):
         )
         return
     await state.update_data(time=time_val)
+    data = await state.get_data()
     await state.set_state(AddAppointmentForm.price)
+    price_hint = ""
+    if data.get("price"):
+        price_hint = f"\n_Стандартная цена: {data['price']}₽ — просто отправь её или введи другую_"
     await message.answer(
         f"✅ Время: *{time_val if time_val else 'не указано'}*\n\n"
         f"💰 Сколько стоила процедура?\n\n"
-        f"_Введи сумму в рублях или напиши *-* чтобы пропустить_",
+        f"_Введи сумму в рублях или напиши *-* чтобы пропустить_{price_hint}",
         reply_markup=cancel_keyboard(),
         parse_mode="Markdown"
     )

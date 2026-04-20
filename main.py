@@ -31,10 +31,12 @@ from database import (
     create_login_code, verify_login_code, verify_login_code_by_code,
     get_master_full, update_master_full_settings, update_master_payment,
     search_clients,
+    get_services, add_service, delete_service,
+    get_earnings_by_service, get_earnings_by_client, get_earnings_by_day, get_earnings_by_period,
 )
 
 from scheduler import setup_scheduler
-from handlers import start, clients, appointments, settings, stats
+from handlers import start, clients, appointments, settings, stats, services
 from handlers import booking, schedule, subscriptions, templates, reviews, deposit, fallback
 
 
@@ -49,6 +51,7 @@ def build_dispatcher() -> Dispatcher:
     dp.include_router(appointments.router)
     dp.include_router(settings.router)
     dp.include_router(stats.router)
+    dp.include_router(services.router)
     dp.include_router(templates.router)
     dp.include_router(reviews.router)
     dp.include_router(deposit.router)
@@ -354,6 +357,58 @@ async def api_public_book(body: PublicBooking):
     return {"id": appt_id, "ok": True}
 
 
+# ── API: Услуги мастера ───────────────────────────────────────────────
+
+class ServiceCreate(BaseModel):
+    name: str
+    price_default: int = 0
+
+@app.get("/api/services")
+async def api_get_services(master_id: int = Depends(get_jwt_master_id)):
+    rows = await get_services(master_id)
+    return [{"id": r[0], "name": r[1], "price_default": r[2]} for r in rows]
+
+@app.post("/api/services", status_code=201)
+async def api_add_service(body: ServiceCreate, master_id: int = Depends(get_jwt_master_id)):
+    svc_id = await add_service(master_id, body.name, body.price_default)
+    return {"id": svc_id}
+
+@app.delete("/api/services/{svc_id}")
+async def api_delete_service(svc_id: int, master_id: int = Depends(get_jwt_master_id)):
+    ok = await delete_service(svc_id, master_id)
+    if not ok:
+        raise HTTPException(status_code=404)
+    return {"ok": True}
+
+
+# ── API: Расширенная статистика ───────────────────────────────────────
+
+@app.get("/api/stats/period")
+async def api_stats_period(
+    date_from: str, date_to: str,
+    master_id: int = Depends(get_jwt_master_id)
+):
+    data = await get_earnings_by_period(master_id, date_from, date_to)
+    by_svc = await get_earnings_by_service(master_id, date_from, date_to)
+    data["by_service"] = [{"procedure": r[0], "count": r[1], "total": r[2]} for r in by_svc]
+    return data
+
+@app.get("/api/stats/by-service")
+async def api_stats_by_service(master_id: int = Depends(get_jwt_master_id)):
+    rows = await get_earnings_by_service(master_id)
+    return [{"procedure": r[0], "count": r[1], "total": r[2]} for r in rows]
+
+@app.get("/api/stats/by-client")
+async def api_stats_by_client(master_id: int = Depends(get_jwt_master_id)):
+    rows = await get_earnings_by_client(master_id)
+    return [{"name": r[0], "count": r[1], "total": r[2]} for r in rows]
+
+@app.get("/api/stats/chart")
+async def api_stats_chart(days: int = 30, master_id: int = Depends(get_jwt_master_id)):
+    rows = await get_earnings_by_day(master_id, days)
+    return [{"date": r[0], "total": r[1]} for r in rows]
+
+
 # ── WebApp static ─────────────────────────────────────────────────────
 # ── JWT утилиты ───────────────────────────────────────────────────────
 
@@ -508,6 +563,20 @@ async def dash_clients(
     paged = rows[page * page_size: (page + 1) * page_size]
     return {"clients": paged, "total": total}
 
+
+@app.post("/api/dashboard/clients", status_code=201)
+async def dash_add_client(body: ClientCreate, master_id: int = Depends(get_jwt_master_id)):
+    client_id = await add_client(master_id, body.name, body.phone, body.notes)
+    return {"id": client_id}
+
+@app.post("/api/dashboard/appointments", status_code=201)
+async def dash_add_appointment(body: AppointmentCreate, master_id: int = Depends(get_jwt_master_id)):
+    appt_id = await add_appointment(
+        body.client_id, master_id, body.procedure,
+        body.appointment_date, body.price, body.notes,
+        time=body.time,
+    )
+    return {"id": appt_id}
 
 @app.put("/api/dashboard/settings")
 async def dash_settings(body: _MasterSettings, master_id: int = Depends(get_jwt_master_id)):

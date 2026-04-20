@@ -87,6 +87,15 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS services (
+                id SERIAL PRIMARY KEY,
+                master_id INTEGER REFERENCES masters(id),
+                name TEXT NOT NULL,
+                price_default INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         # Миграции для существующих баз
         for sql in [
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS payment_card TEXT DEFAULT ''",
@@ -823,6 +832,122 @@ async def get_payment_reminder_enabled(telegram_id: int) -> bool:
             "SELECT payment_reminder_enabled FROM masters WHERE telegram_id=$1", telegram_id
         )
     return bool(val) if val is not None else True
+
+
+# ── Услуги мастера ────────────────────────────────────────────────────
+
+async def add_service(master_id: int, name: str, price_default: int = 0) -> int:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO services (master_id, name, price_default) VALUES ($1,$2,$3) RETURNING id",
+            master_id, name, price_default
+        )
+    return row['id']
+
+
+async def get_services(master_id: int) -> list:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, name, price_default FROM services WHERE master_id=$1 ORDER BY created_at",
+            master_id
+        )
+    return [(r['id'], r['name'], r['price_default']) for r in rows]
+
+
+async def get_service(service_id: int, master_id: int) -> dict | None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, name, price_default FROM services WHERE id=$1 AND master_id=$2",
+            service_id, master_id
+        )
+    if not row:
+        return None
+    return {"id": row['id'], "name": row['name'], "price_default": row['price_default']}
+
+
+async def delete_service(service_id: int, master_id: int) -> bool:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            "DELETE FROM services WHERE id=$1 AND master_id=$2", service_id, master_id
+        )
+    return result != "DELETE 0"
+
+
+# ── Расширенная статистика ────────────────────────────────────────────
+
+async def get_earnings_by_period(master_id: int, date_from: str, date_to: str) -> dict:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT COUNT(*) as cnt, COALESCE(SUM(price), 0) as total
+            FROM appointments
+            WHERE master_id=$1
+              AND appointment_date BETWEEN $2 AND $3
+              AND status != 'cancelled'
+        """, master_id, date_from, date_to)
+    return {"total_appointments": row['cnt'], "total_earnings": row['total']}
+
+
+async def get_earnings_by_service(master_id: int, date_from: str = None, date_to: str = None) -> list:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        if date_from and date_to:
+            rows = await conn.fetch("""
+                SELECT procedure, COUNT(*) as cnt, COALESCE(SUM(price), 0) as total
+                FROM appointments
+                WHERE master_id=$1 AND status != 'cancelled'
+                  AND appointment_date BETWEEN $2 AND $3
+                GROUP BY procedure ORDER BY total DESC
+            """, master_id, date_from, date_to)
+        else:
+            rows = await conn.fetch("""
+                SELECT procedure, COUNT(*) as cnt, COALESCE(SUM(price), 0) as total
+                FROM appointments
+                WHERE master_id=$1 AND status != 'cancelled'
+                GROUP BY procedure ORDER BY total DESC
+            """, master_id)
+    return [(r['procedure'], r['cnt'], r['total']) for r in rows]
+
+
+async def get_earnings_by_client(master_id: int, date_from: str = None, date_to: str = None) -> list:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        if date_from and date_to:
+            rows = await conn.fetch("""
+                SELECT c.name, COUNT(a.id) as cnt, COALESCE(SUM(a.price), 0) as total
+                FROM appointments a
+                JOIN clients c ON c.id = a.client_id
+                WHERE a.master_id=$1 AND a.status != 'cancelled'
+                  AND a.appointment_date BETWEEN $2 AND $3
+                GROUP BY c.id, c.name ORDER BY total DESC LIMIT 20
+            """, master_id, date_from, date_to)
+        else:
+            rows = await conn.fetch("""
+                SELECT c.name, COUNT(a.id) as cnt, COALESCE(SUM(a.price), 0) as total
+                FROM appointments a
+                JOIN clients c ON c.id = a.client_id
+                WHERE a.master_id=$1 AND a.status != 'cancelled'
+                GROUP BY c.id, c.name ORDER BY total DESC LIMIT 20
+            """, master_id)
+    return [(r['name'], r['cnt'], r['total']) for r in rows]
+
+
+async def get_earnings_by_day(master_id: int, days: int = 30) -> list:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT appointment_date::date as day, COALESCE(SUM(price), 0) as total
+            FROM appointments
+            WHERE master_id=$1
+              AND status != 'cancelled'
+              AND appointment_date::date >= CURRENT_DATE - $2
+            GROUP BY day ORDER BY day
+        """, master_id, days)
+    return [(str(r['day']), int(r['total'])) for r in rows]
 
 
 async def set_payment_reminder_enabled(telegram_id: int, enabled: bool) -> None:

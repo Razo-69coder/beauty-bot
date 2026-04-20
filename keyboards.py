@@ -3,7 +3,7 @@ from datetime import datetime
 from config import WEBHOOK_URL
 from themes import get_theme, THEMES
 
-WEBAPP_URL = f"{WEBHOOK_URL}/app/dashboard.html?v=8" if WEBHOOK_URL else ""
+WEBAPP_URL = f"{WEBHOOK_URL}/app/dashboard.html?v=9" if WEBHOOK_URL else ""
 
 DAYS_SHORT = {0: "Пн", 1: "Вт", 2: "Ср", 3: "Чт", 4: "Пт", 5: "Сб", 6: "Вс"}
 MONTHS_RU = {
@@ -170,6 +170,7 @@ def settings_keyboard(current_days: int, theme_key: str = "pink") -> InlineKeybo
         [InlineKeyboardButton(text=f"{t['icon_time']} Рабочее время", callback_data="settings_work_hours")],
         [InlineKeyboardButton(text=f"{t['icon_link']} Ссылка для записи", callback_data="settings_booking_link")],
         [InlineKeyboardButton(text=f"{t['icon_deposit']} Предоплата", callback_data="settings_deposit")],
+        [InlineKeyboardButton(text="💅 Мои услуги", callback_data="services_list")],
         [InlineKeyboardButton(text=f"{t['icon_template']} Шаблоны сообщений", callback_data="tpl_templates")],
         [InlineKeyboardButton(text=f"{t['icon_theme']} Тема оформления", callback_data="settings_theme")],
         [InlineKeyboardButton(text="💳 Напоминание об оплате", callback_data="settings_payment_reminder")],
@@ -294,6 +295,48 @@ def stats_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="📥 Выгрузить базу в Excel", callback_data="export_excel")],
         [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")],
     ])
+
+
+def stats_menu_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="📅 Сегодня", callback_data="stats_period:day"),
+            InlineKeyboardButton(text="📆 Неделя", callback_data="stats_period:week"),
+            InlineKeyboardButton(text="🗓 Месяц", callback_data="stats_period:month"),
+            InlineKeyboardButton(text="📊 Год", callback_data="stats_period:year"),
+        ],
+        [
+            InlineKeyboardButton(text="💅 По услугам", callback_data="stats_by_service"),
+            InlineKeyboardButton(text="👥 По клиентам", callback_data="stats_by_client"),
+        ],
+        [InlineKeyboardButton(text="📈 График (30 дней)", callback_data="stats_chart")],
+        [InlineKeyboardButton(text="📥 Выгрузить в Excel", callback_data="export_excel")],
+        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")],
+    ])
+
+
+# ─── Услуги мастера ──────────────────────────────────────────────────
+def services_keyboard(services: list) -> InlineKeyboardMarkup:
+    buttons = []
+    for svc_id, name, price in services:
+        label = f"💅 {name}" + (f"  · {price}₽" if price else "")
+        buttons.append([
+            InlineKeyboardButton(text=label, callback_data="noop"),
+            InlineKeyboardButton(text="🗑", callback_data=f"svc_delete:{svc_id}"),
+        ])
+    buttons.append([InlineKeyboardButton(text="➕ Добавить услугу", callback_data="svc_add")])
+    buttons.append([InlineKeyboardButton(text="◀️ Назад к настройкам", callback_data="settings")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def select_service_keyboard(services: list) -> InlineKeyboardMarkup:
+    buttons = []
+    for svc_id, name, price in services:
+        label = f"💅 {name}" + (f"  · {price}₽" if price else "")
+        buttons.append([InlineKeyboardButton(text=label, callback_data=f"svc_select:{svc_id}")])
+    buttons.append([InlineKeyboardButton(text="✏️ Другая процедура", callback_data="svc_custom")])
+    buttons.append([InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 # ─── Абонементы ──────────────────────────────────────────────────────
