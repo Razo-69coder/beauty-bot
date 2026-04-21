@@ -22,6 +22,7 @@ from database import (
     public_book, create_login_code, verify_login_code,
     get_master_full, update_master_settings, update_master_payment,
     get_schedule, get_all_masters,
+    get_appointment, mark_appointment_done_db,
 )
 from models import (
     ClientCreate, ClientUpdate, AppointmentCreate, ReminderUpdate,
@@ -303,6 +304,28 @@ async def dashboard_create_appointment(
         body.appointment_date, body.price, body.notes, "", body.time,
     )
     return {"id": appt_id}
+
+
+@app.get("/api/dashboard/appointments/{appointment_id}")
+async def get_appointment_details(
+    appointment_id: int,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    """Получить детали записи."""
+    appt = await get_appointment(master_id, appointment_id)
+    if not appt:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+    return appt
+
+
+@app.patch("/api/dashboard/appointments/{appointment_id}/done")
+async def mark_appointment_done(
+    appointment_id: int,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    """Отмечает услугу как оказанную. Через 2 часа бот попросит отзыв."""
+    await mark_appointment_done_db(master_id, appointment_id)
+    return {"ok": True}
 
 
 @app.put("/api/dashboard/settings")

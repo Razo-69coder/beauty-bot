@@ -9,6 +9,7 @@ from database import (
     get_appointments_for_correction_reminder, mark_correction_reminder_sent,
     get_appointments_for_review, mark_review_sent,
     get_appointments_pending_deposit_24h,
+    get_appointments_for_review_request,
 )
 
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
@@ -112,28 +113,50 @@ async def send_correction_reminders(bot: Bot):
 
 
 async def send_review_requests(bot: Bot):
-    """Каждые 30 минут — просит клиента оценить визит через ~2 часа после окончания."""
+    """Каждые 30 минут — просит клиента оценить визит.
+    
+    Приоритет: сначала проверяем review_requested_at (установлен после нажатия "Услуга оказана"),
+    затем — старая логика (через 2 часа после времени записи).
+    """
     now = now_msk()
-    target = now - timedelta(hours=2)
-    target_date = target.strftime("%Y-%m-%d")
-    time_from = (target - timedelta(minutes=15)).strftime("%H:%M")
-    time_to = (target + timedelta(minutes=15)).strftime("%H:%M")
-
-    appointments = await get_appointments_for_review(target_date, time_from, time_to)
-
-    for appt_id, client_tg_id, client_id, master_id, client_name, master_name, procedure in appointments:
+    
+    appointments = await get_appointments_for_review_request(now.isoformat())
+    
+    for appt in appointments:
         from keyboards import review_rating_keyboard
         try:
             await bot.send_message(
-                client_tg_id,
-                f"💅 *{client_name}, как прошёл визит?*\n\n"
-                f"Оцените процедуру «{procedure}» у мастера {master_name}:",
-                reply_markup=review_rating_keyboard(appt_id),
+                appt['client_telegram_id'],
+                f"💅 *{appt['client_name']}, как прошёл визит?*\n\n"
+                f"Оцените процедуру «{appt['procedure']}»:",
+                reply_markup=review_rating_keyboard(appt['id']),
                 parse_mode="Markdown",
             )
-            await mark_review_sent(appt_id)
+            await mark_review_sent(appt['id'])
         except Exception:
             pass
+    
+    if not appointments:
+        target = now - timedelta(hours=2)
+        target_date = target.strftime("%Y-%m-%d")
+        time_from = (target - timedelta(minutes=15)).strftime("%H:%M")
+        time_to = (target + timedelta(minutes=15)).strftime("%H:%M")
+
+        appointments = await get_appointments_for_review(target_date, time_from, time_to)
+
+        for appt_id, client_tg_id, client_id, master_id, client_name, master_name, procedure in appointments:
+            from keyboards import review_rating_keyboard
+            try:
+                await bot.send_message(
+                    client_tg_id,
+                    f"💅 *{client_name}, как прошёл визит?*\n\n"
+                    f"Оцените процедуру «{procedure}» у мастера {master_name}:",
+                    reply_markup=review_rating_keyboard(appt_id),
+                    parse_mode="Markdown",
+                )
+                await mark_review_sent(appt_id)
+            except Exception:
+                pass
 
 
 async def send_payment_reminders_24h(bot: Bot):

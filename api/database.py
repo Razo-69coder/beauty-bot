@@ -68,6 +68,8 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN payment_card TEXT DEFAULT ''",
             "ALTER TABLE appointments ADD COLUMN time TEXT DEFAULT ''",
             "ALTER TABLE appointments ADD COLUMN status TEXT DEFAULT 'confirmed'",
+            "ALTER TABLE appointments ADD COLUMN service_done_at TEXT",
+            "ALTER TABLE appointments ADD COLUMN review_requested_at TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -431,7 +433,7 @@ async def public_book(master_telegram_id: int, date_str: str, time_str: str,
 async def get_schedule(master_id: int, date_str: str) -> list:
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("""
-            SELECT a.id, c.name, a.procedure, a.time, a.status, c.phone, a.price
+            SELECT a.id, c.name, a.procedure, a.time, a.status, c.phone, a.price, a.notes, a.service_done_at
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
             WHERE a.master_id=? AND a.appointment_date=?
@@ -440,9 +442,53 @@ async def get_schedule(master_id: int, date_str: str) -> list:
             rows = await cursor.fetchall()
     return [
         {"id": r[0], "client": r[1], "procedure": r[2], "time": r[3],
-         "status": r[4], "phone": r[5], "price": r[6]}
+         "status": r[4], "phone": r[5], "price": r[6], "notes": r[7] or '', "service_done_at": r[8]}
         for r in rows
     ]
+
+
+async def get_appointment(master_id: int, appointment_id: int) -> dict | None:
+    """Получить детали одной записи."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("""
+            SELECT a.id, c.name, c.phone, a.procedure, a.appointment_date, a.time,
+                   a.status, a.price, a.notes, a.service_done_at
+            FROM appointments a
+            JOIN clients c ON c.id = a.client_id
+            WHERE a.id=? AND a.master_id=?
+        """, (appointment_id, master_id)) as cursor:
+            row = await cursor.fetchone()
+    if not row:
+        return None
+    return {
+        "id": row[0], "client": row[1], "phone": row[2], "procedure": row[3],
+        "date": row[4], "time": row[5], "status": row[6], "price": row[7],
+        "notes": row[8] or '', "service_done_at": row[9]
+    }
+
+
+async def update_appointment_status_db(master_id: int, appointment_id: int, status: str):
+    """Обновить статус записи."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE appointments SET status=? WHERE id=? AND master_id=?",
+            (status, appointment_id, master_id)
+        )
+        await db.commit()
+
+
+async def mark_appointment_done_db(master_id: int, appointment_id: int):
+    """Отметить услугу как оказанную. Устанавливает статус completed и планирует запрос отзыва через 2 часа."""
+    from datetime import datetime, timedelta
+    done_at = datetime.utcnow().isoformat()
+    review_at = (datetime.utcnow() + timedelta(hours=2)).isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE appointments
+            SET service_done_at=?, review_requested_at=?, status='completed'
+            WHERE id=? AND master_id=?
+        """, (done_at, review_at, appointment_id, master_id))
+        await db.commit()
 
 
 # ── Авторизация в веб-панели (код из бота) ────────────────────────────

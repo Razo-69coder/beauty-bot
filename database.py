@@ -107,6 +107,8 @@ async def init_db():
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS deposit_amount INTEGER DEFAULT 0",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'pink'",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS payment_reminder_enabled BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS service_done_at TIMESTAMP",
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS review_requested_at TIMESTAMP",
         ]:
             try:
                 await conn.execute(sql)
@@ -347,6 +349,37 @@ async def update_appointment_status(appointment_id: int, status: str):
         await conn.execute(
             "UPDATE appointments SET status=$1 WHERE id=$2", status, appointment_id
         )
+
+
+async def update_appointment_service_done(appointment_id: int):
+    """Отмечает услугу как оказанную. Устанавливает статус completed и планирует запрос отзыва через 2 часа."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE appointments
+            SET service_done_at = NOW(),
+                review_requested_at = NOW() + INTERVAL '2 hours',
+                status = 'completed'
+            WHERE id = $1
+        """, appointment_id)
+
+
+async def get_appointments_for_review_request(target_time: str) -> list:
+    """Получает записи, где пора просить отзыв (service_done_at есть, review_requested_at <= now, review ещё не запрошен)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT a.id, a.client_id, a.master_id, a.procedure,
+                   c.name as client_name, c.telegram_id as client_telegram_id
+            FROM appointments a
+            JOIN clients c ON c.id = a.client_id
+            WHERE a.service_done_at IS NOT NULL
+              AND a.review_requested_at IS NOT NULL
+              AND a.review_requested_at <= $1::timestamp
+              AND a.review_sent = 0
+            ORDER BY a.review_requested_at
+        """, target_time)
+        return [dict(row) for row in rows]
 
 
 async def get_appointment_client_telegram(appointment_id: int) -> tuple:

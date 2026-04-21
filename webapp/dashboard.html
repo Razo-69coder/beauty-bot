@@ -394,6 +394,7 @@ body::after {
 .status-confirmed { background: #f0fff4; color: #30a060; }
 .status-pending   { background: #fff8e8; color: #c08030; }
 .status-cancelled { background: #fff0f0; color: #c04040; }
+.status-completed  { background: #e8f4ff; color: #3080d0; }
 
 /* ════════════════════════════════════════════════════════════════
    ЭКРАН: КЛИЕНТЫ
@@ -1070,6 +1071,19 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
   </div>
 </div>
 
+<!-- Детали записи -->
+<div class="overlay" id="overlay-appointment-detail">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title" id="appt-detail-title">Запись</div>
+    <div id="appt-detail-body" style="text-align:left">
+      <div class="loader"><div class="spinner"></div>Загружаем...</div>
+    </div>
+    <button class="btn btn-primary" id="btn-service-done" style="margin-top:14px" onclick="markServiceDone()">✅ Услуга оказана</button>
+    <button class="btn btn-secondary" style="margin-top:8px" onclick="closeOverlay()">Закрыть</button>
+  </div>
+</div>
+
 <!-- Предоплата -->
 <div class="overlay" id="overlay-deposit">
   <div class="overlay-sheet">
@@ -1564,10 +1578,10 @@ async function loadSchedule(dateStr) {
       </div>`;
       return;
     }
-    const statusLabel = { confirmed: 'Подтверждена', pending: 'Ожидает', cancelled: 'Отменена' };
-    const statusClass = { confirmed: 'status-confirmed', pending: 'status-pending', cancelled: 'status-cancelled' };
+    const statusLabel = { confirmed: 'Подтверждена', pending: 'Ожидает', cancelled: 'Отменена', completed: 'Завершена' };
+    const statusClass = { confirmed: 'status-confirmed', pending: 'status-pending', cancelled: 'status-cancelled', completed: 'status-completed' };
     content.innerHTML = data.appointments.map(a => `
-      <div class="appt-item">
+      <div class="appt-item" onclick="openAppointmentDetailOverlay(${a.id})">
         <div class="appt-time-col">
           <div class="appt-time">${a.time || '—'}</div>
           <div class="appt-dot"></div>
@@ -1583,6 +1597,72 @@ async function loadSchedule(dateStr) {
       </div>`).join('');
   } catch (e) {
     content.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+let currentAppointmentId = null;
+
+async function openAppointmentDetailOverlay(apptId) {
+  currentAppointmentId = apptId;
+  openOverlay('overlay-appointment-detail');
+  const body = document.getElementById('appt-detail-body');
+  const btn = document.getElementById('btn-service-done');
+  try {
+    const a = await api('GET', `/api/dashboard/appointments/${apptId}`);
+    const statusLabel = { confirmed: 'Подтверждена', pending: 'Ожидает', cancelled: 'Отменена', completed: 'Завершена' };
+    const isDone = a.status === 'completed' || a.service_done_at;
+    btn.disabled = isDone;
+    btn.textContent = isDone ? '✅ Услуга оказана' : '✅ Услуга оказана';
+    btn.style.display = (a.status === 'cancelled') ? 'none' : 'inline-block';
+    body.innerHTML = `
+      <div style="margin-bottom:16px">
+        <div style="font-size:24px; font-weight:700; margin-bottom:4px">${a.client}</div>
+        <div style="color:rgba(255,255,255,0.55); font-size:14px">${a.phone || '—'}</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.05); border-radius:12px; padding:16px; margin-bottom:16px">
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px">
+          <span style="color:rgba(255,255,255,0.55)">Дата</span>
+          <span>${a.date || '—'}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px">
+          <span style="color:rgba(255,255,255,0.55)">Время</span>
+          <span>${a.time || '—'}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px">
+          <span style="color:rgba(255,255,255,0.55)">Услуга</span>
+          <span>${a.procedure || '—'}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px">
+          <span style="color:rgba(255,255,255,0.55)">Цена</span>
+          <span>${a.price ? fmt(a.price) + ' ₽' : '—'}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between">
+          <span style="color:rgba(255,255,255,0.55)">Статус</span>
+          <span>${statusLabel[a.status] || a.status}</span>
+        </div>
+      </div>
+      ${a.notes ? `<div style="color:rgba(255,255,255,0.55); font-size:13px; margin-bottom:8px">Заметки:</div><div style="background:rgba(255,255,255,0.05); border-radius:8px; padding:12px">${a.notes}</div>` : ''}
+      ${isDone ? `<div style="margin-top:16px; padding:12px; background:rgba(76,175,80,0.15); border-radius:8px; font-size:13px">✅ Услуга выполнена. Через 2 часа клиенту будет предложено оставить отзыв.</div>` : ''}
+    `;
+  } catch (e) {
+    body.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+  }
+}
+
+async function markServiceDone() {
+  if (!currentAppointmentId) return;
+  const btn = document.getElementById('btn-service-done');
+  btn.disabled = true;
+  btn.textContent = 'Сохраняем...';
+  try {
+    await api('PATCH', `/api/dashboard/appointments/${currentAppointmentId}/done`);
+    btn.textContent = '✅ Услуга оказана';
+    closeOverlay();
+    loadSchedule(currentScheduleDate);
+  } catch (e) {
+    alert(e.message);
+    btn.disabled = false;
+    btn.textContent = '✅ Услуга оказана';
   }
 }
 
