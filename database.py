@@ -1035,24 +1035,41 @@ async def get_appointments_pending_deposit_24h(target_date: str) -> list:
     return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
 
 
-async def get_appointments_pending_deposit_2h() -> list:
-    """Записи с невнесённой предоплатой, созданные 2-3 часа назад."""
+async def get_appointments_pending_deposit_after_service() -> list:
+    """Записи с невнесённой предоплатой, время которых уже прошло + длительность слота."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT a.id, c.telegram_id, c.name, m.telegram_id,
-                   a.appointment_date, a.time, m.deposit_percent
+                   a.appointment_date, a.time, m.deposit_percent, m.slot_duration
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
             JOIN masters m ON m.id = a.master_id
-            WHERE a.created_at >= NOW() - INTERVAL '3 hours'
-              AND a.created_at < NOW() - INTERVAL '2 hours'
-              AND a.deposit_status = 'pending_payment'
+            WHERE a.deposit_status = 'pending_payment'
               AND a.status != 'cancelled'
               AND c.telegram_id IS NOT NULL
               AND COALESCE(m.payment_reminder_enabled, TRUE) = TRUE
+              AND a.appointment_date IS NOT NULL
+              AND a.time IS NOT NULL
         """)
-    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
+    
+    result = []
+    now = datetime.now()
+    for r in rows:
+        appt_id, client_tg, client_name, master_tg, date, time_str, deposit_pct, slot_duration = r
+        if not date or not time_str:
+            continue
+        try:
+            # Время записи + длительность слота
+            appt_dt = datetime.strptime(f"{date} {time_str}", "%Y-%m-%d %H:%M")
+            slot_minutes = slot_duration or 60
+            end_dt = appt_dt + timedelta(minutes=slot_minutes)
+            # Если время окончания прошло (от 5 минут до 2 часов назад)
+            if end_dt <= now and now - end_dt < timedelta(hours=2):
+                result.append((appt_id, client_tg, client_name, master_tg, date, time_str, deposit_pct))
+        except:
+            continue
+    return result
 
 
 # ── Часовые пояса ───────────────────────────────────────────────────────

@@ -8,7 +8,7 @@ from database import (
     mark_reminder_sent,
     get_appointments_for_correction_reminder, mark_correction_reminder_sent,
     get_appointments_for_review, mark_review_sent,
-    get_appointments_pending_deposit_24h, get_appointments_pending_deposit_2h,
+    get_appointments_pending_deposit_24h, get_appointments_pending_deposit_after_service,
     get_appointments_for_review_request,
 )
 
@@ -180,20 +180,20 @@ async def send_payment_reminders_24h(bot: Bot):
             pass
 
 
-async def send_payment_reminders_2h(bot: Bot):
-    """Каждые 30 минут — напоминает об оплате через 2 часа после записи."""
-    appointments = await get_appointments_pending_deposit_2h()
+async def send_payment_reminders_after_service(bot: Bot):
+    """Каждые 30 минут — напоминает об оплате после окончания процедуры."""
+    appointments = await get_appointments_pending_deposit_after_service()
     
-    for appt_id, client_tg_id, client_name, master_tg_id, date, time, deposit_pct in appointments:
+    for appt_id, client_tg_id, client_name, master_tg_id, date, time_str, deposit_pct in appointments:
         date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
-        time_str = f" в *{time}*" if time else ""
+        time_msg = f" в *{time_str}*" if time_str else ""
         try:
             await bot.send_message(
                 client_tg_id,
-                f"💳 *Напоминание об оплате*\n\n"
-                f"Вы записаны на *{date_fmt}*{time_str}.\n\n"
-                f"Для подтверждения записи внесите предоплату *{deposit_pct}%*.\n\n"
-                f"После оплаты мастер подтвердит вашу запись ✅",
+                f"💳 *Оплата услуги*\n\n"
+                f"*{client_name}*, сеанс *{date_fmt}*{time_msg} завершён.\n\n"
+                f"Пожалуйста, внесите оплату *{deposit_pct}%* за услугу.\n\n"
+                f"Спасибо! 🙏",
                 parse_mode="Markdown"
             )
         except Exception:
@@ -219,7 +219,7 @@ def setup_scheduler(bot: Bot):
     # Напоминание об оплате за 24 часа до визита (в 19:00)
     scheduler.add_job(send_payment_reminders_24h, "cron", hour=19, minute=0, args=[bot])
     
-    # Напоминание об оплате через 2 часа после записи
-    scheduler.add_job(send_payment_reminders_2h, "interval", minutes=30, args=[bot])
+    # Напоминание об оплате после окончания процедуры
+    scheduler.add_job(send_payment_reminders_after_service, "interval", minutes=30, args=[bot])
 
     scheduler.start()
