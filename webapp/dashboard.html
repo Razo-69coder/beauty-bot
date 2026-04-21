@@ -1382,14 +1382,15 @@ async function _doVerify(code, errEl, btn) {
     localStorage.setItem('bb_token', token);
     localStorage.setItem('bb_master', JSON.stringify(master));
     
-    // Автоопределение timezone - без await чтобы не блокировать
+    // Автоопределение timezone
     if (!master.timezone) {
       const autoTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (autoTz) {
-        master.timezone = autoTz;
-        localStorage.setItem('bb_master', JSON.stringify(master));
-        // Сохраняем асинхронно, не ждём
-        api('PUT', '/api/dashboard/timezone', { timezone: autoTz }).catch(() => {});
+        try {
+          await api('PUT', '/api/dashboard/timezone', { timezone: autoTz });
+          master.timezone = autoTz;
+          localStorage.setItem('bb_master', JSON.stringify(master));
+        } catch(e) {}
       }
     }
     
@@ -1974,27 +1975,16 @@ async function openClientHistory(clientId, clientName) {
 }
 
 async function writeToClient() {
-  alert('writeToClient START');
-  // 2. Если есть phone (похож на реальный) — открываем чат по номеру
-  const phone = currentClientPhone || '';
-  alert('phone=' + phone);
-  if (phone) {
-    const cleanPhone = phone.replace(/[^\d]/g, '');
-    alert('clean=' + cleanPhone + ' len=' + cleanPhone.length);
-    if (cleanPhone.length >= 10) {
-      window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
-      return;
-    }
+  // 1. Если есть username — открываем сразу чат с клиентом
+  if (currentClientUsername) {
+    window.open(`https://t.me/${currentClientUsername}`, '_blank');
+    return;
   }
   
   // 2. Если есть phone (похож на реальный) — открываем чат по номеру
-  const phone = currentClientPhone || '';
-  alert('START phone=' + phone);
-  if (phone) {
-    const cleanPhone = phone.replace(/[^\d]/g, '');
-    alert('CLEAN=' + cleanPhone + ' len=' + cleanPhone.length);
+  if (currentClientPhone) {
+    const cleanPhone = currentClientPhone.replace(/[^\d]/g, '');
     if (cleanPhone.length >= 10) {
-      alert('OPENING chat...');
       window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
       return;
     }
@@ -2023,6 +2013,8 @@ async function writeToClient() {
       username: currentClientUsername
     });
   } catch(e) {}
+  window.open(`https://t.me/${currentClientUsername}`, '_blank');
+}
   
   // Открываем чат
   window.open(`https://t.me/${currentClientUsername}`, '_blank');
