@@ -1856,16 +1856,16 @@ async function openClientHistory(clientId, clientName) {
 async function writeToClient() {
   let phone = currentClientPhone;
   
-  // 1. Если есть telegram_id — открываем чат напрямую
+  // 1. Если есть telegram_id — открываем чат через t.me
   if (currentClientTgId) {
-    window.open(`tg://resolve?chat_id=${currentClientTgId}`, '_blank');
+    window.open(`https://t.me/resolve?chat_id=${currentClientTgId}`, '_blank');
     return;
   }
   
   // 2. Если нет telegram_id, но есть phone — открываем чат по номеру
   if (phone) {
     const cleanPhone = phone.replace(/[^\d]/g, '');
-    window.open(`tg://resolve?phone=${cleanPhone}`, '_blank');
+    window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
     return;
   }
   
@@ -1883,7 +1883,7 @@ async function writeToClient() {
   
   // Открываем чат
   const cleanPhone = currentClientPhone.replace(/[^\d]/g, '');
-  window.open(`tg://resolve?phone=${cleanPhone}`, '_blank');
+  window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
 }
 
 // ─── Настройки ─────────────────────────────────────────────────────
