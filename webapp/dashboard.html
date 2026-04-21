@@ -818,6 +818,16 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
         </div>
         <span class="row-arrow">›</span>
       </div>
+      <div class="settings-row" onclick="openOverlay('overlay-timezone')">
+        <div class="row-left">
+          <span class="row-icon">🌍</span>
+          <div>
+            <div class="row-title">Часовой пояс</div>
+            <div class="row-sub" id="set-tz-sub">Europe/Moscow</div>
+          </div>
+        </div>
+        <span class="row-arrow">›</span>
+      </div>
     </div>
 
     <!-- Ссылка записи -->
@@ -1001,6 +1011,32 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
   </div>
 </div>
 
+<!-- Часовой пояс -->
+<div class="overlay" id="overlay-timezone">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">Часовой пояс</div>
+    <div class="field">
+      <label>Выберите ваш часовой пояс</label>
+      <select id="ov-timezone">
+        <option value="Europe/Kaliningrad">Калининград (UTC+2)</option>
+        <option value="Europe/Moscow" selected>Москва (UTC+3)</option>
+        <option value="Europe/Samara">Самара (UTC+4)</option>
+        <option value="Asia/Yekaterinburg">Екатеринбург (UTC+5)</option>
+        <option value="Asia/Omsk">Омск (UTC+6)</option>
+        <option value="Asia/Krasnoyarsk">Красноярск (UTC+7)</option>
+        <option value="Asia/Irkutsk">Иркутск (UTC+8)</option>
+        <option value="Asia/Vladivostok">Владивосток (UTC+10)</option>
+        <option value="Asia/Magadan">Магадан (UTC+11)</option>
+        <option value="Asia/Kamchatka">Камчатка (UTC+12)</option>
+        <option value="Asia/Almaty">Алматы (UTC+6)</option>
+        <option value="Asia/Tashkent">Ташкент (UTC+5)</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="saveTimezone()">Сохранить</button>
+  </div>
+</div>
+
 <!-- Добавить клиента -->
 <div class="overlay" id="overlay-add-client">
   <div class="overlay-sheet">
@@ -1023,6 +1059,32 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
       <input id="new-client-notes" type="text" placeholder="Аллергия на лак...">
     </div>
     <button class="btn btn-primary" onclick="saveNewClient()">Добавить клиента</button>
+    <button class="btn btn-secondary" style="margin-top:8px" onclick="closeOverlay()">Отмена</button>
+  </div>
+</div>
+
+<!-- Редактировать клиента -->
+<div class="overlay" id="overlay-edit-client">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">Редактировать: <span id="edit-client-name-display"></span></div>
+    <div class="field">
+      <label>Имя</label>
+      <input id="edit-client-name" type="text" placeholder="Имя клиента">
+    </div>
+    <div class="field">
+      <label>Телефон</label>
+      <input id="edit-client-phone" type="tel" placeholder="+79001234567">
+    </div>
+    <div class="field">
+      <label>Telegram username</label>
+      <input id="edit-client-username" type="text" placeholder="@username">
+    </div>
+    <div class="field">
+      <label>Заметки</label>
+      <input id="edit-client-notes" type="text" placeholder="Заметки...">
+    </div>
+    <button class="btn btn-primary" onclick="saveEditedClient()">Сохранить</button>
     <button class="btn btn-secondary" style="margin-top:8px" onclick="closeOverlay()">Отмена</button>
   </div>
 </div>
@@ -1069,6 +1131,7 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
     <div style="display:flex; gap:8px; margin-top:14px">
       <button class="btn btn-primary" style="flex:1" id="btn-write-client" onclick="writeToClient()">✏️ Написать</button>
       <button class="btn btn-secondary" style="flex:1" onclick="openBookClientOverlay()">📅 Записать</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="openEditClientOverlay()">✂️ Изменить</button>
     </div>
     <button class="btn btn-secondary" style="margin-top:8px" onclick="closeOverlay()">Закрыть</button>
   </div>
@@ -1318,6 +1381,19 @@ async function _doVerify(code, errEl, btn) {
     master = data.master;
     localStorage.setItem('bb_token', token);
     localStorage.setItem('bb_master', JSON.stringify(master));
+    
+    // Автоопределение timezone
+    if (!master.timezone) {
+      const autoTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (autoTz) {
+        try {
+          await api('PUT', '/api/dashboard/timezone', { timezone: autoTz });
+          master.timezone = autoTz;
+          localStorage.setItem('bb_master', JSON.stringify(master));
+        } catch(e) {}
+      }
+    }
+    
     afterLogin();
   } catch (e) {
     errEl.textContent = e.message;
@@ -1691,6 +1767,7 @@ async function loadClients(page) {
       </div>`;
       return;
     }
+    _clientsCache = data.clients || [];
     listEl.innerHTML = data.clients.map(c => {
       const initials = (c.name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
       const lastVisit = c.last_visit ? c.last_visit.slice(0, 10) : 'нет визитов';
@@ -1772,12 +1849,54 @@ async function saveNewClient() {
   } catch(e) { alert(e.message); }
 }
 
+// ─── Редактирование клиента ───────────────────────────────────────────
+
+async function openEditClientOverlay() {
+  try {
+    const client = await api('GET', `/api/dashboard/clients/${currentClientId}`);
+    document.getElementById('edit-client-name-display').textContent = client.name;
+    document.getElementById('edit-client-name').value = client.name || '';
+    document.getElementById('edit-client-phone').value = client.phone || '';
+    document.getElementById('edit-client-username').value = client.username || '';
+    document.getElementById('edit-client-notes').value = client.notes || '';
+    openOverlay('overlay-edit-client');
+  } catch(e) {
+    alert(e.message);
+  }
+}
+
+let _clientsCache = [];
+
+async function saveEditedClient() {
+  const name = document.getElementById('edit-client-name').value.trim();
+  const phone = document.getElementById('edit-client-phone').value.trim();
+  const username = document.getElementById('edit-client-username').value.trim().replace('@', '');
+  const notes = document.getElementById('edit-client-notes').value.trim();
+  if (!name) { alert('Введите имя'); return; }
+  try {
+    await api('PUT', `/api/dashboard/clients/${currentClientId}`, {
+      name, phone, username, notes
+    });
+    closeOverlay();
+    currentClientName = name;
+    currentClientPhone = phone;
+    currentClientUsername = username;
+    loadClients(0);
+    openClientHistory(currentClientId, name);
+  } catch(e) { alert(e.message); }
+}
+
+function _getClientById(id) {
+  return _clientsCache.find(c => c.id === id);
+}
+
 // ─── Запись клиента ──────────────────────────────────────────────────
 
 let currentClientId = null;
 let currentClientName = '';
 let currentClientPhone = '';
 let currentClientTgId = null;
+let currentClientUsername = '';
 
 function openBookClientOverlay() {
   if (!currentClientId) return;
@@ -1816,6 +1935,7 @@ async function openClientHistory(clientId, clientName) {
   currentClientName = clientName;
   currentClientTgId = null;
   currentClientPhone = '';
+  currentClientUsername = '';
   document.getElementById('client-history-title').textContent = `${clientName} — история`;
   document.getElementById('client-history-body').innerHTML =
     '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
@@ -1825,7 +1945,8 @@ async function openClientHistory(clientId, clientName) {
     const data = await api('GET', `/api/dashboard/clients/${clientId}`);
     currentClientTgId = data.telegram_id || null;
     currentClientPhone = data.phone || '';
-    if (currentClientTgId || currentClientPhone) {
+    currentClientUsername = data.username || '';
+    if (currentClientTgId || currentClientPhone || currentClientUsername) {
       document.getElementById('btn-write-client').style.display = 'inline-block';
     }
     const hist = data.history || [];
@@ -1854,23 +1975,13 @@ async function openClientHistory(clientId, clientName) {
 }
 
 async function writeToClient() {
-  // 1. Если есть username — открываем чат
+  // 1. Если есть username — открываем сразу чат с клиентом
   if (currentClientUsername) {
     window.open(`https://t.me/${currentClientUsername}`, '_blank');
     return;
   }
   
-  // 2. Если есть phone — открываем чат по номеру
-  const phone = currentClientPhone || '';
-  if (phone) {
-    const cleanPhone = phone.replace(/[^\d]/g, '');
-    if (cleanPhone.length >= 10) {
-      window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
-      return;
-    }
-  }
-  
-  // 3. Если есть telegram_id — открываем через приложение
+  // 2. Если есть telegram_id но нет username — просим ввести username
   if (currentClientTgId) {
     const username = prompt('Введите username клиента в Telegram (например, @username):');
     if (!username || !username.trim()) return;
@@ -1884,15 +1995,30 @@ async function writeToClient() {
     return;
   }
   
-  // 4. Нет ничего — запрашиваем username
+// 3. Если есть phone (похож на реальный) — открываем чат по номеру
+  if (currentClientPhone) {
+    const cleanPhone = currentClientPhone.replace(/[^\d+]/g, '');
+    if (cleanPhone.length >= 10) {
+      window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
+      return;
+    }
+  }
+
+  // 4. Запрашиваем username у мастера
   const username = prompt('Введите username клиента в Telegram (например, @username):');
   if (!username || !username.trim()) return;
+  
+  // Убираем @ если есть
   currentClientUsername = username.trim().replace('@', '');
+  
+  // Сохраняем в БД
   try {
     await api('PUT', `/api/dashboard/clients/${currentClientId}`, {
       username: currentClientUsername
     });
   } catch(e) {}
+  
+  // Открываем чат
   window.open(`https://t.me/${currentClientUsername}`, '_blank');
 }
 
@@ -1906,6 +2032,7 @@ function fillSettings() {
     `${master.work_start || 10}:00 — ${master.work_end || 20}:00`;
   document.getElementById('set-slot-sub').textContent = `${master.slot_duration || 60} минут`;
   document.getElementById('set-remind-sub').textContent = `через ${master.reminder_days || 40} дней`;
+  document.getElementById('set-tz-sub').textContent = master.timezone || 'Europe/Moscow';
   const link = bookingLink || `${location.origin}/booking.html?master=${master.telegram_id}`;
   document.getElementById('set-link-sub').textContent = link;
 
@@ -1914,6 +2041,7 @@ function fillSettings() {
   document.getElementById('ov-payment').value = master.payment_card || '';
   document.getElementById('ov-slot').value = master.slot_duration || 60;
   document.getElementById('ov-remind').value = master.reminder_days || 40;
+  document.getElementById('ov-timezone').value = master.timezone || 'Europe/Moscow';
 
   // Часы работы: заполняем select
   const wsEl = document.getElementById('ov-wstart');
@@ -1977,6 +2105,17 @@ async function saveReminder() {
   master.reminder_days = days;
   localStorage.setItem('bb_master', JSON.stringify(master));
   document.getElementById('set-remind-sub').textContent = `через ${days} дней`;
+  closeOverlay();
+}
+
+async function saveTimezone() {
+  const timezone = document.getElementById('ov-timezone').value;
+  try {
+    await api('PUT', '/api/dashboard/timezone', { timezone });
+  } catch(e) { alert(e.message); return; }
+  master.timezone = timezone;
+  localStorage.setItem('bb_master', JSON.stringify(master));
+  document.getElementById('set-tz-sub').textContent = timezone;
   closeOverlay();
 }
 
