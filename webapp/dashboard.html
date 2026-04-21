@@ -1975,8 +1975,11 @@ async function openClientHistory(clientId, clientName) {
 }
 
 async function writeToClient() {
+  alert('writeToClient: username=' + (currentClientUsername || 'none') + ' tgId=' + (currentClientTgId || 'none') + ' phone=' + (currentClientPhone || 'none'));
+  
   // 1. Если есть username — открываем сразу чат с клиентом
   if (currentClientUsername) {
+    alert('Opening: t.me/' + currentClientUsername);
     window.open(`https://t.me/${currentClientUsername}`, '_blank');
     return;
   }
