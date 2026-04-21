@@ -1,5 +1,10 @@
 # Claude Code Configuration - RuFlo V3
 
+## Design Rules
+
+- Для создания дизайнов (лендинги, UI) используй **cursor-talk-to-figma-mcp** (write), а не read-only `figma-mcp`
+- Figma write MCP требует запущенного плагина "Cursor Talk to Figma" в Figma
+
 ## Behavioral Rules (Always Enforced)
 
 - Do what has been asked; nothing more, nothing less

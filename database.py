@@ -432,13 +432,13 @@ async def get_master_schedule(master_id: int, date: str) -> list:
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
-            SELECT a.id, c.name, a.procedure, a.time, a.status, c.phone
+            SELECT a.id, c.name, a.procedure, a.time, a.status, c.phone, a.notes, a.service_done_at
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
             WHERE a.master_id=$1 AND a.appointment_date=$2
             ORDER BY a.time, a.id
         """, master_id, date)
-    return [(r['id'], r['name'], r['procedure'], r['time'], r['status'], r['phone']) for r in rows]
+    return [(r['id'], r['name'], r['procedure'], r['time'], r['status'], r['phone'], r['notes'], r['service_done_at']) for r in rows]
 
 
 # ── Напоминания клиентам ──────────────────────────────────────────────

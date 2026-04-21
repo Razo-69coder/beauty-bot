@@ -33,6 +33,7 @@ from database import (
     search_clients,
     get_services, add_service, delete_service,
     get_earnings_by_service, get_earnings_by_client, get_earnings_by_day, get_earnings_by_period,
+    get_appointment_with_client, update_appointment_service_done,
 )
 
 from scheduler import setup_scheduler
@@ -554,7 +555,7 @@ async def dash_schedule(date: str, master_id: int = Depends(get_jwt_master_id)):
     return {
         "date": date,
         "appointments": [
-            {"id": r[0], "client": r[1], "procedure": r[2], "time": r[3], "status": r[4], "phone": r[5]}
+            {"id": r[0], "client": r[1], "procedure": r[2], "time": r[3], "status": r[4], "phone": r[5], "notes": r[6] or "", "service_done_at": r[7]}
             for r in rows
         ],
     }
@@ -601,6 +602,35 @@ async def dash_add_appointment(body: AppointmentCreate, master_id: int = Depends
         time=body.time,
     )
     return {"id": appt_id}
+
+
+@app.get("/api/dashboard/appointments/{appointment_id}")
+async def dash_get_appointment(
+    appointment_id: int,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    appt = await get_appointment_with_client(appointment_id)
+    if not appt or appt["master_id"] != master_id:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+    return {
+        "id": appt["id"], "client": appt["client_name"],
+        "phone": "", "procedure": appt["procedure"],
+        "date": appt["appointment_date"], "time": appt["time"] or "",
+        "status": "confirmed", "price": appt["deposit_amount"],
+        "notes": "", "service_done_at": None,
+    }
+
+
+@app.patch("/api/dashboard/appointments/{appointment_id}/done")
+async def dash_mark_done(
+    appointment_id: int,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    appt = await get_appointment_with_client(appointment_id)
+    if not appt or appt["master_id"] != master_id:
+        raise HTTPException(status_code=404, detail="Запись не найдена")
+    await update_appointment_service_done(appointment_id)
+    return {"ok": True}
 
 @app.put("/api/dashboard/settings")
 async def dash_settings(body: _MasterSettings, master_id: int = Depends(get_jwt_master_id)):
