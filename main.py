@@ -674,6 +674,22 @@ async def dash_template_count(type: str, master_id: int = Depends(get_jwt_master
     clients = await _template_clients(type, master_id)
     return {"count": len(clients)}
 
+
+class _SendMessageBody(BaseModel):
+    telegram_id: int
+    text: str
+
+
+@app.post("/api/dashboard/send-message")
+async def dash_send_message(body: _SendMessageBody, master_id: int = Depends(get_jwt_master_id)):
+    """Отправить сообщение клиенту от имени бота."""
+    try:
+        await bot.send_message(chat_id=body.telegram_id, text=body.text)
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 class _SendTemplateBody(BaseModel):
     template_type: str
 
