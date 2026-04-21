@@ -1381,6 +1381,19 @@ async function _doVerify(code, errEl, btn) {
     master = data.master;
     localStorage.setItem('bb_token', token);
     localStorage.setItem('bb_master', JSON.stringify(master));
+    
+    // Автоопределение timezone
+    if (!master.timezone) {
+      const autoTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (autoTz) {
+        try {
+          await api('PUT', '/api/dashboard/timezone', { timezone: autoTz });
+          master.timezone = autoTz;
+          localStorage.setItem('bb_master', JSON.stringify(master));
+        } catch(e) {}
+      }
+    }
+    
     afterLogin();
   } catch (e) {
     errEl.textContent = e.message;

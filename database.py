@@ -1035,6 +1035,26 @@ async def get_appointments_pending_deposit_24h(target_date: str) -> list:
     return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
 
 
+async def get_appointments_pending_deposit_2h() -> list:
+    """Записи с невнесённой предоплатой, созданные 2-3 часа назад."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT a.id, c.telegram_id, c.name, m.telegram_id,
+                   a.appointment_date, a.time, m.deposit_percent
+            FROM appointments a
+            JOIN clients c ON c.id = a.client_id
+            JOIN masters m ON m.id = a.master_id
+            WHERE a.created_at >= NOW() - INTERVAL '3 hours'
+              AND a.created_at < NOW() - INTERVAL '2 hours'
+              AND a.deposit_status = 'pending_payment'
+              AND a.status != 'cancelled'
+              AND c.telegram_id IS NOT NULL
+              AND COALESCE(m.payment_reminder_enabled, TRUE) = TRUE
+        """)
+    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
+
+
 # ── Часовые пояса ───────────────────────────────────────────────────────
 
 def get_local_time(utc_time: datetime, timezone: str) -> datetime:
