@@ -1877,7 +1877,16 @@ async function writeToClient() {
     return;
   }
   
-// 3. Запрашиваем username у мастера
+// 3. Если есть phone (похож на реальный) — открываем чат по номеру
+  if (currentClientPhone) {
+    const cleanPhone = currentClientPhone.replace(/[^\d+]/g, '');
+    if (cleanPhone.length >= 10) {
+      window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
+      return;
+    }
+  }
+
+  // 4. Запрашиваем username у мастера
   const username = prompt('Введите username клиента в Telegram (например, @username):');
   if (!username || !username.trim()) return;
   
