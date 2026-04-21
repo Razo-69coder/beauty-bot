@@ -818,6 +818,16 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
         </div>
         <span class="row-arrow">›</span>
       </div>
+      <div class="settings-row" onclick="openOverlay('overlay-timezone')">
+        <div class="row-left">
+          <span class="row-icon">🌍</span>
+          <div>
+            <div class="row-title">Часовой пояс</div>
+            <div class="row-sub" id="set-tz-sub">Europe/Moscow</div>
+          </div>
+        </div>
+        <span class="row-arrow">›</span>
+      </div>
     </div>
 
     <!-- Ссылка записи -->
@@ -1312,26 +1322,16 @@ function setTheme(t) {
 let tgUserId = null;  // Telegram ID из WebApp, если доступен
 
 async function requestCode() {
-  if (!tgUserId) {
-    showManualLogin();
-    return;
-  }
+  if (!tgUserId) return;
   document.getElementById('login-state-sending').style.display = '';
   document.getElementById('login-state-code').style.display = 'none';
   document.getElementById('login-state-manual').style.display = 'none';
-  
-  // Таймаут 10 секунд
-  const timeout = setTimeout(() => {
-    showManualLogin();
-  }, 10000);
-  
   try {
     const r = await fetch(API + '/api/auth/request-code', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({telegram_id: tgUserId}),
     });
-    clearTimeout(timeout);
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       document.getElementById('login-state-sending').style.display = 'none';
@@ -1344,7 +1344,6 @@ async function requestCode() {
     document.getElementById('login-state-code').style.display = '';
     document.getElementById('inp-code').focus();
   } catch (e) {
-    clearTimeout(timeout);
     showManualLogin();
   }
 }
@@ -1382,7 +1381,6 @@ async function _doVerify(code, errEl, btn) {
     master = data.master;
     localStorage.setItem('bb_token', token);
     localStorage.setItem('bb_master', JSON.stringify(master));
-    
     afterLogin();
   } catch (e) {
     errEl.textContent = e.message;
@@ -1970,16 +1968,7 @@ async function writeToClient() {
     return;
   }
   
-  // 2. Если есть phone (похож на реальный) — открываем чат по номеру
-  if (currentClientPhone) {
-    const cleanPhone = currentClientPhone.replace(/[^\d]/g, '');
-    if (cleanPhone.length >= 10) {
-      window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
-      return;
-    }
-  }
-  
-  // 3. Если есть telegram_id но нет username — просим ввести username
+  // 2. Если есть telegram_id но нет username — просим ввести username
   if (currentClientTgId) {
     const username = prompt('Введите username клиента в Telegram (например, @username):');
     if (!username || !username.trim()) return;
@@ -1993,17 +1982,28 @@ async function writeToClient() {
     return;
   }
   
-  // 4. Нет ничего — запрашиваем username
+// 3. Если есть phone (похож на реальный) — открываем чат по номеру
+  if (currentClientPhone) {
+    const cleanPhone = currentClientPhone.replace(/[^\d+]/g, '');
+    if (cleanPhone.length >= 10) {
+      window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
+      return;
+    }
+  }
+
+  // 4. Запрашиваем username у мастера
   const username = prompt('Введите username клиента в Telegram (например, @username):');
   if (!username || !username.trim()) return;
+  
+  // Убираем @ если есть
   currentClientUsername = username.trim().replace('@', '');
+  
+  // Сохраняем в БД
   try {
     await api('PUT', `/api/dashboard/clients/${currentClientId}`, {
       username: currentClientUsername
     });
   } catch(e) {}
-  window.open(`https://t.me/${currentClientUsername}`, '_blank');
-}
   
   // Открываем чат
   window.open(`https://t.me/${currentClientUsername}`, '_blank');
@@ -2028,6 +2028,7 @@ function fillSettings() {
   document.getElementById('ov-payment').value = master.payment_card || '';
   document.getElementById('ov-slot').value = master.slot_duration || 60;
   document.getElementById('ov-remind').value = master.reminder_days || 40;
+  document.getElementById('ov-timezone').value = master.timezone || 'Europe/Moscow';
 
   // Часы работы: заполняем select
   const wsEl = document.getElementById('ov-wstart');
@@ -2458,16 +2459,13 @@ async function loadServicesCount() {
   }
 
   // Считываем Telegram ID из WebApp автоматически
-  try {
-    const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-    if (tgUser?.id) {
-      tgUserId = tgUser.id;
-      try { window.Telegram.WebApp.ready(); } catch(e) {}
-      requestCode();
-    } else {
-      showManualLogin();
-    }
-  } catch(e) {
+  const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+  if (tgUser?.id) {
+    tgUserId = tgUser.id;
+    window.Telegram.WebApp.ready();
+    requestCode();  // сразу отправляем код, пользователь ничего не вводит
+  } else {
+    // Открыто не из Telegram — показываем ручной режим
     showManualLogin();
   }
 })();
