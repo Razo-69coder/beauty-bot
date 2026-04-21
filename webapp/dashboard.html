@@ -1975,10 +1975,17 @@ async function openClientHistory(clientId, clientName) {
 }
 
 async function writeToClient() {
-  // 1. Если есть username — открываем сразу чат с клиентом
-  if (currentClientUsername) {
-    window.open(`https://t.me/${currentClientUsername}`, '_blank');
-    return;
+  alert('writeToClient START');
+  // 2. Если есть phone (похож на реальный) — открываем чат по номеру
+  const phone = currentClientPhone || '';
+  alert('phone=' + phone);
+  if (phone) {
+    const cleanPhone = phone.replace(/[^\d]/g, '');
+    alert('clean=' + cleanPhone + ' len=' + cleanPhone.length);
+    if (cleanPhone.length >= 10) {
+      window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
+      return;
+    }
   }
   
   // 2. Если есть phone (похож на реальный) — открываем чат по номеру
