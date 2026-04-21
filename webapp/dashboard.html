@@ -1975,16 +1975,22 @@ async function openClientHistory(clientId, clientName) {
 }
 
 async function writeToClient() {
-  // ОТЛАДКА
-  alert(`phone: "${currentClientPhone}"\ntelegram_id: "${currentClientTgId}"\nusername: "${currentClientUsername}"`);
-  
   // 1. Если есть username — открываем сразу чат с клиентом
   if (currentClientUsername) {
     window.open(`https://t.me/${currentClientUsername}`, '_blank');
     return;
   }
   
-  // 2. Если есть telegram_id но нет username — просим ввести username
+  // 2. Если есть phone (похож на реальный) — открываем чат по номеру
+  if (currentClientPhone) {
+    const cleanPhone = currentClientPhone.replace(/[^\d]/g, '');
+    if (cleanPhone.length >= 10) {
+      window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
+      return;
+    }
+  }
+  
+  // 3. Если есть telegram_id но нет username — просим ввести username
   if (currentClientTgId) {
     const username = prompt('Введите username клиента в Telegram (например, @username):');
     if (!username || !username.trim()) return;
@@ -1998,28 +2004,17 @@ async function writeToClient() {
     return;
   }
   
-// 3. Если есть phone (похож на реальный) — открываем чат по номеру
-  if (currentClientPhone) {
-    const cleanPhone = currentClientPhone.replace(/[^\d+]/g, '');
-    if (cleanPhone.length >= 10) {
-      window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
-      return;
-    }
-  }
-
-  // 4. Запрашиваем username у мастера
+  // 4. Нет ничего — запрашиваем username
   const username = prompt('Введите username клиента в Telegram (например, @username):');
   if (!username || !username.trim()) return;
-  
-  // Убираем @ если есть
   currentClientUsername = username.trim().replace('@', '');
-  
-  // Сохраняем в БД
   try {
     await api('PUT', `/api/dashboard/clients/${currentClientId}`, {
       username: currentClientUsername
     });
   } catch(e) {}
+  window.open(`https://t.me/${currentClientUsername}`, '_blank');
+}
   
   // Открываем чат
   window.open(`https://t.me/${currentClientUsername}`, '_blank');
