@@ -63,18 +63,6 @@ def build_dispatcher() -> Dispatcher:
 bot = Bot(token=BOT_TOKEN)
 dp = build_dispatcher()
 
-
-# ── Главная страница (для keep-alive) ─────────────────────────────────
-@app.get("/")
-async def root():
-    return {"status": "ok", "message": "Beauty Book API — бот работает"}
-
-
-@app.get("/health")
-async def health():
-    return {"status": "healthy"}
-
-
 # ── Lifespan ──────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -102,6 +90,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+# ── Health checks (для keep-alive) ─────────────────────────────────────
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Beauty Book API — бот работает"}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
 
 
 # ── Telegram Webhook ──────────────────────────────────────────────────
