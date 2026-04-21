@@ -1985,7 +1985,6 @@ async function writeToClient() {
   const phone = currentClientPhone || '';
   if (phone) {
     const cleanPhone = phone.replace(/[^\d]/g, '');
-    alert('phone: \"' + phone + '\"\nclean: \"' + cleanPhone + '\" (' + cleanPhone.length + ' цифр)');
     if (cleanPhone.length >= 10) {
       window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
       return;
