@@ -1312,16 +1312,26 @@ function setTheme(t) {
 let tgUserId = null;  // Telegram ID из WebApp, если доступен
 
 async function requestCode() {
-  if (!tgUserId) return;
+  if (!tgUserId) {
+    showManualLogin();
+    return;
+  }
   document.getElementById('login-state-sending').style.display = '';
   document.getElementById('login-state-code').style.display = 'none';
   document.getElementById('login-state-manual').style.display = 'none';
+  
+  // Таймаут 10 секунд
+  const timeout = setTimeout(() => {
+    showManualLogin();
+  }, 10000);
+  
   try {
     const r = await fetch(API + '/api/auth/request-code', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({telegram_id: tgUserId}),
     });
+    clearTimeout(timeout);
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       document.getElementById('login-state-sending').style.display = 'none';
@@ -1334,6 +1344,7 @@ async function requestCode() {
     document.getElementById('login-state-code').style.display = '';
     document.getElementById('inp-code').focus();
   } catch (e) {
+    clearTimeout(timeout);
     showManualLogin();
   }
 }
@@ -2447,13 +2458,16 @@ async function loadServicesCount() {
   }
 
   // Считываем Telegram ID из WebApp автоматически
-  const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-  if (tgUser?.id) {
-    tgUserId = tgUser.id;
-    window.Telegram.WebApp.ready();
-    requestCode();  // сразу отправляем код, пользователь ничего не вводит
-  } else {
-    // Открыто не из Telegram — показываем ручной режим
+  try {
+    const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+    if (tgUser?.id) {
+      tgUserId = tgUser.id;
+      try { window.Telegram.WebApp.ready(); } catch(e) {}
+      requestCode();
+    } else {
+      showManualLogin();
+    }
+  } catch(e) {
     showManualLogin();
   }
 })();
