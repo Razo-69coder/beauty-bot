@@ -1857,18 +1857,23 @@ async function openClientHistory(clientId, clientName) {
 }
 
 async function writeToClient() {
-  // ОТЛАДКА
-  alert(`username: "${currentClientUsername}"\ntelegram_id: "${currentClientTgId}"\nphone: "${currentClientPhone}"`);
-  
   // 1. Если есть username — открываем сразу чат с клиентом
   if (currentClientUsername) {
     window.open(`https://t.me/${currentClientUsername}`, '_blank');
     return;
   }
   
-  // 2. Если есть telegram_id — открываем через приложение
+  // 2. Если есть telegram_id но нет username — просим ввести username
   if (currentClientTgId) {
-    window.location.href = `tg://openmessage?user_id=${currentClientTgId}`;
+    const username = prompt('Введите username клиента в Telegram (например, @username):');
+    if (!username || !username.trim()) return;
+    currentClientUsername = username.trim().replace('@', '');
+    try {
+      await api('PUT', `/api/dashboard/clients/${currentClientId}`, {
+        username: currentClientUsername
+      });
+    } catch(e) {}
+    window.open(`https://t.me/${currentClientUsername}`, '_blank');
     return;
   }
   
