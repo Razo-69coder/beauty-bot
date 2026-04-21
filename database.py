@@ -260,11 +260,11 @@ async def get_client(client_id: int) -> dict | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT id, name, phone, notes, telegram_id FROM clients WHERE id=$1", client_id
+            "SELECT id, name, phone, notes, telegram_id, master_id FROM clients WHERE id=$1", client_id
         )
     if not row:
         return None
-    return {"id": row['id'], "name": row['name'], "phone": row['phone'], "notes": row['notes'], "telegram_id": row['telegram_id']}
+    return {"id": row['id'], "name": row['name'], "phone": row['phone'], "notes": row['notes'], "telegram_id": row['telegram_id'], "master_id": row['master_id']}
 
 
 async def update_client(client_id: int, master_id: int, name: str, phone: str, notes: str) -> bool:

@@ -64,6 +64,17 @@ bot = Bot(token=BOT_TOKEN)
 dp = build_dispatcher()
 
 
+# ── Главная страница (для keep-alive) ─────────────────────────────────
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Beauty Book API — бот работает"}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+
 # ── Lifespan ──────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -181,9 +192,9 @@ class ClientCreate(BaseModel):
     notes: str = ""
 
 class ClientUpdate(BaseModel):
-    name: str
-    phone: str
-    notes: str = ""
+    name: str | None = None
+    phone: str | None = None
+    notes: str | None = None
 
 class AppointmentCreate(BaseModel):
     client_id: int
@@ -587,6 +598,18 @@ async def dash_client(client_id: int, master_id: int = Depends(get_jwt_master_id
     history = await get_client_history(client_id)
     hist = [{"procedure": h[0], "date": str(h[1])[:10], "price": h[2], "notes": h[3]} for h in history]
     return {**client, "history": hist}
+
+
+@app.put("/api/dashboard/clients/{client_id}")
+async def dash_update_client(client_id: int, body: ClientUpdate, master_id: int = Depends(get_jwt_master_id)):
+    client = await get_client(client_id)
+    if not client or client.get("master_id") != master_id:
+        raise HTTPException(status_code=404, detail="Клиент не найден")
+    await update_client(client_id, master_id,
+        body.name or client.get("name", ""),
+        body.phone or client.get("phone", ""),
+        body.notes or client.get("notes", ""))
+    return {"ok": True}
 
 
 @app.post("/api/dashboard/clients", status_code=201)
