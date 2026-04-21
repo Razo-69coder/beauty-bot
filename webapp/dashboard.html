@@ -1984,6 +1984,7 @@ async function writeToClient() {
   // 2. Если есть phone (похож на реальный) — открываем чат по номеру
   if (currentClientPhone) {
     const cleanPhone = currentClientPhone.replace(/[^\d]/g, '');
+    alert('phone: "' + currentClientPhone + '"\nclean: "' + cleanPhone + '" (' + cleanPhone.length + ' цифр)');
     if (cleanPhone.length >= 10) {
       window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
       return;
