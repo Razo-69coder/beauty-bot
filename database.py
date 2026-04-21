@@ -1,5 +1,4 @@
 import asyncpg
-import pytz
 from config import DATABASE_URL
 from datetime import datetime, timedelta
 
@@ -25,7 +24,6 @@ async def init_db():
                 work_start INTEGER DEFAULT 10,
                 work_end INTEGER DEFAULT 20,
                 slot_duration INTEGER DEFAULT 60,
-                timezone TEXT DEFAULT 'Europe/Moscow',
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
@@ -37,8 +35,6 @@ async def init_db():
                 phone TEXT,
                 notes TEXT DEFAULT '',
                 telegram_id BIGINT,
-                username TEXT DEFAULT '',
-                timezone TEXT DEFAULT 'Europe/Moscow',
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
@@ -264,11 +260,11 @@ async def get_client(client_id: int) -> dict | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT id, name, phone, notes, telegram_id, username, master_id FROM clients WHERE id=$1", client_id
+            "SELECT id, name, phone, notes, telegram_id, master_id FROM clients WHERE id=$1", client_id
         )
     if not row:
         return None
-    return {"id": row['id'], "name": row['name'], "phone": row['phone'], "notes": row['notes'], "telegram_id": row['telegram_id'], "username": row['username'] or '', "master_id": row['master_id']}
+    return {"id": row['id'], "name": row['name'], "phone": row['phone'], "notes": row['notes'], "telegram_id": row['telegram_id'], "master_id": row['master_id']}
 
 
 async def update_client(client_id: int, master_id: int, name: str, phone: str, notes: str) -> bool:
@@ -277,16 +273,6 @@ async def update_client(client_id: int, master_id: int, name: str, phone: str, n
         result = await conn.execute(
             "UPDATE clients SET name=$1, phone=$2, notes=$3 WHERE id=$4 AND master_id=$5",
             name, phone, notes, client_id, master_id
-        )
-    return result != "UPDATE 0"
-
-
-async def update_client_username(client_id: int, master_id: int, username: str) -> bool:
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        result = await conn.execute(
-            "UPDATE clients SET username=$1 WHERE id=$2 AND master_id=$3",
-            username, client_id, master_id
         )
     return result != "UPDATE 0"
 
@@ -647,7 +633,7 @@ async def get_master_full(master_id: int) -> dict | None:
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT id, telegram_id, name, reminder_days, work_start, work_end, slot_duration, "
-            "COALESCE(payment_card,'') as payment_card, COALESCE(timezone,'Europe/Moscow') as timezone "
+            "COALESCE(payment_card,'') as payment_card "
             "FROM masters WHERE id=$1",
             master_id
         )
@@ -659,7 +645,6 @@ async def get_master_full(master_id: int) -> dict | None:
         "work_start": row['work_start'] or 10, "work_end": row['work_end'] or 20,
         "slot_duration": row['slot_duration'] or 60,
         "payment_card": row['payment_card'],
-        "timezone": row['timezone'],
     }
 
 
@@ -678,14 +663,6 @@ async def update_master_payment(master_id: int, payment_card: str):
     async with pool.acquire() as conn:
         await conn.execute(
             "UPDATE masters SET payment_card=$1 WHERE id=$2", payment_card, master_id
-        )
-
-
-async def update_master_timezone(master_id: int, timezone: str):
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        await conn.execute(
-            "UPDATE masters SET timezone=$1 WHERE id=$2", timezone, master_id
         )
 
 
@@ -1033,80 +1010,3 @@ async def get_appointments_pending_deposit_24h(target_date: str) -> list:
               AND COALESCE(m.payment_reminder_enabled, TRUE) = TRUE
         """, target_date)
     return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
-
-
-async def get_appointments_pending_deposit_after_service() -> list:
-    """Записи с невнесённой предоплатой, время которых уже прошло + длительность слота."""
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        rows = await conn.fetch("""
-            SELECT a.id, c.telegram_id, c.name, m.telegram_id,
-                   a.appointment_date, a.time, m.deposit_percent, m.slot_duration
-            FROM appointments a
-            JOIN clients c ON c.id = a.client_id
-            JOIN masters m ON m.id = a.master_id
-            WHERE a.deposit_status = 'pending_payment'
-              AND a.status != 'cancelled'
-              AND c.telegram_id IS NOT NULL
-              AND COALESCE(m.payment_reminder_enabled, TRUE) = TRUE
-              AND a.appointment_date IS NOT NULL
-              AND a.time IS NOT NULL
-        """)
-    
-    result = []
-    now = datetime.now()
-    for r in rows:
-        appt_id, client_tg, client_name, master_tg, date, time_str, deposit_pct, slot_duration = r
-        if not date or not time_str:
-            continue
-        try:
-            # Время записи + длительность слота
-            appt_dt = datetime.strptime(f"{date} {time_str}", "%Y-%m-%d %H:%M")
-            slot_minutes = slot_duration or 60
-            end_dt = appt_dt + timedelta(minutes=slot_minutes)
-            # Если время окончания прошло (от 5 минут до 2 часов назад)
-            if end_dt <= now and now - end_dt < timedelta(hours=2):
-                result.append((appt_id, client_tg, client_name, master_tg, date, time_str, deposit_pct))
-        except:
-            continue
-    return result
-
-
-# ── Часовые пояса ───────────────────────────────────────────────────────
-
-def get_local_time(utc_time: datetime, timezone: str) -> datetime:
-    """Конвертирует UTC время в локальное."""
-    if not timezone:
-        timezone = 'Europe/Moscow'
-    try:
-        tz = pytz.timezone(timezone)
-        if utc_time.tzinfo is None:
-            utc_time = pytz.utc.localize(utc_time)
-        return utc_time.astimezone(tz)
-    except Exception:
-        return utc_time
-
-
-def to_utc(local_time: datetime, timezone: str) -> datetime:
-    """Конвертирует локальное время в UTC."""
-    if not timezone:
-        timezone = 'Europe/Moscow'
-    try:
-        tz = pytz.timezone(timezone)
-        if local_time.tzinfo is None:
-            local_time = tz.localize(local_time)
-        return local_time.astimezone(pytz.utc)
-    except Exception:
-        return local_time
-
-
-def format_local_time(utc_time: datetime, timezone: str, fmt: str = "%H:%M") -> str:
-    """Форматирует UTC время в локальное строкой."""
-    local = get_local_time(utc_time, timezone)
-    return local.strftime(fmt)
-
-
-def get_client_timezone(client_id: int) -> str:
-    """Получает часовой пояс клиента."""
-    # Пока возвращаем дефолт — потом можно получить из БД
-    return 'Europe/Moscow'
