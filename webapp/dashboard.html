@@ -1027,6 +1027,32 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
   </div>
 </div>
 
+<!-- Редактировать клиента -->
+<div class="overlay" id="overlay-edit-client">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">Редактировать: <span id="edit-client-name-display"></span></div>
+    <div class="field">
+      <label>Имя</label>
+      <input id="edit-client-name" type="text" placeholder="Имя клиента">
+    </div>
+    <div class="field">
+      <label>Телефон</label>
+      <input id="edit-client-phone" type="tel" placeholder="+79001234567">
+    </div>
+    <div class="field">
+      <label>Telegram username</label>
+      <input id="edit-client-username" type="text" placeholder="@username">
+    </div>
+    <div class="field">
+      <label>Заметки</label>
+      <input id="edit-client-notes" type="text" placeholder="Заметки...">
+    </div>
+    <button class="btn btn-primary" onclick="saveEditedClient()">Сохранить</button>
+    <button class="btn btn-secondary" style="margin-top:8px" onclick="closeOverlay()">Отмена</button>
+  </div>
+</div>
+
 <!-- Записать клиента -->
 <div class="overlay" id="overlay-book-client">
   <div class="overlay-sheet">
@@ -1069,6 +1095,7 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
     <div style="display:flex; gap:8px; margin-top:14px">
       <button class="btn btn-primary" style="flex:1" id="btn-write-client" onclick="writeToClient()">✏️ Написать</button>
       <button class="btn btn-secondary" style="flex:1" onclick="openBookClientOverlay()">📅 Записать</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="openEditClientOverlay()">✂️ Изменить</button>
     </div>
     <button class="btn btn-secondary" style="margin-top:8px" onclick="closeOverlay()">Закрыть</button>
   </div>
@@ -1691,6 +1718,7 @@ async function loadClients(page) {
       </div>`;
       return;
     }
+    _clientsCache = data.clients || [];
     listEl.innerHTML = data.clients.map(c => {
       const initials = (c.name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
       const lastVisit = c.last_visit ? c.last_visit.slice(0, 10) : 'нет визитов';
@@ -1770,6 +1798,47 @@ async function saveNewClient() {
     closeOverlay();
     loadClients(0);
   } catch(e) { alert(e.message); }
+}
+
+// ─── Редактирование клиента ───────────────────────────────────────────
+
+async function openEditClientOverlay() {
+  try {
+    const client = await api('GET', `/api/dashboard/clients/${currentClientId}`);
+    document.getElementById('edit-client-name-display').textContent = client.name;
+    document.getElementById('edit-client-name').value = client.name || '';
+    document.getElementById('edit-client-phone').value = client.phone || '';
+    document.getElementById('edit-client-username').value = client.username || '';
+    document.getElementById('edit-client-notes').value = client.notes || '';
+    openOverlay('overlay-edit-client');
+  } catch(e) {
+    alert(e.message);
+  }
+}
+
+let _clientsCache = [];
+
+async function saveEditedClient() {
+  const name = document.getElementById('edit-client-name').value.trim();
+  const phone = document.getElementById('edit-client-phone').value.trim();
+  const username = document.getElementById('edit-client-username').value.trim().replace('@', '');
+  const notes = document.getElementById('edit-client-notes').value.trim();
+  if (!name) { alert('Введите имя'); return; }
+  try {
+    await api('PUT', `/api/dashboard/clients/${currentClientId}`, {
+      name, phone, username, notes
+    });
+    closeOverlay();
+    currentClientName = name;
+    currentClientPhone = phone;
+    currentClientUsername = username;
+    loadClients(0);
+    openClientHistory(currentClientId, name);
+  } catch(e) { alert(e.message); }
+}
+
+function _getClientById(id) {
+  return _clientsCache.find(c => c.id === id);
 }
 
 // ─── Запись клиента ──────────────────────────────────────────────────
