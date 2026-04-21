@@ -29,7 +29,7 @@ from database import (
     get_master_info, get_master_info_by_telegram, get_available_slots,
     get_master_schedule, update_appointment_status,
     create_login_code, verify_login_code, verify_login_code_by_code,
-    get_master_full, update_master_full_settings, update_master_payment,
+    get_master_full, update_master_full_settings, update_master_payment, update_master_timezone,
     search_clients,
     get_services, add_service, delete_service,
     get_earnings_by_service, get_earnings_by_client, get_earnings_by_day, get_earnings_by_period,
@@ -68,14 +68,22 @@ dp = build_dispatcher()
 async def lifespan(app: FastAPI):
     await init_db()
     
-    # Миграция: добавить username в clients если нет
+    # Миграции: добавить отсутствующие колонки
     from database import get_pool
     pool = await get_pool()
     async with pool.acquire() as conn:
         try:
             await conn.execute("ALTER TABLE clients ADD COLUMN username VARCHAR(50) DEFAULT ''")
         except Exception:
-            pass  # Колонка уже есть
+            pass
+        try:
+            await conn.execute("ALTER TABLE masters ADD COLUMN timezone VARCHAR(50) DEFAULT 'Europe/Moscow'")
+        except Exception:
+            pass
+        try:
+            await conn.execute("ALTER TABLE clients ADD COLUMN timezone VARCHAR(50) DEFAULT 'Europe/Moscow'")
+        except Exception:
+            pass
     
     setup_scheduler(bot)
 
@@ -679,6 +687,15 @@ async def dash_settings(body: _MasterSettings, master_id: int = Depends(get_jwt_
 @app.put("/api/dashboard/payment")
 async def dash_payment(body: _PaymentUpdate, master_id: int = Depends(get_jwt_master_id)):
     await update_master_payment(master_id, body.payment_card)
+    return {"ok": True}
+
+
+class _TimezoneUpdate(BaseModel):
+    timezone: str
+
+@app.put("/api/dashboard/timezone")
+async def dash_timezone(body: _TimezoneUpdate, master_id: int = Depends(get_jwt_master_id)):
+    await update_master_timezone(master_id, body.timezone)
     return {"ok": True}
 
 

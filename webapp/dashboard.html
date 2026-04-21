@@ -818,6 +818,16 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
         </div>
         <span class="row-arrow">›</span>
       </div>
+      <div class="settings-row" onclick="openOverlay('overlay-timezone')">
+        <div class="row-left">
+          <span class="row-icon">🌍</span>
+          <div>
+            <div class="row-title">Часовой пояс</div>
+            <div class="row-sub" id="set-tz-sub">Europe/Moscow</div>
+          </div>
+        </div>
+        <span class="row-arrow">›</span>
+      </div>
     </div>
 
     <!-- Ссылка записи -->
@@ -998,6 +1008,32 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
       </select>
     </div>
     <button class="btn btn-primary" onclick="saveReminder()">Сохранить</button>
+  </div>
+</div>
+
+<!-- Часовой пояс -->
+<div class="overlay" id="overlay-timezone">
+  <div class="overlay-sheet">
+    <div class="overlay-handle"></div>
+    <div class="overlay-title">Часовой пояс</div>
+    <div class="field">
+      <label>Выберите ваш часовой пояс</label>
+      <select id="ov-timezone">
+        <option value="Europe/Kaliningrad">Калининград (UTC+2)</option>
+        <option value="Europe/Moscow" selected>Москва (UTC+3)</option>
+        <option value="Europe/Samara">Самара (UTC+4)</option>
+        <option value="Asia/Yekaterinburg">Екатеринбург (UTC+5)</option>
+        <option value="Asia/Omsk">Омск (UTC+6)</option>
+        <option value="Asia/Krasnoyarsk">Красноярск (UTC+7)</option>
+        <option value="Asia/Irkutsk">Иркутск (UTC+8)</option>
+        <option value="Asia/Vladivostok">Владивосток (UTC+10)</option>
+        <option value="Asia/Magadan">Магадан (UTC+11)</option>
+        <option value="Asia/Kamchatka">Камчатка (UTC+12)</option>
+        <option value="Asia/Almaty">Алматы (UTC+6)</option>
+        <option value="Asia/Tashkent">Ташкент (UTC+5)</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="saveTimezone()">Сохранить</button>
   </div>
 </div>
 
@@ -1983,6 +2019,7 @@ function fillSettings() {
     `${master.work_start || 10}:00 — ${master.work_end || 20}:00`;
   document.getElementById('set-slot-sub').textContent = `${master.slot_duration || 60} минут`;
   document.getElementById('set-remind-sub').textContent = `через ${master.reminder_days || 40} дней`;
+  document.getElementById('set-tz-sub').textContent = master.timezone || 'Europe/Moscow';
   const link = bookingLink || `${location.origin}/booking.html?master=${master.telegram_id}`;
   document.getElementById('set-link-sub').textContent = link;
 
@@ -1991,6 +2028,7 @@ function fillSettings() {
   document.getElementById('ov-payment').value = master.payment_card || '';
   document.getElementById('ov-slot').value = master.slot_duration || 60;
   document.getElementById('ov-remind').value = master.reminder_days || 40;
+  document.getElementById('ov-timezone').value = master.timezone || 'Europe/Moscow';
 
   // Часы работы: заполняем select
   const wsEl = document.getElementById('ov-wstart');
@@ -2054,6 +2092,17 @@ async function saveReminder() {
   master.reminder_days = days;
   localStorage.setItem('bb_master', JSON.stringify(master));
   document.getElementById('set-remind-sub').textContent = `через ${days} дней`;
+  closeOverlay();
+}
+
+async function saveTimezone() {
+  const timezone = document.getElementById('ov-timezone').value;
+  try {
+    await api('PUT', '/api/dashboard/timezone', { timezone });
+  } catch(e) { alert(e.message); return; }
+  master.timezone = timezone;
+  localStorage.setItem('bb_master', JSON.stringify(master));
+  document.getElementById('set-tz-sub').textContent = timezone;
   closeOverlay();
 }
 

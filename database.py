@@ -1,4 +1,5 @@
 import asyncpg
+import pytz
 from config import DATABASE_URL
 from datetime import datetime, timedelta
 
@@ -24,6 +25,7 @@ async def init_db():
                 work_start INTEGER DEFAULT 10,
                 work_end INTEGER DEFAULT 20,
                 slot_duration INTEGER DEFAULT 60,
+                timezone TEXT DEFAULT 'Europe/Moscow',
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
@@ -35,6 +37,8 @@ async def init_db():
                 phone TEXT,
                 notes TEXT DEFAULT '',
                 telegram_id BIGINT,
+                username TEXT DEFAULT '',
+                timezone TEXT DEFAULT 'Europe/Moscow',
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
@@ -643,7 +647,7 @@ async def get_master_full(master_id: int) -> dict | None:
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT id, telegram_id, name, reminder_days, work_start, work_end, slot_duration, "
-            "COALESCE(payment_card,'') as payment_card "
+            "COALESCE(payment_card,'') as payment_card, COALESCE(timezone,'Europe/Moscow') as timezone "
             "FROM masters WHERE id=$1",
             master_id
         )
@@ -655,6 +659,7 @@ async def get_master_full(master_id: int) -> dict | None:
         "work_start": row['work_start'] or 10, "work_end": row['work_end'] or 20,
         "slot_duration": row['slot_duration'] or 60,
         "payment_card": row['payment_card'],
+        "timezone": row['timezone'],
     }
 
 
@@ -673,6 +678,14 @@ async def update_master_payment(master_id: int, payment_card: str):
     async with pool.acquire() as conn:
         await conn.execute(
             "UPDATE masters SET payment_card=$1 WHERE id=$2", payment_card, master_id
+        )
+
+
+async def update_master_timezone(master_id: int, timezone: str):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE masters SET timezone=$1 WHERE id=$2", timezone, master_id
         )
 
 
@@ -1020,3 +1033,43 @@ async def get_appointments_pending_deposit_24h(target_date: str) -> list:
               AND COALESCE(m.payment_reminder_enabled, TRUE) = TRUE
         """, target_date)
     return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
+
+
+# ── Часовые пояса ───────────────────────────────────────────────────────
+
+def get_local_time(utc_time: datetime, timezone: str) -> datetime:
+    """Конвертирует UTC время в локальное."""
+    if not timezone:
+        timezone = 'Europe/Moscow'
+    try:
+        tz = pytz.timezone(timezone)
+        if utc_time.tzinfo is None:
+            utc_time = pytz.utc.localize(utc_time)
+        return utc_time.astimezone(tz)
+    except Exception:
+        return utc_time
+
+
+def to_utc(local_time: datetime, timezone: str) -> datetime:
+    """Конвертирует локальное время в UTC."""
+    if not timezone:
+        timezone = 'Europe/Moscow'
+    try:
+        tz = pytz.timezone(timezone)
+        if local_time.tzinfo is None:
+            local_time = tz.localize(local_time)
+        return local_time.astimezone(pytz.utc)
+    except Exception:
+        return local_time
+
+
+def format_local_time(utc_time: datetime, timezone: str, fmt: str = "%H:%M") -> str:
+    """Форматирует UTC время в локальное строкой."""
+    local = get_local_time(utc_time, timezone)
+    return local.strftime(fmt)
+
+
+def get_client_timezone(client_id: int) -> str:
+    """Получает часовой пояс клиента."""
+    # Пока возвращаем дефолт — потом можно получить из БД
+    return 'Europe/Moscow'
