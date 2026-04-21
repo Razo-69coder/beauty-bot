@@ -1776,6 +1776,8 @@ async function saveNewClient() {
 
 let currentClientId = null;
 let currentClientName = '';
+let currentClientPhone = '';
+let currentClientTgId = null;
 
 function openBookClientOverlay() {
   if (!currentClientId) return;
@@ -1813,6 +1815,7 @@ async function openClientHistory(clientId, clientName) {
   currentClientId = clientId;
   currentClientName = clientName;
   currentClientTgId = null;
+  currentClientPhone = '';
   document.getElementById('client-history-title').textContent = `${clientName} — история`;
   document.getElementById('client-history-body').innerHTML =
     '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
@@ -1820,8 +1823,9 @@ async function openClientHistory(clientId, clientName) {
   openOverlay('overlay-client-history');
   try {
     const data = await api('GET', `/api/dashboard/clients/${clientId}`);
-    currentClientTgId = data.telegram_id;
-    if (currentClientTgId) {
+    currentClientTgId = data.telegram_id || null;
+    currentClientPhone = data.phone || '';
+    if (currentClientTgId || currentClientPhone) {
       document.getElementById('btn-write-client').style.display = 'inline-block';
     }
     const hist = data.history || [];
@@ -1850,21 +1854,46 @@ async function openClientHistory(clientId, clientName) {
 }
 
 async function writeToClient() {
-  if (!currentClientTgId) {
-    alert('У клиента нет Telegram');
+  // 1. Если есть username — открываем чат
+  if (currentClientUsername) {
+    window.open(`https://t.me/${currentClientUsername}`, '_blank');
     return;
   }
-  const msg = prompt('Введите сообщение для клиента:');
-  if (!msg || !msg.trim()) return;
-  try {
-    await api('POST', '/api/dashboard/send-message', {
-      telegram_id: currentClientTgId,
-      text: msg.trim()
-    });
-    alert('Сообщение отправлено!');
-  } catch (e) {
-    alert('Ошибка: ' + e.message);
+  
+  // 2. Если есть phone — открываем чат по номеру
+  const phone = currentClientPhone || '';
+  if (phone) {
+    const cleanPhone = phone.replace(/[^\d]/g, '');
+    if (cleanPhone.length >= 10) {
+      window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
+      return;
+    }
   }
+  
+  // 3. Если есть telegram_id — открываем через приложение
+  if (currentClientTgId) {
+    const username = prompt('Введите username клиента в Telegram (например, @username):');
+    if (!username || !username.trim()) return;
+    currentClientUsername = username.trim().replace('@', '');
+    try {
+      await api('PUT', `/api/dashboard/clients/${currentClientId}`, {
+        username: currentClientUsername
+      });
+    } catch(e) {}
+    window.open(`https://t.me/${currentClientUsername}`, '_blank');
+    return;
+  }
+  
+  // 4. Нет ничего — запрашиваем username
+  const username = prompt('Введите username клиента в Telegram (например, @username):');
+  if (!username || !username.trim()) return;
+  currentClientUsername = username.trim().replace('@', '');
+  try {
+    await api('PUT', `/api/dashboard/clients/${currentClientId}`, {
+      username: currentClientUsername
+    });
+  } catch(e) {}
+  window.open(`https://t.me/${currentClientUsername}`, '_blank');
 }
 
 // ─── Настройки ─────────────────────────────────────────────────────

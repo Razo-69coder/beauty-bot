@@ -22,14 +22,14 @@ from datetime import datetime as _dt, timedelta as _td
 
 from database import (
     init_db, get_or_create_master, get_clients, get_client,
-    get_client_history, get_statistics, add_client, update_client,
+    get_client_history, get_statistics, add_client, update_client, update_client_username,
     delete_client, add_appointment, get_inactive_clients,
     get_reminder_days, update_reminder_days,
     get_reminder_days_by_master, update_reminder_days_by_master,
     get_master_info, get_master_info_by_telegram, get_available_slots,
     get_master_schedule, update_appointment_status,
     create_login_code, verify_login_code, verify_login_code_by_code,
-    get_master_full, update_master_full_settings, update_master_payment,
+    get_master_full, update_master_full_settings, update_master_payment, update_master_timezone,
     search_clients,
     get_services, add_service, delete_service,
     get_earnings_by_service, get_earnings_by_client, get_earnings_by_day, get_earnings_by_period,
@@ -67,6 +67,24 @@ dp = build_dispatcher()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    
+    # Миграции: добавить отсутствующие колонки
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        try:
+            await conn.execute("ALTER TABLE clients ADD COLUMN username VARCHAR(50) DEFAULT ''")
+        except Exception:
+            pass
+        try:
+            await conn.execute("ALTER TABLE masters ADD COLUMN timezone VARCHAR(50) DEFAULT 'Europe/Moscow'")
+        except Exception:
+            pass
+        try:
+            await conn.execute("ALTER TABLE clients ADD COLUMN timezone VARCHAR(50) DEFAULT 'Europe/Moscow'")
+        except Exception:
+            pass
+    
     setup_scheduler(bot)
 
     # Сохраняем username бота для ссылок самозаписи
@@ -194,6 +212,7 @@ class ClientUpdate(BaseModel):
     name: str | None = None
     phone: str | None = None
     notes: str | None = None
+    username: str | None = None
 
 class AppointmentCreate(BaseModel):
     client_id: int
@@ -608,6 +627,8 @@ async def dash_update_client(client_id: int, body: ClientUpdate, master_id: int 
         body.name or client.get("name", ""),
         body.phone or client.get("phone", ""),
         body.notes or client.get("notes", ""))
+    if body.username is not None:
+        await update_client_username(client_id, master_id, body.username)
     return {"ok": True}
 
 
@@ -666,6 +687,15 @@ async def dash_settings(body: _MasterSettings, master_id: int = Depends(get_jwt_
 @app.put("/api/dashboard/payment")
 async def dash_payment(body: _PaymentUpdate, master_id: int = Depends(get_jwt_master_id)):
     await update_master_payment(master_id, body.payment_card)
+    return {"ok": True}
+
+
+class _TimezoneUpdate(BaseModel):
+    timezone: str
+
+@app.put("/api/dashboard/timezone")
+async def dash_timezone(body: _TimezoneUpdate, master_id: int = Depends(get_jwt_master_id)):
+    await update_master_timezone(master_id, body.timezone)
     return {"ok": True}
 
 
