@@ -1879,12 +1879,14 @@ async function writeToClient() {
   
   // 3. Если есть phone — открываем чат по номеру
   if (currentClientPhone) {
+    alert('Phone: ' + currentClientPhone + ' -> opening resolve');
     const cleanPhone = currentClientPhone.replace(/[^\d]/g, '');
     window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
     return;
   }
   
   // 4. Нет ничего — запрашиваем username у мастера
+  alert('No data! Requesting username...');
   const username = prompt('Введите username клиента в Telegram (например, @username):');
   if (!username || !username.trim()) return;
   
