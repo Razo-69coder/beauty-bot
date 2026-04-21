@@ -1856,9 +1856,16 @@ async function openClientHistory(clientId, clientName) {
 async function writeToClient() {
   let phone = currentClientPhone;
   
-  // 1. Если есть telegram_id — открываем чат через t.me
+  // 1. Если есть telegram_id — пробуем открыть через приложение
   if (currentClientTgId) {
-    window.open(`https://t.me/resolve?chat_id=${currentClientTgId}`, '_blank');
+    // Сначала пробуем через приложение (работает на iOS/Android)
+    const appUrl = `tg://openmessage?user_id=${currentClientTgId}`;
+    // Пробуем открыть приложение
+    window.location.href = appUrl;
+    // Через 500мс открываем веб-версию если приложение не установлено
+    setTimeout(() => {
+      window.open(`https://t.me/${currentClientTgId}`, '_blank');
+    }, 500);
     return;
   }
   
