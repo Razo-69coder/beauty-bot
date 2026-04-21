@@ -1778,6 +1778,7 @@ let currentClientId = null;
 let currentClientName = '';
 let currentClientPhone = '';
 let currentClientTgId = null;
+let currentClientUsername = '';
 
 function openBookClientOverlay() {
   if (!currentClientId) return;
@@ -1816,6 +1817,7 @@ async function openClientHistory(clientId, clientName) {
   currentClientName = clientName;
   currentClientTgId = null;
   currentClientPhone = '';
+  currentClientUsername = '';
   document.getElementById('client-history-title').textContent = `${clientName} — история`;
   document.getElementById('client-history-body').innerHTML =
     '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
@@ -1825,7 +1827,8 @@ async function openClientHistory(clientId, clientName) {
     const data = await api('GET', `/api/dashboard/clients/${clientId}`);
     currentClientTgId = data.telegram_id || null;
     currentClientPhone = data.phone || '';
-    if (currentClientTgId || currentClientPhone) {
+    currentClientUsername = data.username || '';
+    if (currentClientTgId || currentClientPhone || currentClientUsername) {
       document.getElementById('btn-write-client').style.display = 'inline-block';
     }
     const hist = data.history || [];
@@ -1854,43 +1857,41 @@ async function openClientHistory(clientId, clientName) {
 }
 
 async function writeToClient() {
-  let phone = currentClientPhone;
-  
-  // 1. Если есть telegram_id — пробуем открыть через приложение
-  if (currentClientTgId) {
-    // Сначала пробуем через приложение (работает на iOS/Android)
-    const appUrl = `tg://openmessage?user_id=${currentClientTgId}`;
-    // Пробуем открыть приложение
-    window.location.href = appUrl;
-    // Через 500мс открываем веб-версию если приложение не установлено
-    setTimeout(() => {
-      window.open(`https://t.me/${currentClientTgId}`, '_blank');
-    }, 500);
+  // 1. Если есть username — открываем сразу чат с клиентом
+  if (currentClientUsername) {
+    window.open(`https://t.me/${currentClientUsername}`, '_blank');
     return;
   }
   
-  // 2. Если нет telegram_id, но есть phone — открываем чат по номеру
-  if (phone) {
-    const cleanPhone = phone.replace(/[^\d]/g, '');
+  // 2. Если есть telegram_id — открываем через приложение
+  if (currentClientTgId) {
+    window.location.href = `tg://openmessage?user_id=${currentClientTgId}`;
+    return;
+  }
+  
+  // 3. Если есть phone — открываем чат по номеру
+  if (currentClientPhone) {
+    const cleanPhone = currentClientPhone.replace(/[^\d]/g, '');
     window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
     return;
   }
   
-  // 3. Нет ничего — запрашиваем телефон
-  const newPhone = prompt('Введите номер телефона клиента (например, +79001234567):');
-  if (!newPhone || !newPhone.trim()) return;
-  currentClientPhone = newPhone.trim();
+  // 4. Нет ничего — запрашиваем username у мастера
+  const username = prompt('Введите username клиента в Telegram (например, @username):');
+  if (!username || !username.trim()) return;
   
-  // Сохраняем телефон в БД
+  // Убираем @ если есть
+  currentClientUsername = username.trim().replace('@', '');
+  
+  // Сохраняем в БД
   try {
     await api('PUT', `/api/dashboard/clients/${currentClientId}`, {
-      phone: currentClientPhone
+      username: currentClientUsername
     });
   } catch(e) {}
   
   // Открываем чат
-  const cleanPhone = currentClientPhone.replace(/[^\d]/g, '');
-  window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
+  window.open(`https://t.me/${currentClientUsername}`, '_blank');
 }
 
 // ─── Настройки ─────────────────────────────────────────────────────

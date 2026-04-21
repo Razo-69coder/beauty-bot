@@ -260,11 +260,11 @@ async def get_client(client_id: int) -> dict | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT id, name, phone, notes, telegram_id, master_id FROM clients WHERE id=$1", client_id
+            "SELECT id, name, phone, notes, telegram_id, username, master_id FROM clients WHERE id=$1", client_id
         )
     if not row:
         return None
-    return {"id": row['id'], "name": row['name'], "phone": row['phone'], "notes": row['notes'], "telegram_id": row['telegram_id'], "master_id": row['master_id']}
+    return {"id": row['id'], "name": row['name'], "phone": row['phone'], "notes": row['notes'], "telegram_id": row['telegram_id'], "username": row['username'] or '', "master_id": row['master_id']}
 
 
 async def update_client(client_id: int, master_id: int, name: str, phone: str, notes: str) -> bool:
@@ -273,6 +273,16 @@ async def update_client(client_id: int, master_id: int, name: str, phone: str, n
         result = await conn.execute(
             "UPDATE clients SET name=$1, phone=$2, notes=$3 WHERE id=$4 AND master_id=$5",
             name, phone, notes, client_id, master_id
+        )
+    return result != "UPDATE 0"
+
+
+async def update_client_username(client_id: int, master_id: int, username: str) -> bool:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE clients SET username=$1 WHERE id=$2 AND master_id=$3",
+            username, client_id, master_id
         )
     return result != "UPDATE 0"
 
