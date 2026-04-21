@@ -1975,6 +1975,9 @@ async function openClientHistory(clientId, clientName) {
 }
 
 async function writeToClient() {
+  // ОТЛАДКА
+  alert(`phone: "${currentClientPhone}"\ntelegram_id: "${currentClientTgId}"\nusername: "${currentClientUsername}"`);
+  
   // 1. Если есть username — открываем сразу чат с клиентом
   if (currentClientUsername) {
     window.open(`https://t.me/${currentClientUsername}`, '_blank');
