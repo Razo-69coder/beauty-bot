@@ -578,6 +578,26 @@ async def dash_me(master_id: int = Depends(get_jwt_master_id)):
     return {**full, "stats": stats, "booking_link": booking_link}
 
 
+ADMIN_IDS = [5837984455, 0]  # IDs с доступом к админ-панели (0 = для тестов)
+
+
+async def require_admin(authorization: str = Header(None)) -> int:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Требуется авторизация")
+    payload = _decode_jwt(authorization[7:])
+    if not payload:
+        raise HTTPException(401, "Неверный токен")
+    if payload.get("tg") not in ADMIN_IDS:
+        raise HTTPException(403, "Нет доступа")
+    return payload["mid"]
+
+
+@app.get("/api/admin/masters")
+async def admin_list_masters(master_id: int = Depends(require_admin)):
+    masters = await get_all_masters()
+    return {"masters": masters}
+
+
 @app.get("/api/dashboard/schedule")
 async def dash_schedule(date: str, master_id: int = Depends(get_jwt_master_id)):
     rows = await get_master_schedule(master_id, date)

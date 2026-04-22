@@ -181,8 +181,8 @@ async def update_master_work_hours(master_id: int, work_start: int, work_end: in
 async def get_all_masters() -> list:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        rows = await conn.fetch("SELECT id, telegram_id FROM masters")
-    return [(r['id'], r['telegram_id']) for r in rows]
+        rows = await conn.fetch("SELECT id, telegram_id, name FROM masters ORDER BY name")
+    return [{"id": r['id'], "telegram_id": r['telegram_id'], "name": r['name']} for r in rows]
 
 
 async def get_reminder_days(telegram_id: int) -> int:
