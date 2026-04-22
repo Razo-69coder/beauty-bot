@@ -1685,8 +1685,11 @@ async function loadSchedule(dateStr) {
     `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}, ${DAYS_SHORT[d.getDay()]}`;
   content.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
   try {
-    const masterParam = _selectedMasterId ? `&master_id=${_selectedMasterId}` : '';
-    const data = await api('GET', `/api/dashboard/schedule?date=${dateStr}${masterParam}`);
+    let data;
+    if (_selectedMasterId) {
+      data = await api('GET', `/api/admin/master/${_selectedMasterId}/schedule?date=${dateStr}`);
+    } else {
+      data = await api('GET', `/api/dashboard/schedule?date=${dateStr}`);
     if (!data.appointments.length) {
       content.innerHTML = `<div class="empty-state">
         <div class="emoji">🌸</div>
@@ -1791,12 +1794,18 @@ async function loadClients(page) {
   listEl.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
   try {
     const q = document.getElementById('client-search').value.trim();
-    // Используем выбранный masterId если в админ-режиме
-    const masterParam = _selectedMasterId ? `&master_id=${_selectedMasterId}` : '';
-    const url = q
-      ? `/api/dashboard/clients?search=${encodeURIComponent(q)}${masterParam}`
-      : `/api/dashboard/clients?page=${page}${masterParam}`;
-    const data = await api('GET', url);
+    let data;
+    if (_selectedMasterId) {
+      const url = q
+        ? `/api/admin/master/${_selectedMasterId}/clients?search=${encodeURIComponent(q)}`
+        : `/api/admin/master/${_selectedMasterId}/clients?page=${page}`;
+      data = await api('GET', url);
+    } else {
+      const url = q
+        ? `/api/dashboard/clients?search=${encodeURIComponent(q)}`
+        : `/api/dashboard/clients?page=${page}`;
+      data = await api('GET', url);
+    }
     document.getElementById('clients-count-sub').textContent = `${data.total} клиентов`;
 
     if (!data.clients.length) {
@@ -1836,8 +1845,12 @@ async function loadInactive() {
   const listEl = document.getElementById('inactive-list');
   listEl.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
   try {
-    const masterParam = _selectedMasterId ? `?master_id=${_selectedMasterId}` : '';
-    const data = await api('GET', '/api/dashboard/inactive' + masterParam);
+    let data;
+    if (_selectedMasterId) {
+      data = await api('GET', `/api/admin/master/${_selectedMasterId}/inactive`);
+    } else {
+      data = await api('GET', '/api/dashboard/inactive');
+    }
     const clients = data.clients || [];
     document.getElementById('inactive-count-sub').textContent =
       clients.length ? `${clients.length} клиентов` : 'Все активны 🎉';
@@ -2323,9 +2336,13 @@ async function loadEarnings(period) {
   document.getElementById('earn-total').textContent = '…';
   document.getElementById('earn-count').textContent = '…';
 
-  try {
-    const masterParam = _selectedMasterId ? `&master_id=${_selectedMasterId}` : '';
-    const data = await api('GET', `/api/stats/period?date_from=${from}&date_to=${to}${masterParam}`);
+try {
+    let data;
+    if (_selectedMasterId) {
+      data = await api('GET', `/api/admin/master/${_selectedMasterId}/stats/period?date_from=${from}&date_to=${to}`);
+    } else {
+      data = await api('GET', `/api/stats/period?date_from=${from}&date_to=${to}`);
+    }
     document.getElementById('earn-total').textContent = fmt(data.total_earnings) + ' ₽';
     document.getElementById('earn-count').textContent = data.total_appointments;
 
@@ -2359,8 +2376,12 @@ async function loadEarnings(period) {
 async function loadEarnByClient() {
   const el = document.getElementById('earn-by-client');
   try {
-    const masterParam = _selectedMasterId ? `?master_id=${_selectedMasterId}` : '';
-    const rows = await api('GET', '/api/stats/by-client' + masterParam);
+    let rows;
+    if (_selectedMasterId) {
+      rows = await api('GET', `/api/admin/master/${_selectedMasterId}/stats/by-client`);
+    } else {
+      rows = await api('GET', '/api/stats/by-client');
+    }
     if (!rows.length) {
       el.innerHTML = `<div style="color:var(--text-muted); font-size:13px; padding:8px 0">Нет данных</div>`;
       return;
@@ -2383,8 +2404,12 @@ async function loadEarnByClient() {
 async function loadEarnChart() {
   const el = document.getElementById('earn-chart');
   try {
-    const masterParam = _selectedMasterId ? `&master_id=${_selectedMasterId}` : '';
-    const rows = await api('GET', `/api/stats/chart?days=30${masterParam}`);
+    let rows;
+    if (_selectedMasterId) {
+      rows = await api('GET', `/api/admin/master/${_selectedMasterId}/stats/chart?days=30`);
+    } else {
+      rows = await api('GET', '/api/stats/chart?days=30');
+    }
     if (!rows.length) {
       el.innerHTML = `<div style="color:var(--text-muted); font-size:13px; padding:8px 0">Нет данных за последние 30 дней</div>`;
       return;
