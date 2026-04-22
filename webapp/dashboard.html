@@ -1421,6 +1421,8 @@ async function verifyCodeManual() {
 
 const ADMIN_TG_ID = 550421233;
 let _realMasterId = null;  // master_id администратора (его собственный)
+let _selectedMasterId = null; // Выбранный ID мастера в админ-режиме
+let _selectedMasterName = '';  // Имя выбранного мастера для отображения
 
 function afterLogin() {
   document.getElementById('nav-bar').style.display = 'flex';
@@ -1441,7 +1443,16 @@ async function _checkAdminMode() {
 
   // Показываем панель и загружаем список мастеров
   document.getElementById('admin-panel').style.display = '';
-  _realMasterId = null;  // сбросим — сейчас смотрим свой аккаунт
+  _realMasterId = master.id;
+  
+  // Восстанавливаем выбор если был
+  if (_selectedMasterId) {
+    const sel = document.getElementById('admin-master-select');
+    sel.value = _selectedMasterId;
+    document.getElementById('admin-viewing').style.display = '';
+    document.getElementById('admin-viewing-name').textContent = 
+      `${_selectedMasterName} (id:${_selectedMasterId})`;
+  }
 
   try {
     console.log('Загружаю список мастеров...');
@@ -1471,12 +1482,16 @@ async function adminSwitchMaster() {
   const masterId = sel.value;
   if (!masterId) { adminResetMaster(); return; }
 
+  _selectedMasterId = masterId; // Сохраняем ВЫБРАННЫЙ ID
+  _selectedMasterName = m.name;
+  localStorage.setItem('bb_selected_master', masterId);
+  localStorage.setItem('bb_selected_name', m.name);
+
   try {
     const data = await api('GET', `/api/admin/master/${masterId}/data`);
     const m = data.master;
 
-    // Запоминаем реальный master_id если ещё не сохранён
-    if (_realMasterId === null) _realMasterId = master.id || null;
+    if (_realMasterId === null) _realMasterId = m.id;
 
     // Показываем чьи данные смотрим
     document.getElementById('admin-viewing').style.display = '';
@@ -1499,6 +1514,10 @@ function adminResetMaster() {
   document.getElementById('admin-master-select').value = '';
   document.getElementById('admin-viewing').style.display = 'none';
   _realMasterId = null;
+  _selectedMasterId = null;
+  _selectedMasterName = '';
+  localStorage.removeItem('bb_selected_master');
+  localStorage.removeItem('bb_selected_name');
   // Перезагружаем свой дашборд
   const today = new Date();
   const MONTHS = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
@@ -1523,13 +1542,24 @@ function logout() {
 async function loadDash() {
   const today = new Date();
   const MONTHS = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-  const DAYS = ['воскресенье','понедельник','вторник','среду','четверг','пятницу','субботу'];
-  document.getElementById('dash-greeting').textContent = `Привет, ${master?.name || 'Мастер'}! ✨`;
+  const DAYS = ['воскресенье','понедельник','вторник','среду','четверг','пятницу','суббота'];
+  
+  // Используем имя выбранного мастера если в админ-режиме
+  const displayName = _selectedMasterName || master?.name || 'Мастер';
+  const prefix = _selectedMasterId ? '👁 ' : '';
+  document.getElementById('dash-greeting').textContent = `${prefix}${displayName}! ✨`;
   document.getElementById('dash-date').textContent =
     `${DAYS[today.getDay()]}, ${today.getDate()} ${MONTHS[today.getMonth()]}`;
 
   try {
-    const data = await api('GET', '/api/me');
+    // Используем выбранный masterId если в админ-режиме
+    let data;
+    if (_selectedMasterId) {
+      const d = await api('GET', `/api/admin/master/${_selectedMasterId}/data`);
+      data = d;
+    } else {
+      data = await api('GET', '/api/me');
+    }
     document.getElementById('s-clients').textContent = fmt(data.stats.total_clients);
     document.getElementById('s-month').textContent = fmt(data.stats.month_earnings) + ' ₽';
     document.getElementById('s-total').textContent = fmt(data.stats.total_appointments);
@@ -1760,9 +1790,11 @@ async function loadClients(page) {
   listEl.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
   try {
     const q = document.getElementById('client-search').value.trim();
+    // Используем выбранный masterId если в админ-режиме
+    const masterParam = _selectedMasterId ? `&master_id=${_selectedMasterId}` : '';
     const url = q
-      ? `/api/dashboard/clients?search=${encodeURIComponent(q)}`
-      : `/api/dashboard/clients?page=${page}`;
+      ? `/api/dashboard/clients?search=${encodeURIComponent(q)}${masterParam}`
+      : `/api/dashboard/clients?page=${page}${masterParam}`;
     const data = await api('GET', url);
     document.getElementById('clients-count-sub').textContent = `${data.total} клиентов`;
 
@@ -1803,7 +1835,8 @@ async function loadInactive() {
   const listEl = document.getElementById('inactive-list');
   listEl.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
   try {
-    const data = await api('GET', '/api/dashboard/inactive');
+    const masterParam = _selectedMasterId ? `?master_id=${_selectedMasterId}` : '';
+    const data = await api('GET', '/api/dashboard/inactive' + masterParam);
     const clients = data.clients || [];
     document.getElementById('inactive-count-sub').textContent =
       clients.length ? `${clients.length} клиентов` : 'Все активны 🎉';
@@ -2444,6 +2477,10 @@ async function loadServicesCount() {
   // Восстановить тему
   const savedTheme = localStorage.getItem('bb_theme') || 'pink';
   setTheme(savedTheme);
+
+  // Восстановить выбор админа
+  _selectedMasterId = localStorage.getItem('bb_selected_master');
+  _selectedMasterName = localStorage.getItem('bb_selected_name') || '';
 
   // Если уже залогинен — открываем дашборд
   if (token && master) {
