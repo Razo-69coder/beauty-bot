@@ -595,6 +595,12 @@ async def list_all_masters():
     masters = await get_all_masters()
     return {"masters": masters}
 
+@app.get("/api/v2/masters")
+async def list_masters_v2():
+    """Публичный список всех мастеров"""
+    masters = await get_all_masters()
+    return {"masters": masters}
+
 
 @app.get("/api/dashboard/schedule")
 async def dash_schedule(date: str, master_id: int = Depends(get_jwt_master_id)):
