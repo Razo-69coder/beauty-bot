@@ -507,12 +507,16 @@ async def create_login_code(telegram_id: int) -> str:
 
 
 async def get_all_masters() -> list[dict]:
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT id, telegram_id, name FROM masters ORDER BY name"
-        ) as c:
-            rows = await c.fetchall()
-    return [{"id": r[0], "telegram_id": r[1], "name": r[2]} for r in rows]
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute(
+                "SELECT id, telegram_id, name FROM masters ORDER BY name"
+            ) as c:
+                rows = await c.fetchall()
+        return [{"id": r[0], "telegram_id": r[1], "name": r[2] or "Без имени"} for r in rows]
+    except Exception as e:
+        print(f"api get_all_masters error: {e}")
+        return []
 
 
 async def verify_login_code(telegram_id: int, code: str) -> bool:
