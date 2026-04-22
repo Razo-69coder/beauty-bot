@@ -181,6 +181,8 @@ async def public_book_endpoint(body: PublicBooking):
             f"📅 {d.strftime('%d.%m.%Y')} в {body.time}\n\n"
             f"Откройте приложение для подтверждения.",
         )
+        # Уведомление клиенту (без telegram_id — просто текст)
+        # Клиент получит подтверждение когда мастер нажмёт "Подтвердить"
         return {"ok": True, "appointment_id": appt_id}
     except ValueError as e:
         raise HTTPException(400, str(e))

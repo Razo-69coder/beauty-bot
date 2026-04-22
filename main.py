@@ -399,7 +399,7 @@ async def api_public_master(telegram_id: int):
         raise HTTPException(status_code=404, detail="Мастер не найден")
     today = dt.now().date()
     available_dates = []
-    for i in range(1, 14):
+    for i in range(0, 31):  # 0 = сегодня, 30 = через 30 дней
         d = today + timedelta(days=i)
         date_str = d.strftime("%Y-%m-%d")
         slots = await get_available_slots(
@@ -408,7 +408,7 @@ async def api_public_master(telegram_id: int):
         )
         if slots:
             available_dates.append(date_str)
-        if len(available_dates) == 7:
+        if len(available_dates) == 30:
             break
     return {"name": master["name"], "master_id": master["id"], "available_dates": available_dates}
 
