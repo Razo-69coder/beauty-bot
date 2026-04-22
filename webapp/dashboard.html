@@ -256,6 +256,15 @@ body::after {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px var(--shadow-strong);
 }
+.btn-danger {
+  background: #dc3545; color: #fff;
+  box-shadow: 0 2px 12px rgba(220,53,69,0.3); width: 100%;
+  border: none;
+}
+.btn-danger:hover {
+  background: #c82333;
+  transform: translateY(-2px);
+}
 .btn-ghost {
   background: var(--primary-light); color: var(--primary);
   font-size: 13px; padding: 10px 16px; border-radius: 12px;
@@ -1158,6 +1167,7 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
       <input id="edit-client-notes" type="text" placeholder="Заметки...">
     </div>
     <button class="btn btn-primary" onclick="saveEditedClient()">Сохранить</button>
+    <button class="btn btn-danger" style="margin-top:8px" onclick="deleteCurrentClient()">🗑 Удалить клиента</button>
     <button class="btn btn-secondary" style="margin-top:8px" onclick="closeOverlay()">Отмена</button>
   </div>
 </div>
@@ -2010,6 +2020,15 @@ async function saveEditedClient() {
     currentClientUsername = username;
     loadClients(0);
     openClientHistory(currentClientId, name);
+  } catch(e) { alert(e.message); }
+}
+
+async function deleteCurrentClient() {
+  if (!confirm('Удалить клиента? Все записи также будут удалены.')) return;
+  try {
+    await api('DELETE', `/api/dashboard/clients/${currentClientId}`);
+    closeOverlay();
+    loadClients(0);
   } catch(e) { alert(e.message); }
 }
 
