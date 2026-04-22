@@ -116,13 +116,11 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 async def root():
     return {"status": "ok", "message": "Beauty Book v4", "v": 4}
 
-@app.get("/api/all-masters")
-async def get_all():
+@app.get("/api/all-masters-v6")
+async def get_all_v6():
     """Публичный список мастеров"""
-    try:
-        masters = await get_all_masters()
-    except Exception as e:
-        return {"error": str(e), "masters": []}
+    from database import get_all_masters as gam
+    masters = await gam()
     return {"masters": masters}
 
 
