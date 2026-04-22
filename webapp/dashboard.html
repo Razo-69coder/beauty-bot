@@ -1975,55 +1975,18 @@ async function openClientHistory(clientId, clientName) {
 }
 
 async function writeToClient() {
-  // 1. Если есть username — открываем сразу чат с клиентом
-  if (currentClientUsername) {
-    window.open(`https://t.me/${currentClientUsername}`, '_blank');
-    return;
-  }
+  const username = currentClientUsername || prompt('Введите username клиента в Telegram (@username):');
+  if (!username || !username.trim()) return;
   
-  // 2. Если есть telegram_id но нет username — просим ввести username
-  if (currentClientTgId) {
-    const username = prompt('Введите username клиента в Telegram (например, @username):');
-    if (!username || !username.trim()) return;
+  // Сохраняем username если его не было
+  if (!currentClientUsername) {
     currentClientUsername = username.trim().replace('@', '');
     try {
       await api('PUT', `/api/dashboard/clients/${currentClientId}`, {
         username: currentClientUsername
       });
     } catch(e) {}
-    window.open(`https://t.me/${currentClientUsername}`, '_blank');
-    return;
   }
-  
-// 3. Если есть phone — открываем чат по номеру
-  if (currentClientPhone) {
-    // Убираем всё кроме цифр, потом оставляем последние 10 цифр (без +7/8)
-    let digits = currentClientPhone.replace(/\D/g, '');
-    // Если начинается с 7 или 8 — пропускаем первую цифру (код страны)
-    if (digits.length === 11 && (digits[0] === '7' || digits[0] === '8')) {
-      digits = digits.substring(1); // убираем 7 или 8
-    }
-    // Формат для Telegram: +79XXXXXXXXX или просто 79XXXXXXXXX
-    const phoneForTelegram = '7' + digits.slice(-10);
-    if (phoneForTelegram.length >= 11) {
-      window.open(`https://t.me/${phoneForTelegram}`, '_blank');
-      return;
-    }
-  }
-
-  // 4. Запрашиваем username у мастера
-  const username = prompt('Введите username клиента в Telegram (например, @username):');
-  if (!username || !username.trim()) return;
-  
-  // Убираем @ если есть
-  currentClientUsername = username.trim().replace('@', '');
-  
-  // Сохраняем в БД
-  try {
-    await api('PUT', `/api/dashboard/clients/${currentClientId}`, {
-      username: currentClientUsername
-    });
-  } catch(e) {}
   
   // Открываем чат
   window.open(`https://t.me/${currentClientUsername}`, '_blank');
