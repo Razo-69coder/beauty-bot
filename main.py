@@ -136,6 +136,22 @@ async def admin_master_data(master_id: int):
     return {"master": master, "stats": stats, "clients": clients, "total_clients": len(clients)}
 
 
+@app.get("/api/admin/master/{master_id}/appointment/{appt_id}")
+async def admin_get_appointment(master_id: int, appt_id: int):
+    from database import get_appointment_with_client
+    appt = await get_appointment_with_client(appt_id)
+    if not appt or appt["master_id"] != master_id:
+        from fastapi import HTTPException
+        raise HTTPException(404, "Запись не найдена")
+    return {
+        "id": appt["id"], "client": appt["client_name"],
+        "phone": "", "procedure": appt["procedure"],
+        "date": appt["appointment_date"], "time": appt["time"] or "",
+        "price": appt["price"] or 0, "status": appt["status"],
+        "notes": appt["notes"] or "", "service_done_at": appt.get("service_done_at")
+    }
+
+
 @app.get("/health")
 async def health():
     return {"status": "healthy"}

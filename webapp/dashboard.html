@@ -1805,7 +1805,13 @@ async function openAppointmentDetailOverlay(apptId) {
   const body = document.getElementById('appt-detail-body');
   const btn = document.getElementById('btn-service-done');
   try {
-    const a = await api('GET', `/api/dashboard/appointments/${apptId}`);
+    let a;
+    if (_selectedMasterId) {
+      a = await api('GET', `/api/admin/master/${_selectedMasterId}/appointment/${apptId}`);
+    } else {
+      a = await api('GET', `/api/dashboard/appointments/${apptId}`);
+    }
+    
     const statusLabel = { confirmed: 'Подтверждена', pending: 'Ожидает', cancelled: 'Отменена', completed: 'Завершена' };
     const isDone = a.status === 'completed' || a.service_done_at;
     btn.disabled = isDone;
@@ -1855,7 +1861,7 @@ async function markServiceDone() {
     await api('PATCH', `/api/dashboard/appointments/${currentAppointmentId}/done`);
     btn.textContent = '✅ Услуга оказана';
     closeOverlay();
-    loadSchedule(currentScheduleDate);
+    loadSchedule(schedDate);
   } catch (e) {
     alert(e.message);
     btn.disabled = false;
