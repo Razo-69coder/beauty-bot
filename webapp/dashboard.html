@@ -2052,14 +2052,8 @@ async function writeToClient() {
 // ─── Настройки ─────────────────────────────────────────────────────
 
 async function fillSettings() {
-  let m;
-  if (_selectedMasterId) {
-    m = await api('GET', `/api/admin/master/${_selectedMasterId}/settings`);
-  } else if (master) {
-    m = master;
-  }
-  if (!m) return;
-  
+  if (!master) return;
+  const m = master;
   document.getElementById('set-name-sub').textContent = m.name || '—';
   document.getElementById('set-payment-sub').textContent = m.payment_card || 'Не указаны';
   document.getElementById('set-hours-sub').textContent =
@@ -2210,13 +2204,7 @@ async function saveDeposit() {
 
 async function loadDepositStatus() {
   try {
-    let data;
-    if (_selectedMasterId) {
-      const m = await api('GET', `/api/admin/master/${_selectedMasterId}/settings`);
-      data = { deposit_enabled: m.deposit_enabled, deposit_percent: m.deposit_percent };
-    } else {
-      data = await api('GET', '/api/dashboard/deposit');
-    }
+    const data = await api('GET', '/api/dashboard/deposit');
     document.getElementById('set-deposit-sub').textContent =
       data.deposit_enabled ? `Включена, ${data.deposit_percent}%` : 'Выключена';
     document.getElementById('deposit-enabled').checked = data.deposit_enabled;
@@ -2503,12 +2491,7 @@ async function deleteService(id) {
 
 async function loadServicesCount() {
   try {
-    let rows;
-    if (_selectedMasterId) {
-      rows = await api('GET', `/api/admin/master/${_selectedMasterId}/services`);
-    } else {
-      rows = await api('GET', '/api/services');
-    }
+    const rows = await api('GET', '/api/services');
     servicesCache = rows;
     _updateServicesDatalist(rows);
     const el = document.getElementById('set-services-sub');
