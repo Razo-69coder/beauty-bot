@@ -34,7 +34,6 @@ from database import (
     get_services, add_service, delete_service,
     get_earnings_by_service, get_earnings_by_client, get_earnings_by_day, get_earnings_by_period,
     get_appointment_with_client, update_appointment_service_done,
-    get_all_masters,
 )
 
 from scheduler import setup_scheduler
@@ -116,7 +115,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 async def root():
     return {"status": "ok", "message": "Beauty Book v4", "v": 4}
 
-@app.get("/api/all-masters-v6")
+@app.get("/api/all-masters")
 async def get_all_v6():
     """Публичный список мастеров"""
     from database import get_all_masters as gam
