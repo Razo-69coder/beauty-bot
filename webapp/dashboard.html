@@ -1981,14 +1981,19 @@ async function writeToClient() {
     return;
   }
   
-  // 2. Если есть телефон — пробуем открыть по номеру (deep link для мобильного)
+  // 2. Если есть телефон — скопировать в буфер и показать подсказку
   if (currentClientPhone) {
     let digits = currentClientPhone.replace(/\D/g, '');
     if (digits.length >= 10) {
-      // Берем последние 10 цифр
       digits = digits.slice(-10);
-      // Пробуем tg:// схему (работает в мобильном Telegram)
-      window.location.href = `tg://resolve?phone=7${digits}`;
+      const phone = '7' + digits;
+      // Пробуем скопировать
+      try {
+        navigator.clipboard.writeText(phone);
+      } catch(e) {}
+      alert(`Номер скопирован: +${phone}\n\n` +
+        'Откройте Telegram → поиск → вставьте номер\n' +
+        'или: io → новый чат → ввести номер');
       return;
     }
   }
