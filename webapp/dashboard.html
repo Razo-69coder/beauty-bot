@@ -1444,18 +1444,25 @@ async function _checkAdminMode() {
   _realMasterId = null;  // сбросим — сейчас смотрим свой аккаунт
 
   try {
+    console.log('Загружаю список мастеров...');
     const data = await api('GET', '/api/admin/masters');
+    console.log('Получено мастеров:', data);
     const sel = document.getElementById('admin-master-select');
     // Очищаем и заполняем
     sel.innerHTML = '<option value="">— выберите мастера —</option>';
-    data.masters.forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m.id;
-      opt.textContent = `${m.name} (tg: ${m.telegram_id})`;
-      sel.appendChild(opt);
-    });
+    if (data.masters && data.masters.length > 0) {
+      data.masters.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = `${m.name} (tg: ${m.telegram_id})`;
+        sel.appendChild(opt);
+      });
+    } else {
+      sel.innerHTML = '<option value="">Нет мастеров</option>';
+    }
   } catch(e) {
     console.warn('Не удалось загрузить список мастеров', e);
+    alert('Ошибка загрузки списка: ' + e.message);
   }
 }
 
