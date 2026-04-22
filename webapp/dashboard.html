@@ -1975,20 +1975,35 @@ async function openClientHistory(clientId, clientName) {
 }
 
 async function writeToClient() {
-  const username = currentClientUsername || prompt('Введите username клиента в Telegram (@username):');
-  if (!username || !username.trim()) return;
-  
-  // Сохраняем username если его не было
-  if (!currentClientUsername) {
-    currentClientUsername = username.trim().replace('@', '');
-    try {
-      await api('PUT', `/api/dashboard/clients/${currentClientId}`, {
-        username: currentClientUsername
-      });
-    } catch(e) {}
+  // 1. Если есть username — сразу открываем
+  if (currentClientUsername) {
+    window.open(`https://t.me/${currentClientUsername}`, '_blank');
+    return;
   }
   
-  // Открываем чат
+  // 2. Если есть телефон — пробуем открыть по номеру (deep link для мобильного)
+  if (currentClientPhone) {
+    let digits = currentClientPhone.replace(/\D/g, '');
+    if (digits.length >= 10) {
+      // Берем последние 10 цифр
+      digits = digits.slice(-10);
+      // Пробуем tg:// схему (работает в мобильном Telegram)
+      window.location.href = `tg://resolve?phone=7${digits}`;
+      return;
+    }
+  }
+  
+  // 3. Нет данных — просим username
+  const username = prompt('Введите username клиента в Telegram (@username):');
+  if (!username || !username.trim()) return;
+  
+  currentClientUsername = username.trim().replace('@', '');
+  try {
+    await api('PUT', `/api/dashboard/clients/${currentClientId}`, {
+      username: currentClientUsername
+    });
+  } catch(e) {}
+  
   window.open(`https://t.me/${currentClientUsername}`, '_blank');
 }
 
