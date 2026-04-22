@@ -1445,7 +1445,7 @@ async function _checkAdminMode() {
 
   try {
     console.log('Загружаю список мастеров...');
-    const data = await api('GET', '/api/admin/masters');
+    const data = await api('GET', '/api/all-masters');
     console.log('Получено мастеров:', data);
     const sel = document.getElementById('admin-master-select');
     // Очищаем и заполняем
