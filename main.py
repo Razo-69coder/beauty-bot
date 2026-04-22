@@ -587,7 +587,7 @@ async def require_admin(authorization: str = Header(None)) -> int:
     payload = _decode_jwt(authorization[7:])
     if not payload:
         raise HTTPException(401, "Неверный токен")
-    return payload["mid"]  # Пропускаем всех для тестов
+    return payload["mid"]
 
 
 @app.get("/api/admin/masters")
