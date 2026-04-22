@@ -591,7 +591,7 @@ async def require_admin(authorization: str = Header(None)) -> int:
 
 
 @app.get("/api/admin/masters")
-async def admin_list_masters():
+async def list_all_masters():
     masters = await get_all_masters()
     return {"masters": masters}
 
