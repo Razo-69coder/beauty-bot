@@ -144,11 +144,16 @@ async def admin_get_appointment(master_id: int, appt_id: int):
         from fastapi import HTTPException
         raise HTTPException(404, "Запись не найдена")
     return {
-        "id": appt["id"], "client": appt["client_name"],
-        "phone": "", "procedure": appt["procedure"],
-        "date": appt["appointment_date"], "time": appt["time"] or "",
-        "price": appt["price"] or 0, "status": appt["status"],
-        "notes": appt["notes"] or "", "service_done_at": appt.get("service_done_at")
+        "id": appt["id"],
+        "client": appt.get("client_name"),
+        "phone": appt.get("client_telegram_id") or "",
+        "procedure": appt.get("procedure"),
+        "date": str(appt.get("appointment_date")) if appt.get("appointment_date") else "",
+        "time": appt.get("time") or "",
+        "price": appt.get("deposit_amount") or 0,
+        "status": appt.get("status") or "confirmed",
+        "notes": appt.get("notes") or "",
+        "service_done_at": appt.get("service_done_at")
     }
 
 
@@ -726,11 +731,16 @@ async def dash_get_appointment(
     if not appt or appt["master_id"] != master_id:
         raise HTTPException(status_code=404, detail="Запись не найдена")
     return {
-        "id": appt["id"], "client": appt["client_name"],
-        "phone": "", "procedure": appt["procedure"],
-        "date": appt["appointment_date"], "time": appt["time"] or "",
-        "status": "confirmed", "price": appt["deposit_amount"],
-        "notes": "", "service_done_at": None,
+        "id": appt["id"],
+        "client": appt.get("client_name"),
+        "phone": appt.get("client_telegram_id") or "",
+        "procedure": appt.get("procedure"),
+        "date": str(appt.get("appointment_date")) if appt.get("appointment_date") else "",
+        "time": appt.get("time") or "",
+        "status": appt.get("status") or "confirmed",
+        "price": appt.get("deposit_amount") or 0,
+        "notes": appt.get("notes") or "",
+        "service_done_at": appt.get("service_done_at"),
     }
 
 

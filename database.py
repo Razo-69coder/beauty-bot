@@ -819,6 +819,7 @@ async def get_appointment_with_client(appointment_id: int) -> dict | None:
         row = await conn.fetchrow("""
             SELECT a.id, a.master_id, a.client_id, a.procedure,
                    a.appointment_date, a.time, a.deposit_status, a.deposit_amount,
+                   a.status, a.notes, a.service_done_at,
                    c.name as client_name, c.telegram_id as client_tg_id,
                    m.telegram_id as master_tg_id, m.name as master_name
             FROM appointments a
