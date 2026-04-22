@@ -122,6 +122,16 @@ async def get_all_v6():
     masters = await gam()
     return {"masters": masters}
 
+@app.get("/api/admin/master/{master_id}/data")
+async def admin_master_data(master_id: int):
+    from database import get_master_full, get_statistics, get_clients_page
+    master = await get_master_full(master_id)
+    if not master:
+        return {"error": "Мастер не найден"}, 404
+    stats = await get_statistics(master_id)
+    clients, total = await get_clients_page(master_id, 0, 100)
+    return {"master": master, "stats": stats, "clients": clients, "total_clients": total}
+
 
 @app.get("/health")
 async def health():
