@@ -392,6 +392,14 @@ async def remove_client(client_id: int, master_id: int = Depends(get_master_id))
     return {"ok": True}
 
 
+@app.delete("/api/dashboard/clients/{client_id}")
+async def dashboard_remove_client(client_id: int, master_id: int = Depends(get_master_id)):
+    ok = await delete_client(client_id, master_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Клиент не найден")
+    return {"ok": True}
+
+
 # ─── Процедуры ───────────────────────────────────────────────────────
 
 @app.post("/api/appointments", status_code=201)
