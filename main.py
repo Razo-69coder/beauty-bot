@@ -595,6 +595,12 @@ async def admin_list_masters(master_id: int = Depends(require_admin)):
     masters = await get_all_masters()
     return {"masters": masters}
 
+@app.get("/api/public/masters")
+async def public_list_masters():
+    """Публичный эндпоинт для тестирования"""
+    masters = await get_all_masters()
+    return {"masters": masters}
+
 
 @app.get("/api/dashboard/schedule")
 async def dash_schedule(date: str, master_id: int = Depends(get_jwt_master_id)):
