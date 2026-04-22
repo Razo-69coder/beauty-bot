@@ -34,6 +34,7 @@ from database import (
     get_services, add_service, delete_service,
     get_earnings_by_service, get_earnings_by_client, get_earnings_by_day, get_earnings_by_period,
     get_appointment_with_client, update_appointment_service_done,
+    get_all_masters,
 )
 
 from scheduler import setup_scheduler
