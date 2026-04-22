@@ -2052,8 +2052,15 @@ async function writeToClient() {
 // ─── Настройки ─────────────────────────────────────────────────────
 
 async function fillSettings() {
-  if (!master) return;
-  const m = master;
+  let m, isReadOnly = false;
+  if (_selectedMasterId) {
+    m = await api('GET', `/api/admin/master/${_selectedMasterId}/settings`);
+    isReadOnly = true;
+  } else if (master) {
+    m = master;
+  }
+  if (!m) return;
+  
   document.getElementById('set-name-sub').textContent = m.name || '—';
   document.getElementById('set-payment-sub').textContent = m.payment_card || 'Не указаны';
   document.getElementById('set-hours-sub').textContent =
@@ -2070,6 +2077,11 @@ async function fillSettings() {
   document.getElementById('ov-slot').value = m.slot_duration || 60;
   document.getElementById('ov-remind').value = m.reminder_days || 40;
   document.getElementById('ov-timezone').value = m.timezone || 'Europe/Moscow';
+  
+  // Блокируем редактирование в режиме просмотра
+  const sets = document.querySelectorAll('#screen-settings .settings-row');
+  sets.forEach(r => r.style.opacity = isReadOnly ? '0.6' : '1');
+  document.querySelectorAll('#screen-settings .btn-primary').forEach(b => b.disabled = isReadOnly);
 
   // Часы работы: заполняем select
   const wsEl = document.getElementById('ov-wstart');
@@ -2204,7 +2216,13 @@ async function saveDeposit() {
 
 async function loadDepositStatus() {
   try {
-    const data = await api('GET', '/api/dashboard/deposit');
+    let data;
+    if (_selectedMasterId) {
+      const m = await api('GET', `/api/admin/master/${_selectedMasterId}/settings`);
+      data = { deposit_enabled: m.deposit_enabled, deposit_percent: m.deposit_percent };
+    } else {
+      data = await api('GET', '/api/dashboard/deposit');
+    }
     document.getElementById('set-deposit-sub').textContent =
       data.deposit_enabled ? `Включена, ${data.deposit_percent}%` : 'Выключена';
     document.getElementById('deposit-enabled').checked = data.deposit_enabled;
