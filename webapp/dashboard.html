@@ -1305,7 +1305,14 @@ function goScreen(id) {
   if (id === 'clients')  loadClients(0);
   if (id === 'inactive') loadInactive();
   if (id === 'earnings') loadEarnings(currentEarnPeriod || 'month');
-  if (id === 'settings') { fillSettings(); loadDepositStatus(); loadServicesCount(); }
+  if (id === 'settings') { 
+    fillSettings(); loadDepositStatus(); loadServicesCount();
+    // Показать чьи настройки
+    const title = document.querySelector('#screen-settings .header h1');
+    if (_selectedMasterName && title) {
+      title.textContent = `⚙️ Настройки — ${_selectedMasterName}`;
+    }
+  }
 }
 
 // ─── Тема ──────────────────────────────────────────────────────────
