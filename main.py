@@ -591,13 +591,7 @@ async def require_admin(authorization: str = Header(None)) -> int:
 
 
 @app.get("/api/admin/masters")
-async def admin_list_masters(master_id: int = Depends(require_admin)):
-    masters = await get_all_masters()
-    return {"masters": masters}
-
-@app.get("/api/public/masters")
-async def public_list_masters():
-    """Публичный эндпоинт для тестирования"""
+async def admin_list_masters():
     masters = await get_all_masters()
     return {"masters": masters}
 
