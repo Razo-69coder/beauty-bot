@@ -1482,14 +1482,14 @@ async function adminSwitchMaster() {
   const masterId = sel.value;
   if (!masterId) { adminResetMaster(); return; }
 
-  _selectedMasterId = masterId; // Сохраняем ВЫБРАННЫЙ ID
-  _selectedMasterName = m.name;
-  localStorage.setItem('bb_selected_master', masterId);
-  localStorage.setItem('bb_selected_name', m.name);
-
   try {
     const data = await api('GET', `/api/admin/master/${masterId}/data`);
     const m = data.master;
+
+    _selectedMasterId = masterId;
+    _selectedMasterName = m.name;
+    localStorage.setItem('bb_selected_master', masterId);
+    localStorage.setItem('bb_selected_name', m.name);
 
     if (_realMasterId === null) _realMasterId = m.id;
 
@@ -1685,7 +1685,8 @@ async function loadSchedule(dateStr) {
     `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}, ${DAYS_SHORT[d.getDay()]}`;
   content.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
   try {
-    const data = await api('GET', `/api/dashboard/schedule?date=${dateStr}`);
+    const masterParam = _selectedMasterId ? `&master_id=${_selectedMasterId}` : '';
+    const data = await api('GET', `/api/dashboard/schedule?date=${dateStr}${masterParam}`);
     if (!data.appointments.length) {
       content.innerHTML = `<div class="empty-state">
         <div class="emoji">🌸</div>
@@ -2189,7 +2190,10 @@ async function saveDeposit() {
 
 async function loadDepositStatus() {
   try {
-    const data = await api('GET', '/api/dashboard/deposit');
+    const url = _selectedMasterId 
+      ? `/api/dashboard/deposit?master_id=${_selectedMasterId}` 
+      : '/api/dashboard/deposit';
+    const data = await api('GET', url);
     document.getElementById('set-deposit-sub').textContent =
       data.deposit_enabled ? `Включена, ${data.deposit_percent}%` : 'Выключена';
     document.getElementById('deposit-enabled').checked = data.deposit_enabled;
@@ -2320,7 +2324,8 @@ async function loadEarnings(period) {
   document.getElementById('earn-count').textContent = '…';
 
   try {
-    const data = await api('GET', `/api/stats/period?date_from=${from}&date_to=${to}`);
+    const masterParam = _selectedMasterId ? `&master_id=${_selectedMasterId}` : '';
+    const data = await api('GET', `/api/stats/period?date_from=${from}&date_to=${to}${masterParam}`);
     document.getElementById('earn-total').textContent = fmt(data.total_earnings) + ' ₽';
     document.getElementById('earn-count').textContent = data.total_appointments;
 
