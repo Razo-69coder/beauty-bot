@@ -13,8 +13,6 @@ from pydantic import BaseModel
 
 from aiogram import Bot, Dispatcher
 from aiogram.types import Update
-
-ADMIN_TG_ID = 550421233  # Telegram ID администратора
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import BOT_TOKEN, WEBHOOK_URL, WEBHOOK_SECRET
@@ -115,96 +113,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 # ── Health checks (для keep-alive) ─────────────────────────────────────
 @app.get("/")
 async def root():
-    return {"status": "ok", "message": "Beauty Book v4", "v": 4}
-
-@app.get("/api/all-masters")
-async def get_all_v6():
-    """Публичный список мастеров"""
-    from database import get_all_masters as gam
-    masters = await gam()
-    return {"masters": masters}
-
-@app.get("/api/admin/master/{master_id}/data")
-async def admin_master_data(master_id: int):
-    from database import get_master_full, get_statistics, get_clients
-    master = await get_master_full(master_id)
-    if not master:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Мастер не найден")
-    stats = await get_statistics(master_id)
-    clients = await get_clients(master_id)
-    return {"master": master, "stats": stats, "clients": clients, "total_clients": len(clients)}
-
-
-# Эндпоинты для админ-режима (расписание, заработок и т.д.)
-@app.get("/api/admin/master/{master_id}/schedule")
-async def admin_master_schedule(master_id: int, date: str):
-    from database import get_master_schedule
-    rows = await get_master_schedule(master_id, date)
-    return {"date": date, "appointments": [
-        {"id": r[0], "client": r[1], "procedure": r[2], "time": r[3], "status": r[4], "phone": r[5], "notes": r[6] or ""}
-        for r in rows
-    ]}
-
-
-@app.get("/api/admin/master/{master_id}/inactive")
-async def admin_master_inactive(master_id: int):
-    from database import get_inactive_clients
-    rows = await get_inactive_clients(master_id)
-    return {"clients": [
-        {"id": r[0], "name": r[1], "phone": r[2], "days_ago": r[3], "last_visit": str(r[4])[:10]}
-        for r in rows
-    ]}
-
-
-@app.get("/api/admin/master/{master_id}/stats/period")
-async def admin_master_stats_period(master_id: int, date_from: str, date_to: str):
-    from database import get_earnings_by_period, get_earnings_by_service
-    data = await get_earnings_by_period(master_id, date_from, date_to)
-    by_svc = await get_earnings_by_service(master_id, date_from, date_to)
-    data["by_service"] = [{"procedure": r[0], "count": r[1], "total": r[2]} for r in by_svc]
-    return data
-
-
-@app.get("/api/admin/master/{master_id}/stats/chart")
-async def admin_master_chart(master_id: int, days: int = 30):
-    from database import get_earnings_by_day
-    rows = await get_earnings_by_day(master_id, days)
-    return [{"date": r[0], "total": r[1]} for r in rows]
-
-
-@app.get("/api/admin/master/{master_id}/stats/by-client")
-async def admin_master_by_client(master_id: int):
-    from database import get_earnings_by_client
-    rows = await get_earnings_by_client(master_id)
-    return [{"name": r[0], "count": r[1], "total": r[2]} for r in rows]
-
-
-@app.get("/api/admin/master/{master_id}/clients")
-async def admin_master_clients(master_id: int, page: int = 0, search: str = None):
-    from database import get_clients, search_clients
-    if search:
-        rows = await search_clients(master_id, search)
-    else:
-        rows = await get_clients(master_id, page * 50, 50)
-    return {"clients": [{"id": r[0], "name": r[1], "phone": r[2], "notes": r[3], "last_visit": str(r[4])[:10]} for r in rows], "total": len(rows)}
-
-
-@app.get("/api/admin/master/{master_id}/settings")
-async def admin_master_settings(master_id: int):
-    from database import get_master_full
-    master = await get_master_full(master_id)
-    if not master:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Мастер не найден")
-    return master
-
-
-@app.get("/api/admin/master/{master_id}/services")
-async def admin_master_services(master_id: int):
-    from database import get_services
-    rows = await get_services(master_id)
-    return [{"id": r[0], "name": r[1], "price_default": r[2]} for r in rows]
+    return {"status": "ok", "message": "Beauty Book API — бот работает"}
 
 
 @app.get("/health")
@@ -284,23 +193,12 @@ def _decode_jwt(token: str) -> dict | None:
     except jwt.InvalidTokenError:
         return None
 
-async def get_jwt_master_id(
-    authorization: str = Header(None),
-    master_id: int = None
-) -> int:
-    """Получает master_id из токена или из URL-параметра (для админа)"""
+async def get_jwt_master_id(authorization: str = Header(None)) -> int:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Требуется авторизация")
     payload = _decode_jwt(authorization[7:])
     if not payload:
         raise HTTPException(401, "Неверный или устаревший токен")
-    
-    # Если передан master_id в URL и это админ — используем его
-    if master_id:
-        admin_tg = int(payload.get("tg"))
-        if admin_tg == ADMIN_TG_ID:
-            return master_id
-    
     return int(payload["mid"])
 
 
@@ -692,9 +590,10 @@ async def require_admin(authorization: str = Header(None)) -> int:
     return payload["mid"]
 
 
-@app.get("/")
-async def root_v2():
-    return {"status": "ok", "message": "v2"}
+@app.get("/api/admin/masters")
+async def list_all_masters():
+    masters = await get_all_masters()
+    return {"masters": masters}
 
 @app.get("/api/v2/masters")
 async def list_masters_v2():

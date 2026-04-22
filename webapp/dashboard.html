@@ -1421,8 +1421,6 @@ async function verifyCodeManual() {
 
 const ADMIN_TG_ID = 550421233;
 let _realMasterId = null;  // master_id администратора (его собственный)
-let _selectedMasterId = null; // Выбранный ID мастера в админ-режиме
-let _selectedMasterName = '';  // Имя выбранного мастера для отображения
 
 function afterLogin() {
   document.getElementById('nav-bar').style.display = 'flex';
@@ -1443,20 +1441,11 @@ async function _checkAdminMode() {
 
   // Показываем панель и загружаем список мастеров
   document.getElementById('admin-panel').style.display = '';
-  _realMasterId = master.id;
-  
-  // Восстанавливаем выбор если был
-  if (_selectedMasterId) {
-    const sel = document.getElementById('admin-master-select');
-    sel.value = _selectedMasterId;
-    document.getElementById('admin-viewing').style.display = '';
-    document.getElementById('admin-viewing-name').textContent = 
-      `${_selectedMasterName} (id:${_selectedMasterId})`;
-  }
+  _realMasterId = null;  // сбросим — сейчас смотрим свой аккаунт
 
   try {
     console.log('Загружаю список мастеров...');
-    const data = await api('GET', '/api/all-masters');
+    const data = await api('GET', '/api/admin/masters');
     console.log('Получено мастеров:', data);
     const sel = document.getElementById('admin-master-select');
     // Очищаем и заполняем
@@ -1486,12 +1475,8 @@ async function adminSwitchMaster() {
     const data = await api('GET', `/api/admin/master/${masterId}/data`);
     const m = data.master;
 
-    _selectedMasterId = masterId;
-    _selectedMasterName = m.name;
-    localStorage.setItem('bb_selected_master', masterId);
-    localStorage.setItem('bb_selected_name', m.name);
-
-    if (_realMasterId === null) _realMasterId = m.id;
+    // Запоминаем реальный master_id если ещё не сохранён
+    if (_realMasterId === null) _realMasterId = master.id || null;
 
     // Показываем чьи данные смотрим
     document.getElementById('admin-viewing').style.display = '';
@@ -1514,10 +1499,6 @@ function adminResetMaster() {
   document.getElementById('admin-master-select').value = '';
   document.getElementById('admin-viewing').style.display = 'none';
   _realMasterId = null;
-  _selectedMasterId = null;
-  _selectedMasterName = '';
-  localStorage.removeItem('bb_selected_master');
-  localStorage.removeItem('bb_selected_name');
   // Перезагружаем свой дашборд
   const today = new Date();
   const MONTHS = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
@@ -1542,24 +1523,13 @@ function logout() {
 async function loadDash() {
   const today = new Date();
   const MONTHS = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-  const DAYS = ['воскресенье','понедельник','вторник','среду','четверг','пятницу','суббота'];
-  
-  // Используем имя выбранного мастера если в админ-режиме
-  const displayName = _selectedMasterName || master?.name || 'Мастер';
-  const prefix = _selectedMasterId ? '👁 ' : '';
-  document.getElementById('dash-greeting').textContent = `${prefix}${displayName}! ✨`;
+  const DAYS = ['воскресенье','понедельник','вторник','среду','четверг','пятницу','субботу'];
+  document.getElementById('dash-greeting').textContent = `Привет, ${master?.name || 'Мастер'}! ✨`;
   document.getElementById('dash-date').textContent =
     `${DAYS[today.getDay()]}, ${today.getDate()} ${MONTHS[today.getMonth()]}`;
 
   try {
-    // Используем выбранный masterId если в админ-режиме
-    let data;
-    if (_selectedMasterId) {
-      const d = await api('GET', `/api/admin/master/${_selectedMasterId}/data`);
-      data = d;
-    } else {
-      data = await api('GET', '/api/me');
-    }
+    const data = await api('GET', '/api/me');
     document.getElementById('s-clients').textContent = fmt(data.stats.total_clients);
     document.getElementById('s-month').textContent = fmt(data.stats.month_earnings) + ' ₽';
     document.getElementById('s-total').textContent = fmt(data.stats.total_appointments);
@@ -1685,11 +1655,7 @@ async function loadSchedule(dateStr) {
     `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}, ${DAYS_SHORT[d.getDay()]}`;
   content.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
   try {
-    let data;
-    if (_selectedMasterId) {
-      data = await api('GET', `/api/admin/master/${_selectedMasterId}/schedule?date=${dateStr}`);
-    } else {
-      data = await api('GET', `/api/dashboard/schedule?date=${dateStr}`);
+    const data = await api('GET', `/api/dashboard/schedule?date=${dateStr}`);
     if (!data.appointments.length) {
       content.innerHTML = `<div class="empty-state">
         <div class="emoji">🌸</div>
@@ -1794,18 +1760,10 @@ async function loadClients(page) {
   listEl.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
   try {
     const q = document.getElementById('client-search').value.trim();
-    let data;
-    if (_selectedMasterId) {
-      const url = q
-        ? `/api/admin/master/${_selectedMasterId}/clients?search=${encodeURIComponent(q)}`
-        : `/api/admin/master/${_selectedMasterId}/clients?page=${page}`;
-      data = await api('GET', url);
-    } else {
-      const url = q
-        ? `/api/dashboard/clients?search=${encodeURIComponent(q)}`
-        : `/api/dashboard/clients?page=${page}`;
-      data = await api('GET', url);
-    }
+    const url = q
+      ? `/api/dashboard/clients?search=${encodeURIComponent(q)}`
+      : `/api/dashboard/clients?page=${page}`;
+    const data = await api('GET', url);
     document.getElementById('clients-count-sub').textContent = `${data.total} клиентов`;
 
     if (!data.clients.length) {
@@ -1845,12 +1803,7 @@ async function loadInactive() {
   const listEl = document.getElementById('inactive-list');
   listEl.innerHTML = '<div class="loader"><div class="spinner"></div>Загружаем...</div>';
   try {
-    let data;
-    if (_selectedMasterId) {
-      data = await api('GET', `/api/admin/master/${_selectedMasterId}/inactive`);
-    } else {
-      data = await api('GET', '/api/dashboard/inactive');
-    }
+    const data = await api('GET', '/api/dashboard/inactive');
     const clients = data.clients || [];
     document.getElementById('inactive-count-sub').textContent =
       clients.length ? `${clients.length} клиентов` : 'Все активны 🎉';
@@ -2051,37 +2004,24 @@ async function writeToClient() {
 
 // ─── Настройки ─────────────────────────────────────────────────────
 
-async function fillSettings() {
-  let m, isReadOnly = false;
-  if (_selectedMasterId) {
-    m = await api('GET', `/api/admin/master/${_selectedMasterId}/settings`);
-    isReadOnly = true;
-  } else if (master) {
-    m = master;
-  }
-  if (!m) return;
-  
-  document.getElementById('set-name-sub').textContent = m.name || '—';
-  document.getElementById('set-payment-sub').textContent = m.payment_card || 'Не указаны';
+function fillSettings() {
+  if (!master) return;
+  document.getElementById('set-name-sub').textContent = master.name || '—';
+  document.getElementById('set-payment-sub').textContent = master.payment_card || 'Не указаны';
   document.getElementById('set-hours-sub').textContent =
-    `${m.work_start || 10}:00 — ${m.work_end || 20}:00`;
-  document.getElementById('set-slot-sub').textContent = `${m.slot_duration || 60} минут`;
-  document.getElementById('set-remind-sub').textContent = `через ${m.reminder_days || 40} дней`;
-  document.getElementById('set-tz-sub').textContent = m.timezone || 'Europe/Moscow';
-  const link = bookingLink || `${location.origin}/booking.html?master=${m.telegram_id}`;
+    `${master.work_start || 10}:00 — ${master.work_end || 20}:00`;
+  document.getElementById('set-slot-sub').textContent = `${master.slot_duration || 60} минут`;
+  document.getElementById('set-remind-sub').textContent = `через ${master.reminder_days || 40} дней`;
+  document.getElementById('set-tz-sub').textContent = master.timezone || 'Europe/Moscow';
+  const link = bookingLink || `${location.origin}/booking.html?master=${master.telegram_id}`;
   document.getElementById('set-link-sub').textContent = link;
 
   // Заполняем оверлеи
-  document.getElementById('ov-name').value = m.name || '';
-  document.getElementById('ov-payment').value = m.payment_card || '';
-  document.getElementById('ov-slot').value = m.slot_duration || 60;
-  document.getElementById('ov-remind').value = m.reminder_days || 40;
-  document.getElementById('ov-timezone').value = m.timezone || 'Europe/Moscow';
-  
-  // Блокируем редактирование в режиме просмотра
-  const sets = document.querySelectorAll('#screen-settings .settings-row');
-  sets.forEach(r => r.style.opacity = isReadOnly ? '0.6' : '1');
-  document.querySelectorAll('#screen-settings .btn-primary').forEach(b => b.disabled = isReadOnly);
+  document.getElementById('ov-name').value = master.name || '';
+  document.getElementById('ov-payment').value = master.payment_card || '';
+  document.getElementById('ov-slot').value = master.slot_duration || 60;
+  document.getElementById('ov-remind').value = master.reminder_days || 40;
+  document.getElementById('ov-timezone').value = master.timezone || 'Europe/Moscow';
 
   // Часы работы: заполняем select
   const wsEl = document.getElementById('ov-wstart');
@@ -2216,13 +2156,7 @@ async function saveDeposit() {
 
 async function loadDepositStatus() {
   try {
-    let data;
-    if (_selectedMasterId) {
-      const m = await api('GET', `/api/admin/master/${_selectedMasterId}/settings`);
-      data = { deposit_enabled: m.deposit_enabled, deposit_percent: m.deposit_percent };
-    } else {
-      data = await api('GET', '/api/dashboard/deposit');
-    }
+    const data = await api('GET', '/api/dashboard/deposit');
     document.getElementById('set-deposit-sub').textContent =
       data.deposit_enabled ? `Включена, ${data.deposit_percent}%` : 'Выключена';
     document.getElementById('deposit-enabled').checked = data.deposit_enabled;
@@ -2348,17 +2282,12 @@ async function loadEarnings(period) {
     document.getElementById('ptab-' + p)?.classList.toggle('active', p === period);
   });
   const { from, to, label } = _periodDates(period);
-  document.getElementById('earn-period-label').textContent = label + (_selectedMasterName ? ` (${_selectedMasterName})` : '');
+  document.getElementById('earn-period-label').textContent = label;
   document.getElementById('earn-total').textContent = '…';
   document.getElementById('earn-count').textContent = '…';
 
-try {
-    let data;
-    if (_selectedMasterId) {
-      data = await api('GET', `/api/admin/master/${_selectedMasterId}/stats/period?date_from=${from}&date_to=${to}`);
-    } else {
-      data = await api('GET', `/api/stats/period?date_from=${from}&date_to=${to}`);
-    }
+  try {
+    const data = await api('GET', `/api/stats/period?date_from=${from}&date_to=${to}`);
     document.getElementById('earn-total').textContent = fmt(data.total_earnings) + ' ₽';
     document.getElementById('earn-count').textContent = data.total_appointments;
 
@@ -2392,12 +2321,7 @@ try {
 async function loadEarnByClient() {
   const el = document.getElementById('earn-by-client');
   try {
-    let rows;
-    if (_selectedMasterId) {
-      rows = await api('GET', `/api/admin/master/${_selectedMasterId}/stats/by-client`);
-    } else {
-      rows = await api('GET', '/api/stats/by-client');
-    }
+    const rows = await api('GET', '/api/stats/by-client');
     if (!rows.length) {
       el.innerHTML = `<div style="color:var(--text-muted); font-size:13px; padding:8px 0">Нет данных</div>`;
       return;
@@ -2420,12 +2344,7 @@ async function loadEarnByClient() {
 async function loadEarnChart() {
   const el = document.getElementById('earn-chart');
   try {
-    let rows;
-    if (_selectedMasterId) {
-      rows = await api('GET', `/api/admin/master/${_selectedMasterId}/stats/chart?days=30`);
-    } else {
-      rows = await api('GET', '/api/stats/chart?days=30');
-    }
+    const rows = await api('GET', '/api/stats/chart?days=30');
     if (!rows.length) {
       el.innerHTML = `<div style="color:var(--text-muted); font-size:13px; padding:8px 0">Нет данных за последние 30 дней</div>`;
       return;
@@ -2525,10 +2444,6 @@ async function loadServicesCount() {
   // Восстановить тему
   const savedTheme = localStorage.getItem('bb_theme') || 'pink';
   setTheme(savedTheme);
-
-  // Восстановить выбор админа
-  _selectedMasterId = localStorage.getItem('bb_selected_master');
-  _selectedMasterName = localStorage.getItem('bb_selected_name') || '';
 
   // Если уже залогинен — открываем дашборд
   if (token && master) {
