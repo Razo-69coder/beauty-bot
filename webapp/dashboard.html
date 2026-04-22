@@ -1981,24 +1981,7 @@ async function writeToClient() {
     return;
   }
   
-  // 2. Если есть телефон — скопировать в буфер и показать подсказку
-  if (currentClientPhone) {
-    let digits = currentClientPhone.replace(/\D/g, '');
-    if (digits.length >= 10) {
-      digits = digits.slice(-10);
-      const phone = '7' + digits;
-      // Пробуем скопировать
-      try {
-        navigator.clipboard.writeText(phone);
-      } catch(e) {}
-      alert(`Номер скопирован: +${phone}\n\n` +
-        'Откройте Telegram → поиск → вставьте номер\n' +
-        'или: io → новый чат → ввести номер');
-      return;
-    }
-  }
-  
-  // 3. Нет данных — просим username
+  // 2. Нет username — просим ввести
   const username = prompt('Введите username клиента в Telegram (@username):');
   if (!username || !username.trim()) return;
   
