@@ -1995,11 +1995,18 @@ async function writeToClient() {
     return;
   }
   
-// 3. Если есть phone (похож на реальный) — открываем чат по номеру
+// 3. Если есть phone — открываем чат по номеру
   if (currentClientPhone) {
-    const cleanPhone = currentClientPhone.replace(/[^\d+]/g, '');
-    if (cleanPhone.length >= 10) {
-      window.open(`https://t.me/resolve?phone=${cleanPhone}`, '_blank');
+    // Убираем всё кроме цифр, потом оставляем последние 10 цифр (без +7/8)
+    let digits = currentClientPhone.replace(/\D/g, '');
+    // Если начинается с 7 или 8 — пропускаем первую цифру (код страны)
+    if (digits.length === 11 && (digits[0] === '7' || digits[0] === '8')) {
+      digits = digits.substring(1); // убираем 7 или 8
+    }
+    // Формат для Telegram: +79XXXXXXXXX или просто 79XXXXXXXXX
+    const phoneForTelegram = '7' + digits.slice(-10);
+    if (phoneForTelegram.length >= 11) {
+      window.open(`https://t.me/${phoneForTelegram}`, '_blank');
       return;
     }
   }
