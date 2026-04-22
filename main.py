@@ -113,7 +113,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 # ── Health checks (для keep-alive) ─────────────────────────────────────
 @app.get("/")
 async def root():
-    return {"status": "ok", "message": "Beauty Book API — бот работает"}
+    return {"status": "ok", "message": "Beauty Book v2"}
 
 
 @app.get("/health")
