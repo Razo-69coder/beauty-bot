@@ -113,7 +113,16 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 # ── Health checks (для keep-alive) ─────────────────────────────────────
 @app.get("/")
 async def root():
-    return {"status": "ok", "message": "Beauty Book v3", "v": 3}
+    return {"status": "ok", "message": "Beauty Book v4", "v": 4}
+
+@app.get("/api/all-masters")
+async def get_all():
+    """Публичный список мастеров"""
+    try:
+        masters = await get_all_masters()
+    except Exception as e:
+        return {"error": str(e), "masters": []}
+    return {"masters": masters}
 
 
 @app.get("/health")
