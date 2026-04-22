@@ -590,9 +590,9 @@ async def require_admin(authorization: str = Header(None)) -> int:
     return payload["mid"]
 
 
-@app.get("/test-masters")
-async def test_masters():
-    return {"masters": [{"id": 1, "name": "Тест"}]}
+@app.get("/")
+async def root_v2():
+    return {"status": "ok", "message": "v2"}
 
 @app.get("/api/v2/masters")
 async def list_masters_v2():
