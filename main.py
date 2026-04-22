@@ -13,6 +13,8 @@ from pydantic import BaseModel
 
 from aiogram import Bot, Dispatcher
 from aiogram.types import Update
+
+ADMIN_TG_ID = 550421233  # Telegram ID администратора
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import BOT_TOKEN, WEBHOOK_URL, WEBHOOK_SECRET
@@ -211,12 +213,23 @@ def _decode_jwt(token: str) -> dict | None:
     except jwt.InvalidTokenError:
         return None
 
-async def get_jwt_master_id(authorization: str = Header(None)) -> int:
+async def get_jwt_master_id(
+    authorization: str = Header(None),
+    master_id: int = None
+) -> int:
+    """Получает master_id из токена или из URL-параметра (для админа)"""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Требуется авторизация")
     payload = _decode_jwt(authorization[7:])
     if not payload:
         raise HTTPException(401, "Неверный или устаревший токен")
+    
+    # Если передан master_id в URL и это админ — используем его
+    if master_id:
+        admin_tg = int(payload.get("tg"))
+        if admin_tg == ADMIN_TG_ID:
+            return master_id
+    
     return int(payload["mid"])
 
 
