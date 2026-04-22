@@ -2359,7 +2359,8 @@ async function loadEarnings(period) {
 async function loadEarnByClient() {
   const el = document.getElementById('earn-by-client');
   try {
-    const rows = await api('GET', '/api/stats/by-client');
+    const masterParam = _selectedMasterId ? `?master_id=${_selectedMasterId}` : '';
+    const rows = await api('GET', '/api/stats/by-client' + masterParam);
     if (!rows.length) {
       el.innerHTML = `<div style="color:var(--text-muted); font-size:13px; padding:8px 0">Нет данных</div>`;
       return;
@@ -2382,7 +2383,8 @@ async function loadEarnByClient() {
 async function loadEarnChart() {
   const el = document.getElementById('earn-chart');
   try {
-    const rows = await api('GET', '/api/stats/chart?days=30');
+    const masterParam = _selectedMasterId ? `&master_id=${_selectedMasterId}` : '';
+    const rows = await api('GET', `/api/stats/chart?days=30${masterParam}`);
     if (!rows.length) {
       el.innerHTML = `<div style="color:var(--text-muted); font-size:13px; padding:8px 0">Нет данных за последние 30 дней</div>`;
       return;
