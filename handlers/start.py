@@ -4,7 +4,7 @@ from aiogram.filters import CommandStart
 from aiogram.filters.command import CommandObject
 from aiogram.fsm.context import FSMContext
 
-from database import get_or_create_master, create_login_code, get_master_theme
+from database import get_or_create_master, create_login_code, get_master_theme, get_client_pending_appointments, update_appointment_status
 from keyboards import main_menu
 from themes import get_theme
 
@@ -25,6 +25,38 @@ HELP_TEXT = (
 )
 
 
+@router.message(CommandStart(deep_link="reg"))
+async def cmd_start_reg(message: Message, state: FSMContext):
+    """Клиент подтверждает запись через ссылку"""
+    tg_id = message.from_user.id
+    
+    # Ищем незавершённые записи этого клиента
+    appointments = await get_client_pending_appointments(tg_id)
+    
+    if not appointments:
+        await message.answer(
+            "У вас нет записей, ожидающих подтверждения.\n"
+            "Запишитесь через ссылку мастера."
+        )
+        return
+    
+    # Показываем записи для подтверждения
+    from keyboards import confirm_appointment_keyboard
+    
+    for appt in appointments[:3]:  # макс 3 записи
+        date_str = appt['appointment_date']
+        time_str = appt['time']
+        procedure = appt.get('procedure', 'Процедура')
+        
+        await message.answer(
+            f"📅 *Подтверждение записи*\n\n"
+            f"{procedure}\n"
+            f"{date_str} в {time_str}",
+            reply_markup=confirm_appointment_keyboard(appt['id']),
+            parse_mode="Markdown"
+        )
+
+
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, command: CommandObject):
     if command.args and command.args.startswith("book_"):
@@ -35,6 +67,13 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject)
             return
         from handlers.booking import start_booking_flow
         await start_booking_flow(message, state, master_telegram_id)
+        return
+
+    # Проверяем есть ли незавершённые записи (клиент может заходить через ?start=reg)
+    tg_id = message.from_user.id
+    appointments = await get_client_pending_appointments(tg_id)
+    if appointments:
+        await cmd_start_reg(message, state)
         return
 
     await get_or_create_master(message.from_user.id, message.from_user.full_name)
@@ -71,6 +110,14 @@ async def cb_get_login_code(callback: CallbackQuery):
         f"_Код действует 10 минут._",
         parse_mode="Markdown"
     )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("confirm_book:"))
+async def cb_confirm_booking(callback: CallbackQuery):
+    appointment_id = int(callback.data.split(":")[1])
+    await update_appointment_status(appointment_id, "confirmed")
+    await callback.message.edit_text("✅ Запись подтверждена! Ждём вас.")
     await callback.answer()
 
 

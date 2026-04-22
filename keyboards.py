@@ -452,3 +452,10 @@ def review_rating_keyboard(appointment_id: int) -> InlineKeyboardMarkup:
         for i, s in enumerate(stars)
     ]
     return InlineKeyboardMarkup(inline_keyboard=[row])
+
+
+# ─── Подтверждение записи клиентом ─────────────────────────────────────
+def confirm_appointment_keyboard(appointment_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Подтвердить запись", callback_data=f"confirm_book:{appointment_id}")],
+    ])

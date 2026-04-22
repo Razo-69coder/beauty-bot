@@ -865,6 +865,23 @@ async def get_clients_inactive_range(master_id: int, min_days: int, max_days: in
     return [(r[0], r[1], r[2], r[3], r[4]) for r in rows]
 
 
+# ── Клиентские записи ───────────────────────────────────────────
+
+async def get_client_pending_appointments(telegram_id: int) -> list:
+    """Получить все записи, ожидающие подтверждения, для клиента с данным telegram_id"""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT a.id, a.procedure, a.appointment_date, a.time, m.name as master_name
+            FROM appointments a
+            JOIN clients c ON c.id = a.client_id
+            JOIN masters m ON m.id = a.master_id
+            WHERE c.telegram_id = $1 AND a.status = 'pending'
+            ORDER BY a.appointment_date, a.time
+        """, telegram_id)
+    return [dict(r) for r in rows]
+
+
 # ── Тема оформления ───────────────────────────────────────────────────
 
 async def get_master_theme(telegram_id: int) -> str:
