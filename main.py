@@ -190,6 +190,23 @@ async def admin_master_clients(master_id: int, page: int = 0, search: str = None
     return {"clients": [{"id": r[0], "name": r[1], "phone": r[2], "notes": r[3], "last_visit": str(r[4])[:10]} for r in rows], "total": len(rows)}
 
 
+@app.get("/api/admin/master/{master_id}/settings")
+async def admin_master_settings(master_id: int):
+    from database import get_master_full
+    master = await get_master_full(master_id)
+    if not master:
+        from fastapi import HTTPException
+        raise HTTPException(404, "Мастер не найден")
+    return master
+
+
+@app.get("/api/admin/master/{master_id}/services")
+async def admin_master_services(master_id: int):
+    from database import get_services
+    rows = await get_services(master_id)
+    return [{"id": r[0], "name": r[1], "price_default": r[2]} for r in rows]
+
+
 @app.get("/health")
 async def health():
     return {"status": "healthy"}

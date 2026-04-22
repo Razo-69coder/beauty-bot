@@ -2051,24 +2051,31 @@ async function writeToClient() {
 
 // ─── Настройки ─────────────────────────────────────────────────────
 
-function fillSettings() {
-  if (!master) return;
-  document.getElementById('set-name-sub').textContent = master.name || '—';
-  document.getElementById('set-payment-sub').textContent = master.payment_card || 'Не указаны';
+async function fillSettings() {
+  let m;
+  if (_selectedMasterId) {
+    m = await api('GET', `/api/admin/master/${_selectedMasterId}/settings`);
+  } else if (master) {
+    m = master;
+  }
+  if (!m) return;
+  
+  document.getElementById('set-name-sub').textContent = m.name || '—';
+  document.getElementById('set-payment-sub').textContent = m.payment_card || 'Не указаны';
   document.getElementById('set-hours-sub').textContent =
-    `${master.work_start || 10}:00 — ${master.work_end || 20}:00`;
-  document.getElementById('set-slot-sub').textContent = `${master.slot_duration || 60} минут`;
-  document.getElementById('set-remind-sub').textContent = `через ${master.reminder_days || 40} дней`;
-  document.getElementById('set-tz-sub').textContent = master.timezone || 'Europe/Moscow';
-  const link = bookingLink || `${location.origin}/booking.html?master=${master.telegram_id}`;
+    `${m.work_start || 10}:00 — ${m.work_end || 20}:00`;
+  document.getElementById('set-slot-sub').textContent = `${m.slot_duration || 60} минут`;
+  document.getElementById('set-remind-sub').textContent = `через ${m.reminder_days || 40} дней`;
+  document.getElementById('set-tz-sub').textContent = m.timezone || 'Europe/Moscow';
+  const link = bookingLink || `${location.origin}/booking.html?master=${m.telegram_id}`;
   document.getElementById('set-link-sub').textContent = link;
 
   // Заполняем оверлеи
-  document.getElementById('ov-name').value = master.name || '';
-  document.getElementById('ov-payment').value = master.payment_card || '';
-  document.getElementById('ov-slot').value = master.slot_duration || 60;
-  document.getElementById('ov-remind').value = master.reminder_days || 40;
-  document.getElementById('ov-timezone').value = master.timezone || 'Europe/Moscow';
+  document.getElementById('ov-name').value = m.name || '';
+  document.getElementById('ov-payment').value = m.payment_card || '';
+  document.getElementById('ov-slot').value = m.slot_duration || 60;
+  document.getElementById('ov-remind').value = m.reminder_days || 40;
+  document.getElementById('ov-timezone').value = m.timezone || 'Europe/Moscow';
 
   // Часы работы: заполняем select
   const wsEl = document.getElementById('ov-wstart');
@@ -2203,10 +2210,13 @@ async function saveDeposit() {
 
 async function loadDepositStatus() {
   try {
-    const url = _selectedMasterId 
-      ? `/api/dashboard/deposit?master_id=${_selectedMasterId}` 
-      : '/api/dashboard/deposit';
-    const data = await api('GET', url);
+    let data;
+    if (_selectedMasterId) {
+      const m = await api('GET', `/api/admin/master/${_selectedMasterId}/settings`);
+      data = { deposit_enabled: m.deposit_enabled, deposit_percent: m.deposit_percent };
+    } else {
+      data = await api('GET', '/api/dashboard/deposit');
+    }
     document.getElementById('set-deposit-sub').textContent =
       data.deposit_enabled ? `Включена, ${data.deposit_percent}%` : 'Выключена';
     document.getElementById('deposit-enabled').checked = data.deposit_enabled;
@@ -2493,7 +2503,12 @@ async function deleteService(id) {
 
 async function loadServicesCount() {
   try {
-    const rows = await api('GET', '/api/services');
+    let rows;
+    if (_selectedMasterId) {
+      rows = await api('GET', `/api/admin/master/${_selectedMasterId}/services`);
+    } else {
+      rows = await api('GET', '/api/services');
+    }
     servicesCache = rows;
     _updateServicesDatalist(rows);
     const el = document.getElementById('set-services-sub');
