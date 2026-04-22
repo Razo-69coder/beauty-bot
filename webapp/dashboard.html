@@ -2319,7 +2319,7 @@ async function loadEarnings(period) {
     document.getElementById('ptab-' + p)?.classList.toggle('active', p === period);
   });
   const { from, to, label } = _periodDates(period);
-  document.getElementById('earn-period-label').textContent = label;
+  document.getElementById('earn-period-label').textContent = label + (_selectedMasterName ? ` (${_selectedMasterName})` : '');
   document.getElementById('earn-total').textContent = '…';
   document.getElementById('earn-count').textContent = '…';
 
