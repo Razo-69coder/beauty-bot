@@ -147,12 +147,32 @@ async def search_clients(master_id: int, query: str) -> list:
 async def get_client(client_id: int) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
-            "SELECT id, name, phone, notes FROM clients WHERE id=?", (client_id,)
+            "SELECT id, name, phone, notes, telegram_id FROM clients WHERE id=?", (client_id,)
         ) as cursor:
             row = await cursor.fetchone()
             if not row:
                 return None
-            return {"id": row[0], "name": row[1], "phone": row[2], "notes": row[3]}
+            return {"id": row[0], "name": row[1], "phone": row[2], "notes": row[3], "telegram_id": row[4]}
+
+
+async def get_client_by_phone(master_telegram_id: int, phone: str) -> dict | None:
+    """Получить клиента по номеру телефона"""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT m.id FROM masters WHERE telegram_id=?", (master_telegram_id,)
+        ) as c:
+            row = await c.fetchone()
+        if not row:
+            return None
+        master_id = row[0]
+        
+        async with db.execute(
+            "SELECT id, name, phone, notes, telegram_id FROM clients WHERE master_id=? AND phone=?", (master_id, phone)
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return None
+            return {"id": row[0], "name": row[1], "phone": row[2], "notes": row[3], "telegram_id": row[4]}
 
 
 async def add_client(master_id: int, name: str, phone: str, notes: str = "") -> int:
@@ -403,12 +423,13 @@ async def public_book(master_telegram_id: int, date_str: str, time_str: str,
 
         # Ищем или создаём клиента
         async with db.execute(
-            "SELECT id FROM clients WHERE master_id=? AND phone=?", (master_id, client_phone)
+            "SELECT id, telegram_id FROM clients WHERE master_id=? AND phone=?", (master_id, client_phone)
         ) as c:
             client_row = await c.fetchone()
 
         if client_row:
             client_id = client_row[0]
+            client_tg_id = client_row[1]
         else:
             await db.execute(
                 "INSERT INTO clients (master_id, name, phone) VALUES (?, ?, ?)",
@@ -416,6 +437,7 @@ async def public_book(master_telegram_id: int, date_str: str, time_str: str,
             )
             async with db.execute("SELECT last_insert_rowid()") as c:
                 client_id = (await c.fetchone())[0]
+            client_tg_id = None
 
         await db.execute(
             "INSERT INTO appointments (client_id, master_id, procedure, appointment_date, time, status) "

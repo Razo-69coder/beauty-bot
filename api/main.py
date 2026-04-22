@@ -23,6 +23,7 @@ from database import (
     get_master_full, update_master_settings, update_master_payment,
     get_schedule, get_all_masters,
 )
+from api.database import get_client_by_phone
 from models import (
     ClientCreate, ClientUpdate, AppointmentCreate, ReminderUpdate,
     PublicBooking, RequestCode, VerifyCode, MasterSettings, PaymentUpdate,
@@ -171,18 +172,22 @@ async def public_book_endpoint(body: PublicBooking):
             body.master_telegram_id, body.date, body.time,
             body.client_name, body.client_phone,
         )
-        # Уведомляем мастера в Telegram
+        # Проверяем, есть ли клиент в боте
+        from database import get_client_by_phone
+        client = await get_client_by_phone(body.master_telegram_id, body.client_phone)
+        client_in_bot = client and client.get("telegram_id")
+        
         from datetime import date as date_cls
         d = datetime.strptime(body.date, "%Y-%m-%d")
-        await send_tg_message(
-            body.master_telegram_id,
-            f"📩 *Новая онлайн-запись!*\n"
-            f"👤 {body.client_name} · {body.client_phone}\n"
-            f"📅 {d.strftime('%d.%m.%Y')} в {body.time}\n\n"
-            f"Откройте приложение для подтверждения.",
-        )
-        # Уведомление клиенту (без telegram_id — просто текст)
-        # Клиент получит подтверждение когда мастер нажмёт "Подтвердить"
+        
+        # Уведомляем мастера
+        if client_in_bot:
+            msg = f"📩 *Новая онлайн-запись!*\n👤 {body.client_name} · {body.client_phone}\n📅 {d.strftime('%d.%m.%Y')} в {body.time}"
+        else:
+            msg = f"📩 *Новая онлайн-запись!*\n👤 {body.client_name} · {body.client_phone}\n📅 {d.strftime('%d.%m.%Y')} в {body.time}\n\n⚠️ Клиент ещё НЕ подтвердил запись в боте!\n\nПодтвердите вручную после звонка."
+        
+        await send_tg_message(body.master_telegram_id, msg)
+        
         return {"ok": True, "appointment_id": appt_id}
     except ValueError as e:
         raise HTTPException(400, str(e))
