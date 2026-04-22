@@ -136,60 +136,6 @@ async def admin_master_data(master_id: int):
     return {"master": master, "stats": stats, "clients": clients, "total_clients": len(clients)}
 
 
-# Эндпоинты для админ-режима (расписание, заработок и т.д.)
-@app.get("/api/admin/master/{master_id}/schedule")
-async def admin_master_schedule(master_id: int, date: str):
-    from database import get_master_schedule
-    rows = await get_master_schedule(master_id, date)
-    return {"date": date, "appointments": [
-        {"id": r[0], "client": r[1], "procedure": r[2], "time": r[3], "status": r[4], "phone": r[5], "notes": r[6] or ""}
-        for r in rows
-    ]}
-
-
-@app.get("/api/admin/master/{master_id}/inactive")
-async def admin_master_inactive(master_id: int):
-    from database import get_inactive_clients
-    rows = await get_inactive_clients(master_id)
-    return {"clients": [
-        {"id": r[0], "name": r[1], "phone": r[2], "days_ago": r[3], "last_visit": str(r[4])[:10]}
-        for r in rows
-    ]}
-
-
-@app.get("/api/admin/master/{master_id}/stats/period")
-async def admin_master_stats_period(master_id: int, date_from: str, date_to: str):
-    from database import get_earnings_by_period, get_earnings_by_service
-    data = await get_earnings_by_period(master_id, date_from, date_to)
-    by_svc = await get_earnings_by_service(master_id, date_from, date_to)
-    data["by_service"] = [{"procedure": r[0], "count": r[1], "total": r[2]} for r in by_svc]
-    return data
-
-
-@app.get("/api/admin/master/{master_id}/stats/chart")
-async def admin_master_chart(master_id: int, days: int = 30):
-    from database import get_earnings_by_day
-    rows = await get_earnings_by_day(master_id, days)
-    return [{"date": r[0], "total": r[1]} for r in rows]
-
-
-@app.get("/api/admin/master/{master_id}/stats/by-client")
-async def admin_master_by_client(master_id: int):
-    from database import get_earnings_by_client
-    rows = await get_earnings_by_client(master_id)
-    return [{"name": r[0], "count": r[1], "total": r[2]} for r in rows]
-
-
-@app.get("/api/admin/master/{master_id}/clients")
-async def admin_master_clients(master_id: int, page: int = 0, search: str = None):
-    from database import get_clients, search_clients
-    if search:
-        rows = await search_clients(master_id, search)
-    else:
-        rows = await get_clients(master_id, page * 50, 50)
-    return {"clients": [{"id": r[0], "name": r[1], "phone": r[2], "notes": r[3], "last_visit": str(r[4])[:10]} for r in rows], "total": len(rows)}
-
-
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
