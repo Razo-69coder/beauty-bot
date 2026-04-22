@@ -590,14 +590,9 @@ async def require_admin(authorization: str = Header(None)) -> int:
     return payload["mid"]
 
 
-@app.get("/api/admin/masters")
-async def list_all_masters():
-    try:
-        masters = await get_all_masters()
-    except Exception as e:
-        print(f"ERROR in list_all_masters: {e}")
-        masters = []
-    return {"masters": masters}
+@app.get("/test-masters")
+async def test_masters():
+    return {"masters": [{"id": 1, "name": "Тест"}]}
 
 @app.get("/api/v2/masters")
 async def list_masters_v2():
