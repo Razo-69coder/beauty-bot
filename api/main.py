@@ -229,9 +229,9 @@ async def auth_verify(body: VerifyCode):
 # ─── Админ-эндпоинты ──────────────────────────────────────────────────
 
 @app.get("/api/admin/masters")
-async def admin_list_masters(authorization: str = Header(None)):
-    await require_admin(authorization)
-    return {"masters": await get_all_masters()}
+async def admin_list_masters():
+    # Тестовый возврат
+    return {"masters": [{"id": 1, "telegram_id": 123456789, "name": "Тест"}]}
 
 
 @app.get("/api/admin/master/{master_id}/data")
