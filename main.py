@@ -707,6 +707,15 @@ async def dash_update_client(client_id: int, body: ClientUpdate, master_id: int 
     return {"ok": True}
 
 
+@app.delete("/api/dashboard/clients/{client_id}")
+async def dash_delete_client(client_id: int, master_id: int = Depends(get_jwt_master_id)):
+    client = await get_client(client_id)
+    if not client or client.get("master_id") != master_id:
+        raise HTTPException(status_code=404, detail="Клиент не найден")
+    await delete_client(client_id, master_id)
+    return {"ok": True}
+
+
 @app.post("/api/dashboard/clients", status_code=201)
 async def dash_add_client(body: ClientCreate, master_id: int = Depends(get_jwt_master_id)):
     client_id = await add_client(master_id, body.name, body.phone, body.notes)
