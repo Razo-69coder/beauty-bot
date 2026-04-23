@@ -332,10 +332,11 @@ async function submitBooking() {
     }
     const data = await res.json();
     console.log('Booking response:', data);
-    const apptId = data.appointment_id || data.id || data;
+    // Пробуем разные форматы ответа
+    let apptId = data.appointment_id || data.id || data;
     
     if (!apptId) {
-      throw new Error('Не удалось создать запись');
+      throw new Error('Не удалось создать запись: ' + JSON.stringify(data));
     }
     
     // Сразу перекидываем в бота для подтверждения
