@@ -304,6 +304,20 @@ async def cb_edit_phone(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("client_edit_username:"))
+async def cb_edit_username(callback: CallbackQuery, state: FSMContext):
+    client_id = int(callback.data.split(":")[1])
+    client = await get_client(client_id)
+    await state.update_data(client_id=client_id, field="username")
+    await state.set_state(EditClientForm.value)
+    current = client.get('username') or "_не указан_"
+    await callback.message.edit_text(
+        f"📱 *Telegram*\n\nСейчас: `{current}`\n\nВведи username (без @):",
+        reply_markup=cancel_keyboard(), parse_mode="Markdown"
+    )
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("client_edit_notes:"))
 async def cb_edit_notes(callback: CallbackQuery, state: FSMContext):
     client_id = int(callback.data.split(":")[1])
@@ -331,6 +345,7 @@ async def process_edit_value(message: Message, state: FSMContext):
     name = client["name"]
     phone = client["phone"]
     notes = client["notes"] or ""
+    username = client.get("username") or ""
 
     if field == "name":
         name = new_value
@@ -338,11 +353,13 @@ async def process_edit_value(message: Message, state: FSMContext):
         phone = new_value
     elif field == "notes":
         notes = "" if new_value == "-" else new_value
+    elif field == "username":
+        username = new_value.replace("@", "")
 
-    await update_client(client_id, master_id, name, phone, notes)
+    await update_client(client_id, master_id, name, phone, notes, username=username)
     await state.clear()
 
-    field_names = {"name": "Имя", "phone": "Телефон", "notes": "Заметка"}
+    field_names = {"name": "Имя", "phone": "Телефон", "notes": "Заметка", "username": "Telegram"}
     await message.answer(
         f"✅ *{field_names[field]} обновлено!*",
         reply_markup=client_card_keyboard(client_id),

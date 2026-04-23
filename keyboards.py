@@ -249,6 +249,7 @@ def edit_client_keyboard(client_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="👤 Изменить имя", callback_data=f"client_edit_name:{client_id}")],
         [InlineKeyboardButton(text="📱 Изменить телефон", callback_data=f"client_edit_phone:{client_id}")],
+        [InlineKeyboardButton(text="📱 Telegram", callback_data=f"client_edit_username:{client_id}")],
         [InlineKeyboardButton(text="📝 Изменить заметку", callback_data=f"client_edit_notes:{client_id}")],
         [InlineKeyboardButton(text="◀️ Назад к клиенту", callback_data=f"client_view:{client_id}")],
     ])
