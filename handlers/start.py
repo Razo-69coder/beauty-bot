@@ -52,25 +52,12 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject)
             await message.answer("✅ Запись уже подтверждена.")
             return
         
-        await assign_client_telegram(appt['client_id'], message.from_user.id)
-        await update_appointment_status(appt_id, "confirmed")
-        await message.answer("✅ Запись подтверждена! Ждём вас 📅")
-        return
-        
-        appt = await get_appointment_by_id(appt_id)
-        
-        if not appt:
-            await message.answer("Запись не найдена.")
-            return
-        
-        if appt.get('status') != 'pending':
-            await message.answer("Уже подтверждено.")
-            return
-        
-        # Привязываем telegram и подтверждаем
-        await assign_client_telegram(appt['client_id'], message.from_user.id)
-        await update_appointment_status(appt_id, "confirmed")
-        await message.answer("✅ Запись подтверждена!")
+        try:
+            await assign_client_telegram(appt['client_id'], message.from_user.id)
+            await update_appointment_status(appt_id, "confirmed")
+            await message.answer("✅ Запись подтверждена! Ждём вас 📅")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка: {e}")
         return
     
     # ?start=book_XXX - запись к мастеру
