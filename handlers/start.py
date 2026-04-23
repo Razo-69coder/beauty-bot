@@ -60,8 +60,13 @@ async def cmd_start_reg(message: Message, state: FSMContext):
 @router.message(CommandStart(deep_link="confirm_"))
 async def cmd_start_confirm(message: Message, state: FSMContext, command: CommandObject):
     """Клиент подтверждает конкретную запись по ID"""
+    # command.args = "confirm_123" → нужно "123"
+    arg = command.args or ""
+    if arg.startswith("confirm_"):
+        arg = arg[8:]  # убираем "confirm_"
+    
     try:
-        appointment_id = int(command.args)
+        appointment_id = int(arg)
     except (ValueError, TypeError):
         await message.answer("Неверная ссылка для подтверждения.")
         return
