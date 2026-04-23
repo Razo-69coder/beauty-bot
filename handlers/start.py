@@ -35,9 +35,10 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject)
     # ?start=confirm_123 - подтверждение записи
     if args.startswith("confirm_"):
         try:
-            appt_id = int(args[8:])
-        except:
-            await message.answer("Неверная ссылка.")
+            # убираем "confirm_" prefix
+            appt_id = int(args.replace("confirm_", ""))
+        except Exception as e:
+            await message.answer(f"Ошибка: {e}")
             return
         
         appt = await get_appointment_by_id(appt_id)
