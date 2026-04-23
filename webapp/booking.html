@@ -315,7 +315,8 @@ async function submitBooking() {
   btn.textContent = 'Отправляем...';
 
   try {
-    const res = await fetch('/api/public/book', {
+    const API_BASE = 'https://beauty-bot-44ou.onrender.com';
+    const res = await fetch(API_BASE + '/api/public/book', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
