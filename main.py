@@ -501,7 +501,9 @@ class _MasterSettings(BaseModel):
     reminder_days: int = 40
 
 class _PaymentUpdate(BaseModel):
-    payment_card: str
+    payment_card: str = ""
+    payment_phone: str = ""
+    payment_banks: str = ""
 
 
 @app.post("/api/auth/request-code")
@@ -775,7 +777,7 @@ async def dash_settings(body: _MasterSettings, master_id: int = Depends(get_jwt_
 
 @app.put("/api/dashboard/payment")
 async def dash_payment(body: _PaymentUpdate, master_id: int = Depends(get_jwt_master_id)):
-    await update_master_payment(master_id, body.payment_card)
+    await update_master_payment(master_id, body.payment_card, body.payment_phone, body.payment_banks)
     return {"ok": True}
 
 

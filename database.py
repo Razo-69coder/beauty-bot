@@ -106,9 +106,11 @@ async def init_db():
         # Миграции для существующих баз
         for sql in [
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS payment_card TEXT DEFAULT ''",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS payment_phone TEXT DEFAULT ''",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS payment_banks TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS deposit_enabled BOOLEAN DEFAULT FALSE",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS deposit_percent INTEGER DEFAULT 30",
-            "ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_type TEXT DEFAULT 'new'",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS client_type TEXT DEFAULT 'new'",
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS review_sent INTEGER DEFAULT 0",
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS deposit_status TEXT DEFAULT 'not_required'",
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS deposit_amount INTEGER DEFAULT 0",
@@ -675,7 +677,7 @@ async def get_master_full(master_id: int) -> dict | None:
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT id, telegram_id, name, reminder_days, work_start, work_end, slot_duration, "
-            "COALESCE(payment_card,'') as payment_card, COALESCE(timezone,'Europe/Moscow') as timezone "
+            "COALESCE(payment_card,'') as payment_card, COALESCE(payment_phone,'') as payment_phone, COALESCE(payment_banks,'') as payment_banks, COALESCE(timezone,'Europe/Moscow') as timezone "
             "FROM masters WHERE id=$1",
             master_id
         )
@@ -687,6 +689,8 @@ async def get_master_full(master_id: int) -> dict | None:
         "work_start": row['work_start'] or 10, "work_end": row['work_end'] or 20,
         "slot_duration": row['slot_duration'] or 60,
         "payment_card": row['payment_card'],
+        "payment_phone": row['payment_phone'],
+        "payment_banks": row['payment_banks'],
         "timezone": row['timezone'],
     }
 
@@ -701,11 +705,12 @@ async def update_master_full_settings(master_id: int, name: str, work_start: int
         )
 
 
-async def update_master_payment(master_id: int, payment_card: str):
+async def update_master_payment(master_id: int, payment_card: str, payment_phone: str = "", payment_banks: str = ""):
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute(
-            "UPDATE masters SET payment_card=$1 WHERE id=$2", payment_card, master_id
+            "UPDATE masters SET payment_card=$1, payment_phone=$2, payment_banks=$3 WHERE id=$4",
+            payment_card, payment_phone, payment_banks, master_id
         )
 
 

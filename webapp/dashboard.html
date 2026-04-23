@@ -315,6 +315,21 @@ body::after {
 .alert-success { background: #f0fff4; color: #308050; }
 .alert-info    { background: var(--primary-light); color: var(--primary); }
 
+/* Банки */
+.banks-grid {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;
+}
+.bank-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border: 1px solid var(--border);
+  border-radius: 20px; font-size: 13px; cursor: pointer;
+  transition: all .2s;
+}
+.bank-chip:has(input:checked) {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+}
+.bank-chip input { display: none; }
+
 /* ── Лоадер ────────────────────────────────────────────────────── */
 .loader { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; }
 .spinner {
@@ -1019,17 +1034,34 @@ input:checked + .toggle-slider:before { transform:translateX(18px); }
   </div>
 </div>
 
-<!-- Реквизиты -->
+<!-- Реквизиты для оплаты -->
 <div class="overlay" id="overlay-payment">
   <div class="overlay-sheet">
     <div class="overlay-handle"></div>
     <div class="overlay-title">Реквизиты для оплаты</div>
     <div class="field">
-      <label>Номер карты или СБП-телефон</label>
-      <input id="ov-payment" type="text" placeholder="2200 0000 0000 0000 или +79001234567">
+      <label>Номер карты</label>
+      <input id="ov-payment-card" type="text" placeholder="2200 0000 0000 0000">
+    </div>
+    <div class="field">
+      <label>Телефон для СБП</label>
+      <input id="ov-payment-phone" type="text" placeholder="+7 900 123-45-67">
+    </div>
+    <div class="field">
+      <label>Банки для переводов (выберите до 3)</label>
+      <div class="banks-grid">
+        <label class="bank-chip"><input type="checkbox" name="bank" value="Сбербанк"> Сбербанк</label>
+        <label class="bank-chip"><input type="checkbox" name="bank" value="Тинькофф"> Тинькофф</label>
+        <label class="bank-chip"><input type="checkbox" name="bank" value="Альфа-Банк"> Альфа-Банк</label>
+        <label class="bank-chip"><input type="checkbox" name="bank" value="ВТБ"> ВТБ</label>
+        <label class="bank-chip"><input type="checkbox" name="bank" value="Газпромбанк"> Газпромбанк</label>
+        <label class="bank-chip"><input type="checkbox" name="bank" value="Райффайзен"> Райффайзен</label>
+        <label class="bank-chip"><input type="checkbox" name="bank" value="Почта Банк"> Почта Банк</label>
+        <label class="bank-chip"><input type="checkbox" name="bank" value=" Росбанк"> Росбанк</label>
+      </div>
     </div>
     <div class="alert alert-info" style="margin-bottom:14px; font-size:13px">
-      Клиенты увидят эти реквизиты при покупке абонемента — оплата идёт напрямую вам.
+      Клиенты увидят эти реквизиты при предоплате. Оплата идёт напрямую вам.
     </div>
     <button class="btn btn-primary" onclick="savePayment()">Сохранить</button>
   </div>
@@ -2152,7 +2184,9 @@ async function writeToClient() {
 function fillSettings() {
   if (!master) return;
   document.getElementById('set-name-sub').textContent = master.name || '—';
-  document.getElementById('set-payment-sub').textContent = master.payment_card || 'Не указаны';
+  
+  const payTxt = [master.payment_card, master.payment_phone, master.payment_banks].filter(x => x).join(' / ') || 'Не указаны';
+  document.getElementById('set-payment-sub').textContent = payTxt;
   document.getElementById('set-hours-sub').textContent =
     `${master.work_start || 10}:00 — ${master.work_end || 20}:00`;
   document.getElementById('set-slot-sub').textContent = `${master.slot_duration || 60} минут`;
@@ -2163,7 +2197,14 @@ function fillSettings() {
 
   // Заполняем оверлеи
   document.getElementById('ov-name').value = master.name || '';
-  document.getElementById('ov-payment').value = master.payment_card || '';
+  document.getElementById('ov-payment-card').value = master.payment_card || '';
+  document.getElementById('ov-payment-phone').value = master.payment_phone || '';
+  
+  // Отмечаем выбранные банки
+  document.querySelectorAll('input[name="bank"]').forEach(el => {
+    el.checked = master.payment_banks?.includes(el.value);
+  });
+  
   document.getElementById('ov-slot').value = master.slot_duration || 60;
   document.getElementById('ov-remind').value = master.reminder_days || 40;
   document.getElementById('ov-timezone').value = master.timezone || 'Europe/Moscow';
@@ -2191,12 +2232,24 @@ async function saveName() {
 }
 
 async function savePayment() {
-  const card = document.getElementById('ov-payment').value.trim();
+  const card = document.getElementById('ov-payment-card').value.trim();
+  const phone = document.getElementById('ov-payment-phone').value.trim();
+  const banksEls = document.querySelectorAll('input[name="bank"]:checked');
+  const banks = Array.from(banksEls).map(el => el.value).join(', ');
+  
   try {
-    await api('PUT', '/api/dashboard/payment', { payment_card: card });
+    await api('PUT', '/api/dashboard/payment', { 
+      payment_card: card,
+      payment_phone: phone,
+      payment_banks: banks
+    });
     master.payment_card = card;
+    master.payment_phone = phone;
+    master.payment_banks = banks;
     localStorage.setItem('bb_master', JSON.stringify(master));
-    document.getElementById('set-payment-sub').textContent = card || 'Не указаны';
+    
+    const txt = [card, phone, banks].filter(x => x).join(' / ') || 'Не указаны';
+    document.getElementById('set-payment-sub').textContent = txt;
     closeOverlay();
   } catch (e) { alert(e.message); }
 }

@@ -68,6 +68,8 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN work_end INTEGER DEFAULT 20",
             "ALTER TABLE masters ADD COLUMN slot_duration INTEGER DEFAULT 60",
             "ALTER TABLE masters ADD COLUMN payment_card TEXT DEFAULT ''",
+            "ALTER TABLE masters ADD COLUMN payment_phone TEXT DEFAULT ''",
+            "ALTER TABLE masters ADD COLUMN payment_banks TEXT DEFAULT ''",
             "ALTER TABLE appointments ADD COLUMN time TEXT DEFAULT ''",
             "ALTER TABLE appointments ADD COLUMN status TEXT DEFAULT 'confirmed'",
             "ALTER TABLE appointments ADD COLUMN service_done_at TEXT",
@@ -318,7 +320,7 @@ async def update_reminder_days(telegram_id: int, days: int):
 async def get_master_full(master_id: int) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
-            "SELECT id, telegram_id, name, reminder_days, work_start, work_end, slot_duration, payment_card "
+            "SELECT id, telegram_id, name, reminder_days, work_start, work_end, slot_duration, payment_card, payment_phone, payment_banks "
             "FROM masters WHERE id=?", (master_id,)
         ) as c:
             row = await c.fetchone()
@@ -329,6 +331,8 @@ async def get_master_full(master_id: int) -> dict | None:
         "reminder_days": row[3] or 40, "work_start": row[4] or 10,
         "work_end": row[5] or 20, "slot_duration": row[6] or 60,
         "payment_card": row[7] or "",
+        "payment_phone": row[8] or "",
+        "payment_banks": row[9] or "",
     }
 
 
@@ -342,10 +346,11 @@ async def update_master_settings(master_id: int, work_start: int, work_end: int,
         await db.commit()
 
 
-async def update_master_payment(master_id: int, payment_card: str):
+async def update_master_payment(master_id: int, payment_card: str = "", payment_phone: str = "", payment_banks: str = ""):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
-            "UPDATE masters SET payment_card=? WHERE id=?", (payment_card, master_id)
+            "UPDATE masters SET payment_card=?, payment_phone=?, payment_banks=? WHERE id=?",
+            (payment_card, payment_phone, payment_banks, master_id)
         )
         await db.commit()
 
