@@ -4,7 +4,7 @@ from aiogram.filters import CommandStart
 from aiogram.filters.command import CommandObject
 from aiogram.fsm.context import FSMContext
 
-from database import get_or_create_master, create_login_code, get_master_theme, get_client_pending_appointments, update_appointment_status, get_appointment_by_id
+from database import get_or_create_master, create_login_code, get_master_theme, get_client_pending_appointments, update_appointment_status, get_appointment_by_id, assign_client_telegram
 from keyboards import main_menu, confirm_appointment_keyboard
 from themes import get_theme
 
@@ -71,8 +71,8 @@ async def cmd_start_confirm(message: Message, state: FSMContext, command: Comman
         await message.answer("Неверная ссылка для подтверждения.")
         return
     
-    # Проверяем что запись существует и принадлежит этому клиенту
-    from database import get_appointment_by_id
+    # Проверяем что запись существует
+    from database import get_appointment_by_id, assign_client_telegram
     appt = await get_appointment_by_id(appointment_id)
     
     if not appt:
@@ -82,6 +82,10 @@ async def cmd_start_confirm(message: Message, state: FSMContext, command: Comman
     if appt.get('status') != 'pending':
         await message.answer("Эта запись уже подтверждена.")
         return
+    
+    # Привязываем telegram_id клиента к записи
+    client_tg_id = message.from_user.id
+    await assign_client_telegram(appt['client_id'], client_tg_id)
     
     # Подтверждаем
     await update_appointment_status(appointment_id, "confirmed")

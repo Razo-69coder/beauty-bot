@@ -287,6 +287,15 @@ async def get_appointment_by_id(appointment_id: int) -> dict | None:
     return dict(row)
 
 
+async def assign_client_telegram(client_id: int, telegram_id: int) -> None:
+    """Привязать telegram_id к клиенту"""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE clients SET telegram_id=$1 WHERE id=$2", telegram_id, client_id
+        )
+
+
 async def update_client(client_id: int, master_id: int, name: str, phone: str, notes: str) -> bool:
     pool = await get_pool()
     async with pool.acquire() as conn:
