@@ -25,97 +25,69 @@ HELP_TEXT = (
 )
 
 
-@router.message(CommandStart(deep_link="reg"))
-async def cmd_start_reg(message: Message, state: FSMContext):
-    """Клиент подтверждает запись через ссылку"""
-    tg_id = message.from_user.id
-    
-    # Ищем незавершённые записи этого клиента
-    appointments = await get_client_pending_appointments(tg_id)
-    
-    if not appointments:
-        await message.answer(
-            "У вас нет записей, ожидающих подтверждения.\n"
-            "Запишитесь через ссылку мастера."
-        )
-        return
-    
-    # Показываем записи для подтверждения
-    from keyboards import confirm_appointment_keyboard
-    
-    for appt in appointments[:3]:  # макс 3 записи
-        date_str = appt['appointment_date']
-        time_str = appt['time']
-        procedure = appt.get('procedure', 'Процедура')
-        
-        await message.answer(
-            f"📅 *Подтверждение записи*\n\n"
-            f"{procedure}\n"
-            f"{date_str} в {time_str}",
-            reply_markup=confirm_appointment_keyboard(appt['id']),
-            parse_mode="Markdown"
-        )
-
-
-@router.message(CommandStart(deep_link="confirm_"))
-async def cmd_start_confirm(message: Message, state: FSMContext, command: CommandObject):
-    """Клиент подтверждает конкретную запись по ID"""
-    # command.args = "confirm_123" → нужно "123"
-    arg = command.args or ""
-    if arg.startswith("confirm_"):
-        arg = arg[8:]  # убираем "confirm_"
-    
-    try:
-        appointment_id = int(arg)
-    except (ValueError, TypeError):
-        await message.answer("Неверная ссылка для подтверждения.")
-        return
-    
-    # Проверяем что запись существует
-    from database import get_appointment_by_id, assign_client_telegram
-    appt = await get_appointment_by_id(appointment_id)
-    
-    if not appt:
-        await message.answer("Запись не найдена.")
-        return
-    
-    if appt.get('status') != 'pending':
-        await message.answer("Эта запись уже подтверждена.")
-        return
-    
-    # Привязываем telegram_id клиента к записи
-    client_tg_id = message.from_user.id
-    await assign_client_telegram(appt['client_id'], client_tg_id)
-    
-    # Подтверждаем
-    await update_appointment_status(appointment_id, "confirmed")
-    await message.answer("✅ Запись подтверждена! Ждём вас.")
-
+# ─── Старт бота ────────────────────────────────────────────
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext, command: CommandObject):
-    if command.args and command.args.startswith("book_"):
+    """Обработка любого start"""
+    args = command.args or ""
+    
+    # ?start=confirm_123 - подтверждение записи
+    if args.startswith("confirm_"):
         try:
-            master_telegram_id = int(command.args.split("_", 1)[1])
+            appt_id = int(args[8:])
+        except:
+            await message.answer("Неверная ссылка.")
+            return
+        
+        appt = await get_appointment_by_id(appt_id)
+        
+        if not appt:
+            await message.answer("Запись не найдена.")
+            return
+        
+        if appt.get('status') != 'pending':
+            await message.answer("Уже подтверждено.")
+            return
+        
+        # Привязываем telegram и подтверждаем
+        await assign_client_telegram(appt['client_id'], message.from_user.id)
+        await update_appointment_status(appt_id, "confirmed")
+        await message.answer("✅ Запись подтверждена!")
+        return
+    
+    # ?start=book_XXX - запись к мастеру
+    if args.startswith("book_"):
+        try:
+            master_telegram_id = int(args.split("_", 1)[1])
         except (ValueError, IndexError):
-            await message.answer("Неверная ссылка для записи.")
+            await message.answer("Неверная ссылка.")
             return
         from handlers.booking import start_booking_flow
         await start_booking_flow(message, state, master_telegram_id)
         return
-
-    # Проверяем есть ли незавершённые записи (клиент может заходить через ?start=reg)
-    tg_id = message.from_user.id
-    appointments = await get_client_pending_appointments(tg_id)
-    if appointments:
-        await cmd_start_reg(message, state)
+    
+    # ?start=reg - старый формат подтверждения
+    if args == "reg":
+        appointments = await get_client_pending_appointments(message.from_user.id)
+        if not appointments:
+            await message.answer("Нет записей. Запишитесь через ссылку мастера.")
+            return
+        for appt in appointments[:3]:
+            await message.answer(
+                f"📅 Подтверждение: {appt['appointment_date']} {appt['time']}",
+                reply_markup=confirm_appointment_keyboard(appt['id'])
+            )
         return
-
+    
+    # Обычный старт - показываем меню мастера
     await get_or_create_master(message.from_user.id, message.from_user.full_name)
     theme_key = await get_master_theme(message.from_user.id)
     t = get_theme(theme_key)
     await message.answer(t["welcome"], reply_markup=main_menu(), parse_mode="Markdown")
 
+
+# ─── Callbacks ───────────────────────────────────────────
 
 @router.callback_query(F.data == "main_menu")
 async def cb_main_menu(callback: CallbackQuery):
