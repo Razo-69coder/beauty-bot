@@ -53,10 +53,15 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject)
             return
         
         try:
-            await assign_client_telegram(appt['client_id'], message.from_user.id)
+            client_id = appt['client_id']
+            user_id = message.from_user.id
+            print(f"[DEBUG] assign_client_telegram: client_id={client_id}, telegram_id={user_id}")
+            await assign_client_telegram(client_id, user_id)
             await update_appointment_status(appt_id, "confirmed")
             await message.answer("✅ Запись подтверждена! Ждём вас 📅")
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             await message.answer(f"❌ Ошибка: {e}")
         return
     
