@@ -331,8 +331,12 @@ async function submitBooking() {
       throw new Error(data.detail || 'Ошибка сервера');
     }
     const data = await res.json();
-    const apptId = data.appointment_id;
-    localStorage.setItem('pending_appt_id', apptId);
+    console.log('Booking response:', data);
+    const apptId = data.appointment_id || data.id || data;
+    
+    if (!apptId) {
+      throw new Error('Не удалось создать запись');
+    }
     
     // Сразу перекидываем в бота для подтверждения
     const confirmUrl = 'https://t.me/Beauty6699_bot?start=confirm_' + apptId;
