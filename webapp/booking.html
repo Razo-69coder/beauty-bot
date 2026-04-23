@@ -341,8 +341,6 @@ async function submitBooking() {
     
     // Сразу перекидываем в бота для подтверждения
     const confirmUrl = 'https://t.me/Beauty6699_bot?start=confirm_' + apptId;
-    console.log('Redirecting to:', confirmUrl);
-    alert('Редирект: ' + confirmUrl); // покажем куда идём
     window.location.href = confirmUrl;
   } catch (e) {
     errEl.textContent = e.message;
