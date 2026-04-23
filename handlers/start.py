@@ -4,7 +4,7 @@ from aiogram.filters import CommandStart
 from aiogram.filters.command import CommandObject
 from aiogram.fsm.context import FSMContext
 
-from database import get_or_create_master, create_login_code, get_master_theme, get_client_pending_appointments, update_appointment_status, get_appointment_by_id, assign_client_telegram
+from database import get_or_create_master, create_login_code, get_master_theme, get_client_pending_appointments, update_appointment_status, get_appointment_by_id, assign_client_telegram, update_client_username, get_client
 from keyboards import main_menu, confirm_appointment_keyboard
 from themes import get_theme
 
@@ -55,8 +55,16 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject)
         try:
             client_id = appt['client_id']
             user_id = message.from_user.id
-            print(f"[DEBUG] assign_client_telegram: client_id={client_id}, telegram_id={user_id}")
+            
+            # Привязываем telegram_id
             await assign_client_telegram(client_id, user_id)
+            
+            # Автоматически заполняем username из Telegram
+            tg_username = message.from_user.username
+            if tg_username:
+                master_id = await get_or_create_master(message.from_user.id, message.from_user.full_name)
+                await update_client_username(client_id, master_id, tg_username)
+            
             await update_appointment_status(appt_id, "confirmed")
             await message.answer("✅ Запись подтверждена! Ждём вас 📅")
         except Exception as e:
