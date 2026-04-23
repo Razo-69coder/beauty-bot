@@ -33,12 +33,17 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject)
     args = command.args or ""
     
     # ?start=confirm_123 - подтверждение записи
-    if args.startswith("confirm_"):
+    if args and "confirm_" in args:
+        await message.answer(f"DEBUG: args='{args}'")
+        
+        # убираем "confirm_" prefix
+        clean_id = args.replace("confirm_", "").replace("confirm", "")
+        await message.answer(f"DEBUG: clean_id='{clean_id}'")
+        
         try:
-            # убираем "confirm_" prefix
-            appt_id = int(args.replace("confirm_", ""))
+            appt_id = int(clean_id)
         except Exception as e:
-            await message.answer(f"Ошибка: {e}")
+            await message.answer(f"Ошибка парсинга: {e}, clean_id='{clean_id}'")
             return
         
         appt = await get_appointment_by_id(appt_id)
