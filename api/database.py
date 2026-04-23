@@ -32,6 +32,8 @@ async def init_db():
                 name TEXT NOT NULL,
                 phone TEXT,
                 notes TEXT,
+                telegram_id BIGINT,
+                username TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
