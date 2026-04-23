@@ -183,7 +183,7 @@ body {
       <div class="success-sub">
         Мастер подтвердит запись после звонка.<br><br>
         <span id="success-details"></span><br><br>
-        <a href="https://t.me/Beauty6699_bot?start=reg" style="display:block;padding:14px;background:#fff;color:#150D20;font-weight:700;border-radius:12px;text-align:center;text-decoration:none;margin:8px 0;box-shadow:0 4px 12px rgba(0,0,0,0.15)">✏️ Подтвердить в боте</a>
+        <a href="#" id="confirm-btn" style="display:block;padding:14px;background:#fff;color:#150D20;font-weight:700;border-radius:12px;text-align:center;text-decoration:none;margin:8px 0;box-shadow:0 4px 12px rgba(0,0,0,0.15)">✏️ Подтвердить в боте</a>
         <small style="color:var(--text-muted)">Подтвердите в боте — получите напоминания о записи</small>
       </div>
     </div>
@@ -333,6 +333,11 @@ async function submitBooking() {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.detail || 'Ошибка сервера');
     }
+    const data = await res.json();
+    const apptId = data.appointment_id;
+    localStorage.setItem('pending_appt_id', apptId);
+    const confirmBtn = document.getElementById('confirm-btn');
+    if (confirmBtn) confirmBtn.href = 'https://t.me/Beauty6699_bot?start=confirm_' + apptId;
     const dt = new Date(selectedDate + 'T00:00:00');
     document.getElementById('success-details').textContent =
       `${dt.getDate()} ${MONTHS[dt.getMonth()]} в ${selectedTime} у мастера ${masterName}`;

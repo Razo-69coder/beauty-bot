@@ -4,8 +4,8 @@ from aiogram.filters import CommandStart
 from aiogram.filters.command import CommandObject
 from aiogram.fsm.context import FSMContext
 
-from database import get_or_create_master, create_login_code, get_master_theme, get_client_pending_appointments, update_appointment_status
-from keyboards import main_menu
+from database import get_or_create_master, create_login_code, get_master_theme, get_client_pending_appointments, update_appointment_status, get_appointment_by_id
+from keyboards import main_menu, confirm_appointment_keyboard
 from themes import get_theme
 
 router = Router()
@@ -55,6 +55,32 @@ async def cmd_start_reg(message: Message, state: FSMContext):
             reply_markup=confirm_appointment_keyboard(appt['id']),
             parse_mode="Markdown"
         )
+
+
+@router.message(CommandStart(deep_link="confirm_"))
+async def cmd_start_confirm(message: Message, state: FSMContext, command: CommandObject):
+    """Клиент подтверждает конкретную запись по ID"""
+    try:
+        appointment_id = int(command.args)
+    except (ValueError, TypeError):
+        await message.answer("Неверная ссылка для подтверждения.")
+        return
+    
+    # Проверяем что запись существует и принадлежит этому клиенту
+    from database import get_appointment_by_id
+    appt = await get_appointment_by_id(appointment_id)
+    
+    if not appt:
+        await message.answer("Запись не найдена.")
+        return
+    
+    if appt.get('status') != 'pending':
+        await message.answer("Эта запись уже подтверждена.")
+        return
+    
+    # Подтверждаем
+    await update_appointment_status(appointment_id, "confirmed")
+    await message.answer("✅ Запись подтверждена! Ждём вас.")
 
 
 @router.message(CommandStart())

@@ -275,6 +275,18 @@ async def get_client(client_id: int) -> dict | None:
     return {"id": row['id'], "name": row['name'], "phone": row['phone'], "notes": row['notes'], "telegram_id": row['telegram_id'], "username": row['username'] or '', "master_id": row['master_id']}
 
 
+async def get_appointment_by_id(appointment_id: int) -> dict | None:
+    """Получить запись по ID"""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, client_id, master_id, procedure, appointment_date, time, status FROM appointments WHERE id=$1", appointment_id
+        )
+    if not row:
+        return None
+    return dict(row)
+
+
 async def update_client(client_id: int, master_id: int, name: str, phone: str, notes: str) -> bool:
     pool = await get_pool()
     async with pool.acquire() as conn:
