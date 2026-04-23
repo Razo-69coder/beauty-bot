@@ -34,17 +34,28 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject)
     
     # ?start=confirm_123 - подтверждение записи
     if args and "confirm_" in args:
-        await message.answer(f"DEBUG: args='{args}'")
-        
-        # убираем "confirm_" prefix
-        clean_id = args.replace("confirm_", "").replace("confirm", "")
-        await message.answer(f"DEBUG: clean_id='{clean_id}'")
+        clean_id = args.replace("confirm_", "")
         
         try:
             appt_id = int(clean_id)
-        except Exception as e:
-            await message.answer(f"Ошибка парсинга: {e}, clean_id='{clean_id}'")
+        except (ValueError, IndexError):
+            await message.answer("❌ Ссылка недействительна.")
             return
+        
+        appt = await get_appointment_by_id(appt_id)
+        
+        if not appt:
+            await message.answer("❌ Запись не найдена.")
+            return
+        
+        if appt.get('status') != 'pending':
+            await message.answer("✅ Запись уже подтверждена.")
+            return
+        
+        await assign_client_telegram(appt['client_id'], message.from_user.id)
+        await update_appointment_status(appt_id, "confirmed")
+        await message.answer("✅ Запись подтверждена! Ждём вас 📅")
+        return
         
         appt = await get_appointment_by_id(appt_id)
         
