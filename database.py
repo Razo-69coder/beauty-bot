@@ -43,6 +43,9 @@ async def init_db():
             )
         """)
         await conn.execute("""
+            ALTER TABLE clients ADD COLUMN IF NOT EXISTS telegram_id BIGINT
+        """)
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS appointments (
                 id SERIAL PRIMARY KEY,
                 client_id INTEGER REFERENCES clients(id),
