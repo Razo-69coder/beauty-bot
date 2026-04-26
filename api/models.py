@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
+from typing import Optional
 
 
 class ClientCreate(BaseModel):
@@ -30,11 +31,14 @@ class ReminderUpdate(BaseModel):
 # ── Публичная запись ──────────────────────────────────────────────
 
 class PublicBooking(BaseModel):
-    master_telegram_id: int
-    date: str
-    time: str
+    master_id: int
     client_name: str
     client_phone: str
+    procedure: str
+    appointment_date: str
+    appointment_time: str
+    client_birthday: Optional[str] = None
+    notes: Optional[str] = None
 
 
 # ── Авторизация в веб-панели ──────────────────────────────────────

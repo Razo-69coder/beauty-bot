@@ -143,25 +143,47 @@ async def get_master_id(
 
 # ─── Публичные эндпоинты (без авторизации, для страницы записи) ──────
 
-@app.get("/api/public/master/{telegram_id}")
-async def public_master_info(telegram_id: int):
-    info = await get_master_public_info(telegram_id)
-    if not info:
+@app.get("/api/v1/public/master/{master_id}")
+async def public_master_info(master_id: int):
+    master = await get_master_full(master_id)
+    if not master:
         raise HTTPException(404, "Мастер не найден")
     dates = await get_available_dates(
-        info["id"], info["work_start"], info["work_end"], info["slot_duration"]
+        master_id, master["work_start"], master["work_end"], master["slot_duration"]
     )
-    return {"name": info["name"], "available_dates": dates}
+    return {"name": master["name"], "available_dates": dates}
 
 
-@app.get("/api/public/slots")
-async def public_slots(master: int, date: str):
-    info = await get_master_public_info(master)
-    if not info:
-        raise HTTPException(404, "Мастер не найден")
-    slots = await get_available_slots(
-        info["id"], date, info["work_start"], info["work_end"], info["slot_duration"]
-    )
+@app.post("/api/v1/public/book", status_code=201)
+async def public_book_endpoint(body: PublicBooking):
+    try:
+        master = await get_master_full(body.master_id)
+        if not master:
+            raise HTTPException(404, "Мастер не найден")
+        
+        master_tg_id = master["telegram_id"]
+        
+        appt_id = await public_book(
+            master_tg_id, body.appointment_date, body.appointment_time,
+            body.client_name, body.client_phone,
+        )
+        
+        from database import get_client_by_phone
+        client = await get_client_by_phone(master_tg_id, body.client_phone)
+        client_in_bot = client and client.get("telegram_id")
+        
+        d = datetime.strptime(body.appointment_date, "%Y-%m-%d")
+        
+        if client_in_bot:
+            msg = f"📩 *Новая онлайн-запись!*\n👤 {body.client_name} · {body.client_phone}\n📅 {d.strftime('%d.%m.%Y')} в {body.appointment_time}\n🔧 {body.procedure}"
+        else:
+            msg = f"📩 *Новая онлайн-запись!*\n👤 {body.client_name} · {body.client_phone}\n📅 {d.strftime('%d.%m.%Y')} в {body.appointment_time}\n🔧 {body.procedure}\n\n⚠️ Клиент ещё НЕ подтвердил запись в боте!"
+        
+        await send_tg_message(master_tg_id, msg)
+        
+        return {"ok": True, "appointment_id": appt_id}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     return {"slots": slots}
 
 
