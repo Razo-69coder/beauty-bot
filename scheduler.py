@@ -226,6 +226,36 @@ async def send_birthday_greetings(bot: Bot):
             pass
 
 
+async def send_loyalty_notifications(bot: Bot):
+    """Ежедневно в 20:00 MSK — отправляет уведомления о лояльности клиентам."""
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT c.telegram_id, c.name, m.name as master_name,
+                   COUNT(a.id) as visit_count,
+                   COALESCE(m.loyalty_threshold, 10) as threshold
+            FROM clients c
+            JOIN masters m ON c.master_id = m.id
+            LEFT JOIN appointments a ON a.client_id = c.id AND a.status = 'completed'
+            WHERE c.telegram_id IS NOT NULL
+            GROUP BY c.id, c.name, c.telegram_id, m.name, m.loyalty_threshold
+            HAVING COUNT(a.id) > 0 AND COUNT(a.id) % COALESCE(m.loyalty_threshold, 10) = 0
+        """)
+    
+    for telegram_id, name, master_name, visit_count, threshold in rows:
+        try:
+            await bot.send_message(
+                telegram_id,
+                f"🏆 {name}, вы у нас уже {visit_count} раз!\n\n"
+                f"Вы заработали скидку на следующий визит 🎉\n\n"
+                f"Запишитесь и скажите мастеру {master_name} что вы постоянный клиент 💅",
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+
+
 def setup_scheduler(bot: Bot):
     # Напоминание мастеру о неактивных клиентах
     scheduler.add_job(send_inactive_reminders, "cron", hour=10, minute=0, args=[bot])
@@ -250,5 +280,8 @@ def setup_scheduler(bot: Bot):
 
     # Task 3: Birthday greetings at 9:00 MSK
     scheduler.add_job(send_birthday_greetings, "cron", hour=9, minute=0, args=[bot])
+
+    # Loyalty notifications at 20:00 MSK
+    scheduler.add_job(send_loyalty_notifications, "cron", hour=20, minute=0, args=[bot])
 
     scheduler.start()

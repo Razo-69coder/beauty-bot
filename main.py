@@ -38,6 +38,7 @@ from database import (
     get_appointment_with_client, update_appointment_service_done,
     get_master_by_booking_link, update_booking_link, get_master_booking_link, is_booking_linkTaken,
     get_master_by_email, create_master_with_email,
+    get_expenses, add_expense, delete_expense,
 )
 
 from scheduler import setup_scheduler
@@ -1108,6 +1109,37 @@ async def api_stats_by_client(master_id: int = Depends(get_jwt_master_id)):
 async def api_stats_chart(days: int = 30, master_id: int = Depends(get_jwt_master_id)):
     rows = await get_earnings_by_day(master_id, days)
     return [{"date": r[0], "total": r[1]} for r in rows]
+
+
+# ── Expenses API ───────────────────────────────────────────────────────
+
+class _V1ExpenseCreate(BaseModel):
+    category: str
+    amount: int
+    description: str = ""
+    date: str = ""  # YYYY-MM-DD, defaults to today
+
+@app.get("/api/v1/expenses")
+async def v1_get_expenses(master_id: int = Depends(get_jwt_master_id)):
+    rows = await get_expenses(master_id)
+    return {"expenses": [
+        {"id": r[0], "category": r[1], "amount": r[2],
+         "description": r[3], "date": str(r[4])} for r in rows
+    ]}
+
+@app.post("/api/v1/expenses", status_code=201)
+async def v1_add_expense(body: _V1ExpenseCreate, master_id: int = Depends(get_jwt_master_id)):
+    from datetime import date
+    d = body.date if body.date else str(date.today())
+    eid = await add_expense(master_id, body.category, body.amount, body.description, d)
+    return {"id": eid}
+
+@app.delete("/api/v1/expenses/{expense_id}")
+async def v1_delete_expense(expense_id: int, master_id: int = Depends(get_jwt_master_id)):
+    ok = await delete_expense(expense_id, master_id)
+    if not ok:
+        raise HTTPException(404, "Не найдено")
+    return {"ok": True}
 
 
 # ── Дашборд (JWT) ─────────────────────────────────────────────────────

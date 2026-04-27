@@ -106,6 +106,17 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS expenses (
+                id SERIAL PRIMARY KEY,
+                master_id INTEGER NOT NULL,
+                category VARCHAR(100) NOT NULL,
+                amount INTEGER NOT NULL,
+                description TEXT DEFAULT '',
+                date DATE NOT NULL DEFAULT CURRENT_DATE,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         # Миграции для существующих баз
         for sql in [
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS payment_card TEXT DEFAULT ''",
@@ -124,6 +135,7 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS booking_link TEXT DEFAULT ''",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS loyalty_threshold INTEGER DEFAULT 10",
         ]:
             try:
                 await conn.execute(sql)
@@ -1233,3 +1245,40 @@ def get_client_timezone(client_id: int) -> str:
     """Получает часовой пояс клиента."""
     # Пока возвращаем дефолт — потом можно получить из БД
     return 'Europe/Moscow'
+
+
+# ── Расходы ─────────────────────────────────────────────────────────────
+
+async def get_expenses(master_id: int) -> list:
+    """Получить все расходы мастера"""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, category, amount, description, date FROM expenses "
+            "WHERE master_id=$1 ORDER BY date DESC, created_at DESC",
+            master_id
+        )
+    return [(r['id'], r['category'], r['amount'], r['description'], r['date']) for r in rows]
+
+
+async def add_expense(master_id: int, category: str, amount: int, description: str, date: str) -> int:
+    """Добавить новый расход"""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO expenses (master_id, category, amount, description, date) "
+            "VALUES ($1, $2, $3, $4, $5) RETURNING id",
+            master_id, category, amount, description, date
+        )
+    return row['id']
+
+
+async def delete_expense(expense_id: int, master_id: int) -> bool:
+    """Удалить расход"""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            "DELETE FROM expenses WHERE id=$1 AND master_id=$2",
+            expense_id, master_id
+        )
+    return result != "DELETE 0"
