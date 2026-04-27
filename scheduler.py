@@ -200,6 +200,32 @@ async def send_payment_reminders_2h(bot: Bot):
             pass
 
 
+async def send_birthday_greetings(bot: Bot):
+    """Ежедневно в 9:00 MSK — отправляет поздравления с днём рождения клиентам."""
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT c.telegram_id, c.name, m.name as master_name
+            FROM clients c JOIN masters m ON c.master_id = m.id
+            WHERE c.telegram_id IS NOT NULL
+            AND c.birthday IS NOT NULL
+            AND TO_CHAR(CURRENT_DATE, 'MM-DD') = c.birthday
+        """)
+    
+    for telegram_id, name, master_name in rows:
+        try:
+            await bot.send_message(
+                telegram_id,
+                f"🎂 *С днём рождения, {name}!*\n\n"
+                f"Мастер {master_name} поздравляет вас с праздником! 🎉\n\n"
+                f"Ждём вас на любимой процедуре 💅",
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+
+
 def setup_scheduler(bot: Bot):
     # Напоминание мастеру о неактивных клиентах
     scheduler.add_job(send_inactive_reminders, "cron", hour=10, minute=0, args=[bot])
@@ -221,5 +247,8 @@ def setup_scheduler(bot: Bot):
     
     # Напоминание об оплате через 2 часа после записи
     scheduler.add_job(send_payment_reminders_2h, "interval", minutes=30, args=[bot])
+
+    # Task 3: Birthday greetings at 9:00 MSK
+    scheduler.add_job(send_birthday_greetings, "cron", hour=9, minute=0, args=[bot])
 
     scheduler.start()

@@ -703,6 +703,23 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
         price=price,
         status="pending",
     )
+    
+    # Task 2: Notify master when web booking arrives
+    try:
+        if master.get("telegram_id"):
+            date_fmt = _dt.strptime(body.date, "%Y-%m-%d").strftime("%d.%m.%Y")
+            await bot.send_message(
+                master["telegram_id"],
+                f"🔔 *Новая запись через ссылку!*\n\n"
+                f"👤 {body.client_name}\n"
+                f"📱 {body.client_phone}\n"
+                f"📅 {date_fmt} в {body.time}\n"
+                f"💅 {procedure}",
+                parse_mode="Markdown"
+            )
+    except Exception:
+        pass  # Don't fail if bot message fails
+    
     return {"ok": True, "appointment_id": appt_id}
 
 
@@ -933,6 +950,23 @@ async def v1_create_appointment(body: _V1AppointmentCreate, master_id: int = Dep
         procedure=body.procedure, appointment_date=body.appointment_date,
         price=body.price, notes=body.notes, time=body.time,
     )
+    
+    # Task 1: Send booking confirmation to client
+    try:
+        client = await get_client(body.client_id)
+        if client and client.get("telegram_id"):
+            date_fmt = _dt.strptime(body.appointment_date, "%Y-%m-%d").strftime("%d.%m.%Y")
+            await bot.send_message(
+                client["telegram_id"],
+                f"✅ *Запись подтверждена!*\n\n"
+                f"📅 {date_fmt} в {body.time}\n"
+                f"💅 {body.procedure}\n\n"
+                f"До встречи!",
+                parse_mode="Markdown"
+            )
+    except Exception:
+        pass  # Don't fail if bot message fails
+    
     return {"id": appt_id}
 
 
