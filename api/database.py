@@ -380,10 +380,12 @@ async def get_master_by_email(email: str) -> dict | None:
 
 
 async def create_master_with_email(email: str, password_hash: str, name: str) -> int:
+    import time
+    telegram_id = -int(time.time())
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
-            "INSERT INTO masters (email, password_hash, name, telegram_id) VALUES (?, ?, ?, 0)",
-            (email, password_hash, name)
+            "INSERT INTO masters (email, password_hash, name, telegram_id) VALUES (?, ?, ?, ?)",
+            (email, password_hash, name, telegram_id)
         )
         await db.commit()
         return cursor.lastrowid

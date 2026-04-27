@@ -72,6 +72,14 @@ def create_jwt(telegram_id: int, master_id: int) -> str:
     return jwt.encode(payload, _jwt_secret(), algorithm="HS256")
 
 
+def generate_jwt(master_id: int) -> str:
+    payload = {
+        "mid": master_id,
+        "exp": datetime.utcnow() + timedelta(days=365),
+    }
+    return jwt.encode(payload, _jwt_secret(), algorithm="HS256")
+
+
 def decode_jwt(token: str) -> dict | None:
     try:
         return jwt.decode(token, _jwt_secret(), algorithms=["HS256"])
@@ -294,7 +302,7 @@ async def register(body: EmailRegisterRequest):
     if not master:
         raise HTTPException(500, "Ошибка создания мастера")
     
-    token = jwt.encode({"mid": master_id}, _jwt_secret(), algorithm="HS256")
+    token = generate_jwt(master_id)
     
     return {"token": token, "master": {
         "id": master["id"], "name": master["name"], "email": master["email"],
@@ -318,7 +326,7 @@ async def login(body: EmailLoginRequest):
     if not master or master.get("password_hash") != password_hash:
         raise HTTPException(401, "Неверный email или пароль")
     
-    token = jwt.encode({"mid": master["id"]}, _jwt_secret(), algorithm="HS256")
+    token = generate_jwt(master["id"])
     
     return {"token": token, "master": {
         "id": master["id"], "name": master["name"], "email": master["email"],
