@@ -123,6 +123,7 @@ async def init_db():
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS review_requested_at TIMESTAMP",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT ''",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS booking_link TEXT DEFAULT ''",
         ]:
             try:
                 await conn.execute(sql)
@@ -213,6 +214,53 @@ async def create_master_with_email(email: str, password_hash: str, name: str) ->
             email, password_hash, name, telegram_id
         )
     return row['id'] if row else 0
+
+
+async def get_master_by_booking_link(link: str) -> dict | None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, name, work_start, work_end, slot_duration, booking_link "
+            "FROM masters WHERE booking_link=$1",
+            link
+        )
+    if not row:
+        return None
+    return {
+        "id": row['id'], "name": row['name'] or "",
+        "work_start": row['work_start'] or 9, "work_end": row['work_end'] or 20,
+        "slot_duration": row['slot_duration'] or 60, "booking_link": row['booking_link'] or "",
+    }
+
+
+async def update_booking_link(master_id: int, link: str) -> bool:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE masters SET booking_link=$1 WHERE id=$2",
+            link, master_id
+        )
+    return True
+
+
+async def get_master_booking_link(master_id: int) -> str:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT booking_link FROM masters WHERE id=$1",
+            master_id
+        )
+    return row['booking_link'] if row else ""
+
+
+async def is_booking_linkTaken(link: str, exclude_master_id: int = 0) -> bool:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id FROM masters WHERE booking_link=$1 AND id != $2",
+            link, exclude_master_id
+        )
+    return row is not None
 
 
 async def update_master_work_hours(master_id: int, work_start: int, work_end: int, slot_duration: int):
