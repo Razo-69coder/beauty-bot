@@ -36,6 +36,7 @@ from database import (
     get_services, add_service, delete_service,
     get_earnings_by_service, get_earnings_by_client, get_earnings_by_day, get_earnings_by_period,
     get_appointment_with_client, update_appointment_service_done,
+    get_master_by_email, create_master_with_email,
 )
 
 from scheduler import setup_scheduler
@@ -234,6 +235,12 @@ def _decode_jwt(token: str) -> dict | None:
     except jwt.InvalidTokenError:
         return None
 
+def _generate_jwt(master_id: int) -> str:
+    return jwt.encode(
+        {"mid": master_id, "exp": _dt.utcnow() + _td(days=365)},
+        _jwt_secret(), algorithm="HS256"
+    )
+
 async def get_jwt_master_id(
     authorization: str = Header(None),
     master_id: int = None
@@ -259,6 +266,18 @@ class ClientCreate(BaseModel):
     name: str
     phone: str
     notes: str = ""
+
+
+class EmailRegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+
+
+class EmailLoginRequest(BaseModel):
+    email: str
+    password: str
+
 
 class ClientUpdate(BaseModel):
     name: str | None = None
@@ -539,6 +558,55 @@ async def auth_verify_code(body: _VerifyCodeOnly):
     full = await get_master_full(m["id"])
     token = _create_jwt(tg_id, m["id"])
     return {"token": token, "master": full}
+
+
+# ── API: Email/Password авторизация ───────────────────────────────
+
+@app.post("/api/v1/auth/register")
+async def register(body: EmailRegisterRequest):
+    password_hash = hashlib.sha256(body.password.encode()).hexdigest()
+    
+    existing = await get_master_by_email(body.email)
+    if existing:
+        raise HTTPException(400, "Email уже занят")
+    
+    master_id = await create_master_with_email(body.email, password_hash, body.name)
+    master = await get_master_by_email(body.email)
+    if not master:
+        raise HTTPException(500, "Ошибка создания мастера")
+    
+    token = _generate_jwt(master_id)
+    
+    return {"token": token, "master": {
+        "id": master["id"], "name": master["name"], "email": master["email"],
+        "work_start": master["work_start"], "work_end": master["work_end"],
+        "slot_duration": master["slot_duration"], "timezone": master["timezone"],
+        "reminder_days": master["reminder_days"], "payment_card": master["payment_card"],
+        "payment_phone": master["payment_phone"], "payment_banks": master["payment_banks"],
+        "deposit_enabled": False, "deposit_percent": 30,
+        "theme": master["theme"],
+    }}
+
+
+@app.post("/api/v1/auth/login")
+async def login(body: EmailLoginRequest):
+    password_hash = hashlib.sha256(body.password.encode()).hexdigest()
+    
+    master = await get_master_by_email(body.email)
+    if not master or master.get("password_hash") != password_hash:
+        raise HTTPException(401, "Неверный email или пароль")
+    
+    token = _generate_jwt(master["id"])
+    
+    return {"token": token, "master": {
+        "id": master["id"], "name": master["name"], "email": master["email"],
+        "work_start": master["work_start"], "work_end": master["work_end"],
+        "slot_duration": master["slot_duration"], "timezone": master["timezone"],
+        "reminder_days": master["reminder_days"], "payment_card": master["payment_card"],
+        "payment_phone": master["payment_phone"], "payment_banks": master["payment_banks"],
+        "deposit_enabled": False, "deposit_percent": 30,
+        "theme": master["theme"],
+    }}
 
 
 # ── API: Дашборд — неактивные клиенты ────────────────────────────────

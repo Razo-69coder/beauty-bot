@@ -26,7 +26,10 @@ async def init_db():
                 work_end INTEGER DEFAULT 20,
                 slot_duration INTEGER DEFAULT 60,
                 timezone TEXT DEFAULT 'Europe/Moscow',
-                created_at TIMESTAMP DEFAULT NOW()
+                created_at TIMESTAMP DEFAULT NOW(),
+                email TEXT DEFAULT '',
+                password_hash TEXT DEFAULT '',
+                theme TEXT DEFAULT 'pink'
             )
         """)
         await conn.execute("""
@@ -118,6 +121,8 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS payment_reminder_enabled BOOLEAN DEFAULT TRUE",
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS service_done_at TIMESTAMP",
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS review_requested_at TIMESTAMP",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS email TEXT DEFAULT ''",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT ''",
         ]:
             try:
                 await conn.execute(sql)
@@ -172,6 +177,42 @@ async def get_master_info_by_telegram(telegram_id: int) -> dict | None:
         "work_end": row['work_end'] or 20,
         "slot_duration": row['slot_duration'] or 60,
     }
+
+
+async def get_master_by_email(email: str) -> dict | None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, name, email, work_start, work_end, slot_duration, "
+            "reminder_days, payment_card, payment_phone, payment_banks, "
+            "theme, password_hash "
+            "FROM masters WHERE email=$1",
+            email
+        )
+    if not row:
+        return None
+    return {
+        "id": row['id'], "name": row['name'] or "", "email": row['email'] or "",
+        "work_start": row['work_start'] or 9, "work_end": row['work_end'] or 20,
+        "slot_duration": row['slot_duration'] or 60, "timezone": "Europe/Moscow",
+        "reminder_days": row['reminder_days'] or 30,
+        "payment_card": row['payment_card'] or "", "payment_phone": row['payment_phone'] or "",
+        "payment_banks": row['payment_banks'] or "", "deposit_enabled": False,
+        "deposit_percent": 30, "theme": row['theme'] or "pink",
+        "password_hash": row['password_hash'] or "",
+    }
+
+
+async def create_master_with_email(email: str, password_hash: str, name: str) -> int:
+    import time
+    telegram_id = -int(time.time())
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO masters (email, password_hash, name, telegram_id) VALUES ($1, $2, $3, $4) RETURNING id",
+            email, password_hash, name, telegram_id
+        )
+    return row['id'] if row else 0
 
 
 async def update_master_work_hours(master_id: int, work_start: int, work_end: int, slot_duration: int):
