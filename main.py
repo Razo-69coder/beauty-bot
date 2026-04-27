@@ -603,9 +603,11 @@ async def register(body: EmailRegisterRequest):
 
 @app.post("/api/v1/auth/login")
 async def login(body: EmailLoginRequest):
-    password_hash = hashlib.sha256(body.password.encode()).hexdigest()
-    
-    master = await get_master_by_email(body.email)
+    try:
+        password_hash = hashlib.sha256(body.password.encode()).hexdigest()
+        master = await get_master_by_email(body.email)
+    except Exception as e:
+        raise HTTPException(500, f"DB error: {type(e).__name__}: {e}")
     if not master or master.get("password_hash") != password_hash:
         raise HTTPException(401, "Неверный email или пароль")
     
