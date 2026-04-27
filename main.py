@@ -682,11 +682,14 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
     if body.time not in slots:
         raise HTTPException(409, "Этот слот уже занят")
     procedure = body.procedure
-    if not procedure and body.service_id:
+    price = 0
+    if body.service_id:
         svcs = await get_services(master["id"])
         for s in svcs:
             if s[0] == body.service_id:
-                procedure = s[1]
+                if not procedure:
+                    procedure = s[1]
+                price = s[2] or 0
                 break
     if not procedure:
         procedure = "Запись"
@@ -697,6 +700,7 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
         procedure=procedure,
         appointment_date=body.date,
         time=body.time,
+        price=price,
         status="pending",
     )
     return {"ok": True, "appointment_id": appt_id}
