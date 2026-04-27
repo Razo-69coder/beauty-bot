@@ -76,6 +76,7 @@ async def init_db():
             "ALTER TABLE appointments ADD COLUMN review_requested_at TEXT",
             "ALTER TABLE masters ADD COLUMN email TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN password_hash TEXT DEFAULT ''",
+            "ALTER TABLE masters ADD COLUMN theme TEXT DEFAULT 'pink'",
         ]:
             try:
                 await db.execute(migration)
@@ -360,9 +361,9 @@ async def update_master_payment(master_id: int, payment_card: str = "", payment_
 async def get_master_by_email(email: str) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
-            "SELECT id, name, email, work_start, work_end, slot_duration, timezone, "
+            "SELECT id, name, email, work_start, work_end, slot_duration, "
             "reminder_days, payment_card, payment_phone, payment_banks, "
-            "deposit_enabled, deposit_percent, theme, password_hash "
+            "theme, password_hash "
             "FROM masters WHERE email = ?", (email,)
         ) as c:
             row = await c.fetchone()
@@ -370,12 +371,13 @@ async def get_master_by_email(email: str) -> dict | None:
         return None
     return {
         "id": row[0], "name": row[1] or "", "email": row[2] or "",
-        "work_start": row[3] or 10, "work_end": row[4] or 20, "slot_duration": row[5] or 60,
-        "timezone": row[6] or "Europe/Moscow", "reminder_days": row[7] or 40,
-        "payment_card": row[8] or "", "payment_phone": row[9] or "", "payment_banks": row[10] or "",
-        "deposit_enabled": bool(row[11]) if row[11] is not None else False,
-        "deposit_percent": row[12] or 30, "theme": row[13] or "pink",
-        "password_hash": row[14] or "",
+        "work_start": row[3] or 9, "work_end": row[4] or 20,
+        "slot_duration": row[5] or 60, "timezone": "Europe/Moscow",
+        "reminder_days": row[6] or 30,
+        "payment_card": row[7] or "", "payment_phone": row[8] or "",
+        "payment_banks": row[9] or "", "deposit_enabled": False,
+        "deposit_percent": 30, "theme": row[10] or "pink",
+        "password_hash": row[11] or "",
     }
 
 
