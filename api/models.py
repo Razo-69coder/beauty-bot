@@ -73,3 +73,16 @@ class DashboardAppointmentCreate(BaseModel):
     time: str = ""
     price: int = 0
     notes: str = ""
+
+
+# ── Email/Password авторизация ───────────────────────────────────
+
+class EmailRegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+
+
+class EmailLoginRequest(BaseModel):
+    email: str
+    password: str
