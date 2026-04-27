@@ -36,7 +36,7 @@ from database import (
     get_services, add_service, delete_service,
     get_earnings_by_service, get_earnings_by_client, get_earnings_by_day, get_earnings_by_period,
     get_appointment_with_client, update_appointment_service_done,
-    get_master_by_email, create_master_with_email,
+    get_master_by_booking_link, update_booking_link, get_master_booking_link, is_booking_linkTaken,
 )
 
 from scheduler import setup_scheduler
@@ -277,6 +277,19 @@ class EmailRegisterRequest(BaseModel):
 class EmailLoginRequest(BaseModel):
     email: str
     password: str
+
+
+class BookingLinkUpdateRequest(BaseModel):
+    link: str
+
+
+class PublicBookingRequest(BaseModel):
+    client_name: str
+    client_phone: str
+    service_id: int | None = None
+    procedure: str = ""
+    date: str
+    time: str
 
 
 class ClientUpdate(BaseModel):
@@ -607,6 +620,86 @@ async def login(body: EmailLoginRequest):
         "deposit_enabled": False, "deposit_percent": 30,
         "theme": master["theme"],
     }}
+
+
+# ── API v1: Онлайн-запись по ссылке ──────────────────────────────────
+
+import re as _re
+
+@app.get("/api/v1/masters/me/booking-link")
+async def v1_get_booking_link(master_id: int = Depends(get_jwt_master_id)):
+    link = await get_master_booking_link(master_id)
+    return {"booking_link": link}
+
+
+@app.put("/api/v1/masters/booking-link")
+async def v1_update_booking_link(body: BookingLinkUpdateRequest, master_id: int = Depends(get_jwt_master_id)):
+    link = body.link.strip().lower()
+    if not _re.match(r'^[a-z0-9-]{3,30}$', link):
+        raise HTTPException(400, "Ссылка должна содержать только буквы a-z, цифры и дефис (3–30 символов)")
+    current = await get_master_booking_link(master_id)
+    if current != link and await is_booking_linkTaken(link, exclude_master_id=master_id):
+        raise HTTPException(400, "Эта ссылка уже занята, выберите другую")
+    await update_booking_link(master_id, link)
+    return {"ok": True, "booking_link": link}
+
+
+@app.get("/api/v1/book/{link}")
+async def v1_public_master_info(link: str):
+    master = await get_master_by_booking_link(link)
+    if not master:
+        raise HTTPException(404, "Мастер не найден")
+    svcs = await get_services(master["id"])
+    return {
+        "master_name": master["name"],
+        "work_start": master["work_start"],
+        "work_end": master["work_end"],
+        "services": [{"id": s[0], "name": s[1], "price_default": s[2]} for s in svcs],
+    }
+
+
+@app.get("/api/v1/book/{link}/slots")
+async def v1_public_slots(link: str, date: str):
+    master = await get_master_by_booking_link(link)
+    if not master:
+        raise HTTPException(404, "Мастер не найден")
+    slots = await get_available_slots(
+        master["id"], date,
+        master["work_start"], master["work_end"], master["slot_duration"]
+    )
+    return {"slots": slots}
+
+
+@app.post("/api/v1/book/{link}", status_code=201)
+async def v1_public_book(link: str, body: PublicBookingRequest):
+    master = await get_master_by_booking_link(link)
+    if not master:
+        raise HTTPException(404, "Мастер не найден")
+    slots = await get_available_slots(
+        master["id"], body.date,
+        master["work_start"], master["work_end"], master["slot_duration"]
+    )
+    if body.time not in slots:
+        raise HTTPException(409, "Этот слот уже занят")
+    procedure = body.procedure
+    if not procedure and body.service_id:
+        svcs = await get_services(master["id"])
+        for s in svcs:
+            if s[0] == body.service_id:
+                procedure = s[1]
+                break
+    if not procedure:
+        procedure = "Запись"
+    client_id = await add_client(master["id"], body.client_name, body.client_phone)
+    appt_id = await add_appointment(
+        client_id=client_id,
+        master_id=master["id"],
+        procedure=procedure,
+        appointment_date=body.date,
+        time=body.time,
+        status="pending",
+    )
+    return {"ok": True, "appointment_id": appt_id}
 
 
 # ── API: Дашборд — неактивные клиенты ────────────────────────────────

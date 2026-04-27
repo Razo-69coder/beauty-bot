@@ -77,6 +77,7 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN email TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN password_hash TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN theme TEXT DEFAULT 'pink'",
+            "ALTER TABLE masters ADD COLUMN booking_link TEXT DEFAULT ''",
         ]:
             try:
                 await db.execute(migration)
@@ -408,6 +409,47 @@ async def get_master_public_info(telegram_id: int) -> dict | None:
         "id": row[0], "name": row[1],
         "work_start": row[2] or 10, "work_end": row[3] or 20, "slot_duration": row[4] or 60,
     }
+
+
+async def get_master_by_booking_link(link: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT id, name, work_start, work_end, slot_duration, booking_link "
+            "FROM masters WHERE booking_link = ?", (link,)
+        ) as c:
+            row = await c.fetchone()
+    if not row:
+        return None
+    return {
+        "id": row[0], "name": row[1],
+        "work_start": row[2] or 10, "work_end": row[3] or 20,
+        "slot_duration": row[4] or 60, "booking_link": row[5] or "",
+    }
+
+
+async def update_booking_link(master_id: int, link: str) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE masters SET booking_link = ? WHERE id = ?", (link, master_id)
+        )
+        await db.commit()
+
+
+async def get_booking_link(master_id: int) -> str:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT booking_link FROM masters WHERE id = ?", (master_id,)
+        ) as c:
+            row = await c.fetchone()
+    return (row[0] or "") if row else ""
+
+
+async def booking_link_exists(link: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT id FROM masters WHERE booking_link = ?", (link,)
+        ) as c:
+            return await c.fetchone() is not None
 
 
 async def get_busy_slots(master_id: int, date_str: str) -> list[str]:
