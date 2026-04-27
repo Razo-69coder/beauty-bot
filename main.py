@@ -37,6 +37,7 @@ from database import (
     get_earnings_by_service, get_earnings_by_client, get_earnings_by_day, get_earnings_by_period,
     get_appointment_with_client, update_appointment_service_done,
     get_master_by_booking_link, update_booking_link, get_master_booking_link, is_booking_linkTaken,
+    get_master_by_email, create_master_with_email,
 )
 
 from scheduler import setup_scheduler
@@ -603,11 +604,8 @@ async def register(body: EmailRegisterRequest):
 
 @app.post("/api/v1/auth/login")
 async def login(body: EmailLoginRequest):
-    try:
-        password_hash = hashlib.sha256(body.password.encode()).hexdigest()
-        master = await get_master_by_email(body.email)
-    except Exception as e:
-        raise HTTPException(500, f"DB error: {type(e).__name__}: {e}")
+    password_hash = hashlib.sha256(body.password.encode()).hexdigest()
+    master = await get_master_by_email(body.email)
     if not master or master.get("password_hash") != password_hash:
         raise HTTPException(401, "Неверный email или пароль")
     
