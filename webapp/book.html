@@ -77,21 +77,50 @@ body {
 .service-check { font-size: 18px; color: #FF2D78; display: none; }
 .service-item.selected .service-check { display: block; }
 
-/* Dates */
-.dates-grid {
-  display: grid; grid-template-columns: repeat(3,1fr); gap: 8px;
+/* Calendar */
+.cal-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
 }
-.date-card {
-  background: rgba(255,255,255,0.06); border-radius: 14px;
-  padding: 12px 6px; text-align: center; cursor: pointer;
-  border: 1.5px solid rgba(255,255,255,0.1);
+.cal-nav-btn {
+  width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.07); color: #fff; font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
 }
-.date-card:active { transform: scale(0.96); }
-.date-card.selected { border-color: #FF2D78; background: rgba(255,45,120,0.12); }
-.date-card .wd  { font-size: 10px; font-weight: 700; color: #FF2D78; margin-bottom: 3px; }
-.date-card .dn  { font-size: 22px; font-weight: 800; }
-.date-card .mo  { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+.cal-nav-btn:active { background: rgba(255,45,120,0.2); border-color: #FF2D78; }
+.cal-nav-btn:disabled { opacity: 0.25; cursor: default; }
+.cal-month-label { font-size: 16px; font-weight: 700; }
+.cal-weekdays {
+  display: grid; grid-template-columns: repeat(7,1fr);
+  margin-bottom: 6px;
+}
+.cal-wd {
+  text-align: center; font-size: 10px; font-weight: 700;
+  color: rgba(255,255,255,0.35); padding: 4px 0; letter-spacing: 0.4px;
+}
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7,1fr); gap: 3px;
+}
+.cal-day {
+  aspect-ratio: 1; border-radius: 10px; display: flex; align-items: center;
+  justify-content: center; font-size: 14px; font-weight: 600;
+  cursor: pointer; border: 1.5px solid transparent;
+  transition: all 0.15s;
+}
+.cal-day:active { transform: scale(0.9); }
+.cal-day.today {
+  border-color: rgba(255,45,120,0.45);
+  color: #FF2D78;
+}
+.cal-day.selected {
+  background: rgba(255,45,120,0.25); border-color: #FF2D78; color: #FF2D78;
+}
+.cal-day.past { color: rgba(255,255,255,0.2); cursor: default; pointer-events: none; }
+.cal-day.empty { pointer-events: none; }
+.cal-day:not(.past):not(.empty):not(.selected):hover {
+  background: rgba(255,255,255,0.08);
+}
 
 /* Time slots */
 .slots-grid {
@@ -186,7 +215,17 @@ body {
 <div id="step1" class="hidden">
   <div class="card">
     <div class="card-title">Выберите дату</div>
-    <div class="dates-grid" id="datesList"></div>
+    <div class="cal-nav">
+      <button class="cal-nav-btn" id="calPrev" onclick="calShift(-1)">‹</button>
+      <div class="cal-month-label" id="calMonthLabel"></div>
+      <button class="cal-nav-btn" id="calNext" onclick="calShift(1)">›</button>
+    </div>
+    <div class="cal-weekdays">
+      <div class="cal-wd">Пн</div><div class="cal-wd">Вт</div><div class="cal-wd">Ср</div>
+      <div class="cal-wd">Чт</div><div class="cal-wd">Пт</div><div class="cal-wd">Сб</div>
+      <div class="cal-wd">Вс</div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
   </div>
   <div style="margin:0 16px">
     <button class="btn btn-back" onclick="goStep(0)">← Назад</button>
@@ -255,8 +294,13 @@ let selectedDate = null;
 let selectedTime = null;
 let currentStep = 0;
 
-const MONTHS_RU = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-const DAYS_RU   = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+const MONTHS_RU      = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+const MONTHS_FULL_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const DAYS_RU        = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+
+let calYear  = 0;
+let calMonth = 0;
+const CAL_MAX_MONTHS = 4;
 
 async function init() {
   try {
@@ -302,28 +346,64 @@ function selectService(id, name, price) {
 }
 
 function renderDates() {
-  const grid = document.getElementById('datesList');
-  const today = new Date();
-  let html = '';
-  for (let i = 0; i < 30; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    const iso = d.toISOString().slice(0, 10);
-    const wd  = DAYS_RU[d.getDay()];
-    const dn  = d.getDate();
-    const mo  = MONTHS_RU[d.getMonth()];
-    html += `<div class="date-card" onclick="selectDate('${iso}','${wd}',${dn},'${mo}')" id="date_${iso}">
-      <div class="wd">${wd}</div>
-      <div class="dn">${dn}</div>
-      <div class="mo">${mo}</div>
-    </div>`;
-  }
-  grid.innerHTML = html;
+  const now = new Date();
+  calYear  = now.getFullYear();
+  calMonth = now.getMonth();
+  renderCalendar();
 }
 
-function selectDate(iso, wd, dn, mo) {
-  document.querySelectorAll('.date-card').forEach(el => el.classList.remove('selected'));
-  document.getElementById('date_' + iso).classList.add('selected');
+function calShift(delta) {
+  const now   = new Date();
+  const base  = now.getMonth();
+  const baseY = now.getFullYear();
+  calMonth += delta;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const now      = new Date();
+  const todayIso = now.toISOString().slice(0, 10);
+  const baseYear = now.getFullYear();
+  const baseMon  = now.getMonth();
+  const diffMons = (calYear - baseYear) * 12 + (calMonth - baseMon);
+
+  document.getElementById('calMonthLabel').textContent =
+    `${MONTHS_FULL_RU[calMonth]} ${calYear}`;
+  document.getElementById('calPrev').disabled = diffMons <= 0;
+  document.getElementById('calNext').disabled = diffMons >= CAL_MAX_MONTHS - 1;
+
+  const firstDay = new Date(calYear, calMonth, 1);
+  const lastDay  = new Date(calYear, calMonth + 1, 0);
+  let startWd = firstDay.getDay();
+  if (startWd === 0) startWd = 7;
+
+  let html = '';
+  for (let e = 1; e < startWd; e++) html += '<div class="cal-day empty"></div>';
+
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    const iso  = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const past = iso < todayIso;
+    const isTod = iso === todayIso;
+    const isSel = selectedDate && selectedDate.iso === iso;
+    let cls = 'cal-day';
+    if (past)  cls += ' past';
+    if (isTod) cls += ' today';
+    if (isSel) cls += ' selected';
+    const onclick = past ? '' : `onclick="selectDate('${iso}',${d})"`;
+    html += `<div class="${cls}" id="cald_${iso}" ${onclick}>${d}</div>`;
+  }
+
+  document.getElementById('calGrid').innerHTML = html;
+}
+
+function selectDate(iso, dn) {
+  document.querySelectorAll('.cal-day').forEach(el => el.classList.remove('selected'));
+  const el = document.getElementById('cald_' + iso);
+  if (el) el.classList.add('selected');
+  const mo  = MONTHS_RU[parseInt(iso.slice(5,7)) - 1];
+  const wd  = DAYS_RU[new Date(iso).getDay()];
   selectedDate = { iso, label: `${dn} ${mo}, ${wd}` };
   document.getElementById('btnStep1').disabled = false;
 }
