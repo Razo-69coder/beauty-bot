@@ -1035,5 +1035,11 @@ async def serve_dashboard():
         "Expires": "0",
     })
 
+# ── Страница онлайн-записи для клиентов ──────────────────────────────
+@app.get("/book/{link}")
+async def serve_booking_page(link: str):
+    from fastapi.responses import FileResponse
+    return FileResponse("webapp/book.html")
+
 # ── Остальная статика (webapp) ────────────────────────────────────────
 app.mount("/app", StaticFiles(directory="webapp", html=True), name="webapp")
