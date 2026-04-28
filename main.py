@@ -73,25 +73,20 @@ dp = build_dispatcher()
 async def lifespan(app: FastAPI):
     try:
         await init_db()
+        from database import get_pool
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            for sql in [
+                "ALTER TABLE clients ADD COLUMN IF NOT EXISTS username VARCHAR(50) DEFAULT ''",
+                "ALTER TABLE masters ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) DEFAULT 'Europe/Moscow'",
+                "ALTER TABLE clients ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) DEFAULT 'Europe/Moscow'",
+            ]:
+                try:
+                    await conn.execute(sql)
+                except Exception:
+                    pass
     except Exception as e:
-        print(f"[STARTUP] DB init warning: {e}")
-    
-    # Миграции: добавить отсутствующие колонки
-    from database import get_pool
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        try:
-            await conn.execute("ALTER TABLE clients ADD COLUMN username VARCHAR(50) DEFAULT ''")
-        except Exception:
-            pass
-        try:
-            await conn.execute("ALTER TABLE masters ADD COLUMN timezone VARCHAR(50) DEFAULT 'Europe/Moscow'")
-        except Exception:
-            pass
-        try:
-            await conn.execute("ALTER TABLE clients ADD COLUMN timezone VARCHAR(50) DEFAULT 'Europe/Moscow'")
-        except Exception:
-            pass
+        print(f"[STARTUP] DB warning: {e}")
     
     setup_scheduler(bot)
 
