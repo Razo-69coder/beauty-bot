@@ -1129,10 +1129,17 @@ async def v1_get_expenses(master_id: int = Depends(get_jwt_master_id)):
 
 @app.post("/api/v1/expenses", status_code=201)
 async def v1_add_expense(body: _V1ExpenseCreate, master_id: int = Depends(get_jwt_master_id)):
-    from datetime import date
-    d = body.date if body.date else str(date.today())
-    eid = await add_expense(master_id, body.category, body.amount, body.description, d)
-    return {"id": eid}
+    from datetime import date, datetime
+    try:
+        if body.date:
+            date_obj = datetime.strptime(body.date, "%Y-%m-%d").date()
+        else:
+            date_obj = date.today()
+        eid = await add_expense(master_id, body.category, body.amount, body.description, date_obj)
+        return {"id": eid}
+    except Exception as e:
+        print(f"[expense error] {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/v1/expenses/{expense_id}")
 async def v1_delete_expense(expense_id: int, master_id: int = Depends(get_jwt_master_id)):
