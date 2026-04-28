@@ -163,6 +163,22 @@ async def health():
     return {"status": "healthy"}
 
 
+@app.get("/debug/db")
+async def debug_db():
+    import socket, os
+    url = os.getenv("SUPABASE_URL") or os.getenv("DATABASE_URL", "")
+    host = "aws-0-us-east-1.pooler.supabase.com"
+    results = {}
+    for port in [5432, 6543]:
+        try:
+            sock = socket.create_connection((host, port), timeout=5)
+            sock.close()
+            results[port] = "reachable"
+        except Exception as e:
+            results[port] = str(e)
+    return {"url_prefix": url[:60], "connectivity": results}
+
+
 # ── Telegram Webhook ──────────────────────────────────────────────────
 @app.post("/webhook")
 async def webhook(request: Request):
