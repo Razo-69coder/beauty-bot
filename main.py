@@ -577,18 +577,23 @@ async def auth_verify_code(body: _VerifyCodeOnly):
 
 @app.post("/api/v1/auth/register")
 async def register(body: EmailRegisterRequest):
-    password_hash = hashlib.sha256(body.password.encode()).hexdigest()
-    
-    existing = await get_master_by_email(body.email)
-    if existing:
-        raise HTTPException(400, "Email уже занят")
-    
-    master_id = await create_master_with_email(body.email, password_hash, body.name)
-    master = await get_master_by_email(body.email)
-    if not master:
-        raise HTTPException(500, "Ошибка создания мастера")
-    
-    token = _generate_jwt(master_id)
+    try:
+        password_hash = hashlib.sha256(body.password.encode()).hexdigest()
+
+        existing = await get_master_by_email(body.email)
+        if existing:
+            raise HTTPException(400, "Email уже занят")
+
+        master_id = await create_master_with_email(body.email, password_hash, body.name)
+        master = await get_master_by_email(body.email)
+        if not master:
+            raise HTTPException(500, "Ошибка создания мастера")
+
+        token = _generate_jwt(master_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"DB error: {e}")
     
     return {"token": token, "master": {
         "id": master["id"], "name": master["name"], "email": master["email"],
