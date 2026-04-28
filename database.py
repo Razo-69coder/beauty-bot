@@ -10,7 +10,7 @@ async def get_pool() -> asyncpg.Pool:
     global _pool
     if _pool is None:
         url = DATABASE_URL.split('?')[0] if DATABASE_URL else ''
-        if 'supabase.co' in url:
+        if 'supabase' in url:
             import ssl as ssl_lib
             import urllib.parse
             parsed = urllib.parse.urlparse(url)
@@ -20,7 +20,7 @@ async def get_pool() -> asyncpg.Pool:
             _pool = await asyncpg.create_pool(
                 host=parsed.hostname,
                 port=parsed.port or 5432,
-                user=parsed.username,
+                user=urllib.parse.unquote(parsed.username or ''),
                 password=urllib.parse.unquote(parsed.password or ''),
                 database=parsed.path.lstrip('/'),
                 ssl=ssl_ctx
