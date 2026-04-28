@@ -71,7 +71,10 @@ dp = build_dispatcher()
 # ── Lifespan ──────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
+    try:
+        await init_db()
+    except Exception as e:
+        print(f"[STARTUP] DB init warning: {e}")
     
     # Миграции: добавить отсутствующие колонки
     from database import get_pool
