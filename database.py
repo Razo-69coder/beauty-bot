@@ -9,7 +9,9 @@ _pool: asyncpg.Pool = None
 async def get_pool() -> asyncpg.Pool:
     global _pool
     if _pool is None:
-        _pool = await asyncpg.create_pool(DATABASE_URL)
+        url = DATABASE_URL.split('?')[0]
+        use_ssl = 'supabase.co' in DATABASE_URL
+        _pool = await asyncpg.create_pool(url, ssl=use_ssl if use_ssl else None)
     return _pool
 
 
