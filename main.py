@@ -784,7 +784,7 @@ async def v1_master_me(master_id: int = Depends(get_jwt_master_id)):
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT id, name, email, work_start, work_end, slot_duration, reminder_days, "
+            "SELECT id, name, email, COALESCE(phone,'') as phone, work_start, work_end, slot_duration, reminder_days, "
             "COALESCE(timezone,'Europe/Moscow') as timezone, "
             "COALESCE(payment_card,'') as payment_card, "
             "COALESCE(payment_phone,'') as payment_phone, "
@@ -797,7 +797,7 @@ async def v1_master_me(master_id: int = Depends(get_jwt_master_id)):
     if not row:
         raise HTTPException(404, "Мастер не найден")
     return {
-        "id": row['id'], "name": row['name'] or "", "email": row['email'] or "",
+        "id": row['id'], "name": row['name'] or "", "email": row['email'] or "", "phone": row['phone'],
         "work_start": row['work_start'] or 10, "work_end": row['work_end'] or 20,
         "slot_duration": row['slot_duration'] or 60,
         "reminder_days": row['reminder_days'] or 40,
@@ -818,6 +818,21 @@ async def v1_update_master(body: _V1MasterSettings, master_id: int = Depends(get
     await update_master_timezone(master_id, body.timezone)
     return {"ok": True}
 
+class _V1ProfileUpdate(BaseModel):
+    name: str = ""
+    email: str = ""
+    phone: str = ""
+
+@app.put("/api/v1/profile")
+async def v1_update_profile(body: _V1ProfileUpdate, master_id: int = Depends(get_jwt_master_id)):
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE masters SET name=$1, email=$2, phone=$3 WHERE id=$4",
+            body.name, body.email, body.phone, master_id
+        )
+    return {"ok": True}
 
 @app.put("/api/v1/masters/me/payment")
 async def v1_update_payment(body: _V1PaymentUpdate, master_id: int = Depends(get_jwt_master_id)):

@@ -151,6 +151,7 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS booking_link TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS loyalty_threshold INTEGER DEFAULT 10",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT ''",
         ]:
             try:
                 await conn.execute(sql)
