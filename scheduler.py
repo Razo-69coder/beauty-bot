@@ -69,7 +69,7 @@ async def send_client_reminders_24h(bot: Bot):
 async def send_client_reminders_2h(bot: Bot):
     """Каждые 30 минут — напоминает клиентам о записи через ~2 часа"""
     now = now_msk()
-    target = now + timedelta(hours=2)
+    target = now + timedelta(minutes=56)
     target_date = target.strftime("%Y-%m-%d")
     # Окно ±15 минут от целевого времени
     time_from = (target - timedelta(minutes=15)).strftime("%H:%M")
@@ -263,8 +263,8 @@ def setup_scheduler(bot: Bot):
     # Напоминание клиентам за 24 часа (в 18:00)
     scheduler.add_job(send_client_reminders_24h, "cron", hour=18, minute=0, args=[bot])
 
-    # Напоминание клиентам за 2 часа (каждые 30 минут)
-    scheduler.add_job(send_client_reminders_2h, "interval", minutes=30, args=[bot])
+    # Напоминание клиентам за 2 часа (каждые 1 минуту)
+    scheduler.add_job(send_client_reminders_2h, "interval", minutes=1, args=[bot])
 
     # Напоминание о коррекции через 3 недели
     scheduler.add_job(send_correction_reminders, "cron", hour=12, minute=0, args=[bot])
