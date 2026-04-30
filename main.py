@@ -700,7 +700,16 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
                 break
     if not procedure:
         procedure = "Запись"
-    client_id = await add_client(master["id"], body.client_name, body.client_phone)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        existing = await conn.fetchrow(
+            "SELECT id FROM clients WHERE master_id=$1 AND phone=$2",
+            master["id"], body.client_phone
+        )
+    if existing:
+        client_id = existing["id"]
+    else:
+        client_id = await add_client(master["id"], body.client_name, body.client_phone)
     appt_id = await add_appointment(
         client_id=client_id,
         master_id=master["id"],
