@@ -19,10 +19,29 @@ class PhoneState(StatesGroup):
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
-    """Обработка команды /start для клиентов"""
     await state.clear()
-    await state.set_state(PhoneState.waiting_for_phone)
+    args = message.text.split(maxsplit=1)
+    param = args[1] if len(args) > 1 else ''
 
+    if param.startswith('phone'):
+        phone_digits = param[5:]
+        phone = '+' + phone_digits if not phone_digits.startswith('+') else phone_digits
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            client = await conn.fetchrow(
+                "SELECT id, name FROM clients WHERE phone = $1 LIMIT 1", phone
+            )
+            if client:
+                await conn.execute(
+                    "UPDATE clients SET telegram_id = $1 WHERE phone = $2",
+                    message.from_user.id, phone
+                )
+                await message.answer(
+                    f"✅ Отлично, {client['name']}! Теперь вы будете получать напоминания о записях. До встречи! 💅"
+                )
+                return
+
+    await state.set_state(PhoneState.waiting_for_phone)
     await message.answer(
         "👋 Привет! Я помогу вам не пропустить запись к мастеру.\n\n"
         "После привязки вы будете получать:\n"

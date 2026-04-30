@@ -474,13 +474,16 @@ function updateDots() {
 
 function validateForm() {
   const name  = document.getElementById('clientName').value.trim();
-  const phone = document.getElementById('clientPhone').value.trim();
-  document.getElementById('btnBook').disabled = !(name.length >= 2 && phone.length >= 10);
+  const rawP = document.getElementById('clientPhone').value.trim();
+  const digs = rawP.replace(/\D/g, '');
+  document.getElementById('btnBook').disabled = !(name.length >= 2 && digs.length >= 10);
 }
 
 async function book() {
   const name  = document.getElementById('clientName').value.trim();
-  const phone = document.getElementById('clientPhone').value.trim();
+  const rawPhone = document.getElementById('clientPhone').value.trim();
+  const digits = rawPhone.replace(/\D/g, '');
+  const phone = '+7' + (digits.startsWith('8') ? digits.slice(1) : digits.startsWith('7') ? digits.slice(1) : digits);
   const btn   = document.getElementById('btnBook');
   const errEl = document.getElementById('bookError');
 
@@ -507,6 +510,11 @@ async function book() {
       document.querySelector('.steps-bar').classList.add('hidden');
       document.getElementById('successText').textContent =
         `${selectedDate.label} в ${selectedTime} — услуга "${selectedService.name}". Мастер свяжется для подтверждения.`;
+      const tgLink = document.querySelector('#stepSuccess a[href*="t.me"]');
+      if (tgLink) {
+        const tgDigits = phone.replace(/\D/g, '');
+        tgLink.href = `https://t.me/Beauty6699_bot?start=phone${tgDigits}`;
+      }
     } else {
       const d = await r.json().catch(() => ({}));
       errEl.textContent = d.detail || 'Этот слот уже занят. Выберите другое время.';

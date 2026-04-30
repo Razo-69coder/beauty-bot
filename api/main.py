@@ -30,6 +30,7 @@ from models import (
     ClientCreate, ClientUpdate, AppointmentCreate, ReminderUpdate,
     PublicBooking, RequestCode, VerifyCode, MasterSettings, PaymentUpdate,
     DashboardAppointmentCreate, EmailRegisterRequest, EmailLoginRequest,
+    _V1AppointmentCreate,
 )
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
@@ -499,6 +500,17 @@ async def create_appointment(
         body.appointment_date, body.price, body.notes, body.photo_id,
     )
     return {"id": appt_id}
+
+
+@app.post("/api/v1/appointments", status_code=201)
+async def create_appointment_v1(
+    body: _V1AppointmentCreate, master_id: int = Depends(get_master_id),
+):
+    await add_appointment(
+        body.client_id, master_id, body.procedure,
+        body.appointment_date, body.price, body.notes, "", body.time,
+    )
+    return {"ok": True}
 
 
 # ─── Неактивные клиенты ──────────────────────────────────────────────

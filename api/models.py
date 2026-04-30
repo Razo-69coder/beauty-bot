@@ -86,3 +86,12 @@ class EmailRegisterRequest(BaseModel):
 class EmailLoginRequest(BaseModel):
     email: str
     password: str
+
+
+class _V1AppointmentCreate(BaseModel):
+    client_id: int
+    procedure: str
+    appointment_date: str
+    time: str = ""
+    price: int = 0
+    notes: str = ""
