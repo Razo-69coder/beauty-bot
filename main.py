@@ -989,7 +989,7 @@ async def v1_create_appointment(body: _V1AppointmentCreate, master_id: int = Dep
     except Exception:
         pass  # Don't fail if bot message fails
     
-    return {"id": appt_id}
+    return {"ok": True}
 
 
 @app.delete("/api/v1/appointments/{appt_id}")
