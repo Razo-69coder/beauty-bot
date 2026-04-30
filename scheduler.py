@@ -69,7 +69,7 @@ async def send_client_reminders_24h(bot: Bot):
 async def send_client_reminders_2h(bot: Bot):
     """Каждые 30 минут — напоминает клиентам о записи через ~2 часа"""
     now = now_msk()
-    target = now + timedelta(minutes=56)
+    target = now + timedelta(minutes=110)
     target_date = target.strftime("%Y-%m-%d")
     # Окно ±15 минут от целевого времени
     time_from = (target - timedelta(minutes=15)).strftime("%H:%M")
