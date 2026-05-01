@@ -671,6 +671,9 @@ async def v1_public_slots(link: str, date: str):
     master = await get_master_by_booking_link(link)
     if not master:
         raise HTTPException(404, "Мастер не найден")
+    blocked = await get_blocked_days(master["id"])
+    if date in blocked:
+        return {"slots": []}
     slots = await get_available_slots(
         master["id"], date,
         master["work_start"], master["work_end"], master["slot_duration"]
@@ -683,6 +686,9 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
     master = await get_master_by_booking_link(link)
     if not master:
         raise HTTPException(404, "Мастер не найден")
+    blocked = await get_blocked_days(master["id"])
+    if body.date in blocked:
+        raise HTTPException(409, "Этот день недоступен для записи")
     slots = await get_available_slots(
         master["id"], body.date,
         master["work_start"], master["work_end"], master["slot_duration"]
