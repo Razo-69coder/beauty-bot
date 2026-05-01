@@ -5,10 +5,15 @@ from datetime import datetime, timedelta
 
 import jwt
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Depends, Body
+from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from dotenv import load_dotenv
+from pydantic import BaseModel
+
+
+class AdminLoginBody(BaseModel):
+    password: str
 
 from auth import validate_init_data
 from database import (
@@ -35,6 +40,9 @@ from models import (
     _V1AppointmentCreate,
 )
 
+# Admin endpoints
+from main_admin import init_admin, AdminLoginBody
+
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
@@ -49,6 +57,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Beauty Book API", lifespan=lifespan)
+
+# Init admin endpoints
+init_admin(app, verify_admin_token, create_admin_token, ADMIN_SECRET, _jwt_secret)
 
 app.add_middleware(
     CORSMiddleware,
@@ -88,6 +99,29 @@ def decode_jwt(token: str) -> dict | None:
         return jwt.decode(token, _jwt_secret(), algorithms=["HS256"])
     except jwt.InvalidTokenError:
         return None
+
+
+# ─── Admin JWT ──────────────────────────────────────────────────
+
+ADMIN_SECRET = os.getenv("ADMIN_PASSWORD", "changeme")
+
+
+def create_admin_token() -> str:
+    payload = {"role": "admin", "exp": datetime.utcnow() + timedelta(hours=12)}
+    return jwt.encode(payload, _jwt_secret(), algorithm="HS256")
+
+
+def verify_admin_token(authorization: str = Header(None)) -> bool:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Требуется авторизация")
+    try:
+        token = authorization.replace("Bearer ", "")
+        data = jwt.decode(token, _jwt_secret(), algorithms=["HS256"])
+        if data.get("role") != "admin":
+            raise HTTPException(403, "Нет доступа")
+        return True
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "Неверный токен администратора")
 
 
 async def get_jwt_master_id(authorization: str = Header(None)) -> int:

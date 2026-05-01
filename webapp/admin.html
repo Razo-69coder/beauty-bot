@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solva Admin</title>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a12; color: #e0e0e0; min-height: 100vh; }
+    a { color: #ff2d78; text-decoration: none; }
+    button { cursor: pointer; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; }
+    input { background: #16162a; border: 1px solid #2a2a3a; border-radius: 12px; padding: 14px 16px; color: #fff; font-size: 16px; width: 100%; outline: none; }
+    input:focus { border-color: #ff2d78; }
+    
+    .screen { display: none; min-height: 100vh; padding: 20px; }
+    .screen.active { display: block; }
+    
+    /* Login */
+    .login-wrap { max-width: 400px; margin: 0 auto; padding-top: 30vh; }
+    .login-wrap h1 { text-align: center; font-size: 28px; margin-bottom: 8px; color: #fff; }
+    .login-wrap p { text-align: center; color: #5a5a7a; margin-bottom: 32px; }
+    .login-wrap input { margin-bottom: 16px; }
+    .btn-primary { background: linear-gradient(135deg, #ff2d78, #bf00ff); color: #fff; padding: 14px; width: 100%; }
+    .btn-primary:active { opacity: 0.8; }
+    .error-msg { color: #ff4757; font-size: 14px; margin-top: 12px; text-align: center; }
+    
+    /* Admin panel */
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+    .header h2 { font-size: 22px; color: #fff; }
+    .btn-logout { background: #16162a; color: #ff4757; padding: 8px 16px; font-size: 14px; border: 1px solid #2a2a3a; }
+    
+    /* Masters grid */
+    .masters-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+    .master-card { background: #0f0f1a; border: 1px solid #1a1a2e; border-radius: 16px; padding: 20px; }
+    .master-card h3 { font-size: 18px; color: #fff; margin-bottom: 8px; }
+    .master-card .meta { color: #5a5a7a; font-size: 14px; margin-bottom: 12px; }
+    .master-card .stats { display: flex; gap: 16px; margin-bottom: 16px; }
+    .master-card .stat { background: #16162a; padding: 8px 12px; border-radius: 8px; font-size: 14px; }
+    .master-card .stat b { color: #ff2d78; }
+    .btn-detail { background: #16162a; color: #ff2d78; padding: 10px 16px; width: 100%; font-size: 15px; border: 1px solid #2a2a3a; }
+    
+    /* Detail */
+    .back-btn { background: none; color: #5a5a7a; font-size: 15px; margin-bottom: 20px; padding: 0; }
+    .section { background: #0f0f1a; border: 1px solid #1a1a2e; border-radius: 16px; padding: 20px; margin-bottom: 16px; }
+    .section h3 { font-size: 17px; color: #fff; margin-bottom: 16px; }
+    .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1a1a2e; font-size: 15px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: #5a5a7a; }
+    .info-value { color: #e0e0e0; }
+    
+    /* Clients table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; color: #5a5a7a; padding: 10px 8px; border-bottom: 1px solid #1a1a2e; }
+    td { padding: 10px 8px; border-bottom: 1px solid #1a1a2e; color: #e0e0e0; }
+    tr:last-child td { border-bottom: none; }
+    
+    .loading { text-align: center; padding: 40px; color: #5a5a7a; }
+    .empty { text-align: center; padding: 40px; color: #5a5a7a; }
+    
+    @media (max-width: 640px) {
+        .masters-grid { grid-template-columns: 1fr; }
+        .header { flex-direction: column; align-items: flex-start; }
+    }
+</style>
+</head>
+<body>
+
+<!-- Screen 1: Login -->
+<div id="login" class="screen active">
+    <div class="login-wrap">
+        <h1>Solva Admin</h1>
+        <p>Панель управления мастерами</p>
+        <input type="password" id="password" placeholder="Пароль администратора" onkeydown="if(event.key==='Enter') login()">
+        <button class="btn-primary" onclick="login()">Войти</button>
+        <div id="login-error" class="error-msg"></div>
+    </div>
+</div>
+
+<!-- Screen 2: Masters List -->
+<div id="masters" class="screen">
+    <div class="header">
+        <h2>Мастера (<span id="masters-count">0</span>)</h2>
+        <button class="btn-logout" onclick="logout()">Выйти</button>
+    </div>
+    <div id="masters-list" class="masters-grid"></div>
+    <div id="masters-empty" class="empty" style="display:none">Нет зарегистрированных мастеров</div>
+</div>
+
+<!-- Screen 3: Master Detail -->
+<div id="detail" class="screen">
+    <button class="back-btn" onclick="showScreen('masters')">← Назад к списку</button>
+    <div id="detail-content"></div>
+</div>
+
+<script>
+const API = '';
+let token = localStorage.getItem('admin_token') || '';
+
+async function apiFetch(path, options = {}) {
+    const res = await fetch(API + path, {
+        ...options,
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+        }
+    });
+    if (res.status === 401 || res.status === 403) { logout(); return null; }
+    return res.json();
+}
+
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+async function login() {
+    const pw = document.getElementById('password').value;
+    const data = await fetch('/admin/api/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({password: pw})
+    }).then(r => r.json());
+    if (data.token) {
+        token = data.token;
+        localStorage.setItem('admin_token', token);
+        loadMasters();
+    } else {
+        document.getElementById('login-error').textContent = data.detail || 'Неверный пароль';
+    }
+}
+
+function logout() {
+    token = '';
+    localStorage.removeItem('admin_token');
+    showScreen('login');
+}
+
+async function loadMasters() {
+    showScreen('masters');
+    const el = document.getElementById('masters-list');
+    el.innerHTML = '<div class="loading">Загрузка...</div>';
+    const data = await apiFetch('/api/admin/masters');
+    if (!data) return;
+    document.getElementById('masters-count').textContent = data.masters.length;
+    if (data.masters.length === 0) {
+        document.getElementById('masters-empty').style.display = 'block';
+        el.innerHTML = '';
+        return;
+    }
+    el.innerHTML = data.masters.map(m => `
+        <div class="master-card">
+            <h3>${m.name || 'Без имени'}</h3>
+            <div class="meta">${m.email || ''} ${m.phone ? ' · ' + m.phone : ''}<br><small>Ссылка: <a href="/book/${m.booking_link}" target="_blank">${m.booking_link || 'нет'}</a></small></div>
+            <div class="stats">
+                <div class="stat">Клиентов: <b>${m.clients_count || 0}</b></div>
+                <div class="stat">Записей: <b>${m.appointments_count || 0}</b></div>
+            </div>
+            <button class="btn-detail" onclick="loadMaster(${m.id})">Подробнее →</button>
+        </div>
+    `).join('');
+}
+
+async function loadMaster(id) {
+    showScreen('detail');
+    const el = document.getElementById('detail-content');
+    el.innerHTML = '<div class="loading">Загрузка...</div>';
+    const data = await apiFetch(`/api/admin/master/${id}/data`);
+    if (!data) return;
+    const m = data.master;
+    const stats = data.stats;
+    el.innerHTML = `
+        <div class="section">
+            <h3>👤 Профиль</h3>
+            <div class="info-row"><span class="info-label">Имя</span><span class="info-value">${m.name || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Email</span><span class="info-value">${m.email || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Телефон</span><span class="info-value">${m.phone || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Тема</span><span class="info-value">${m.theme || 'pink'}</span></div>
+            <div class="info-row"><span class="info-label">Booking Link</span><span class="info-value"><a href="/book/${m.booking_link}" target="_blank">${m.booking_link || '-'}</a></span></div>
+        </div>
+        <div class="section">
+            <h3>💳 Реквизиты</h3>
+            <div class="info-row"><span class="info-label">Карта</span><span class="info-value">${m.payment_card || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Телефон (оплата)</span><span class="info-value">${m.payment_phone || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Банки</span><span class="info-value">${m.payment_banks || '-'}</span></div>
+        </div>
+        <div class="section">
+            <h3>📊 Статистика</h3>
+            <div class="info-row"><span class="info-label">Всего клиентов</span><span class="info-value">${stats.total_clients || 0}</span></div>
+            <div class="info-row"><span class="info-label">Всего записей</span><span class="info-value">${stats.total_appointments || 0}</span></div>
+            <div class="info-row"><span class="info-label">Выручка всего</span><span class="info-value">${stats.total_earnings || 0} ₽</span></div>
+            <div class="info-row"><span class="info-label">Выручка за месяц</span><span class="info-value">${stats.month_earnings || 0} ₽</span></div>
+        </div>
+        <div class="section">
+            <h3>👥 Клиенты</h3>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Имя</th><th>Телефон</th><th>Последний визит</th></tr></thead>
+                    <tbody>
+                        ${(data.clients || []).map(c => `<tr><td>${c.name}</td><td>${c.phone || '-'}</td><td>${c.last_visit || '-'}</td></tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+            ${(data.total_clients || 0) === 0 ? '<div class="empty">Нет клиентов</div>' : ''}
+        </div>
+    `;
+}
+
+// Init
+window.onload = () => token ? loadMasters() : showScreen('login');
+</script>
+</body>
+</html>

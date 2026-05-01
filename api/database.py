@@ -627,7 +627,22 @@ async def create_login_code(telegram_id: int) -> str:
 
 
 async def get_all_masters() -> list[dict]:
-    return []  # Без SQLite — возвращаем пустой
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT m.id, m.name, m.email, m.phone, m.created_at,
+                   m.payment_card, m.payment_phone, m.payment_banks,
+                   m.booking_link, m.theme,
+                   COUNT(DISTINCT c.id) as clients_count,
+                   COUNT(DISTINCT a.id) as appointments_count
+            FROM masters m
+            LEFT JOIN clients c ON c.master_id = m.id
+            LEFT JOIN appointments a ON a.master_id = m.id
+            GROUP BY m.id
+            ORDER BY m.created_at DESC
+        """) as cursor:
+            rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
 
 
 async def verify_login_code(telegram_id: int, code: str) -> bool:
