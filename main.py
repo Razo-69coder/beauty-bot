@@ -39,6 +39,7 @@ from database import (
     get_master_by_booking_link, update_booking_link, get_master_booking_link, is_booking_linkTaken,
     get_master_by_email, create_master_with_email,
     get_expenses, add_expense, delete_expense,
+    get_blocked_days, add_blocked_day, remove_blocked_day,
 )
 
 from scheduler import setup_scheduler
@@ -1450,6 +1451,26 @@ async def serve_dashboard():
         "Pragma": "no-cache",
         "Expires": "0",
     })
+
+# ── Нерабочие дни ────────────────────────────────────────────────────
+
+class _BlockedDayBody(BaseModel):
+    date: str
+
+@app.get("/api/v1/schedule/blocked-days")
+async def v1_get_blocked_days(master_id: int = Depends(get_jwt_master_id)):
+    days = await get_blocked_days(master_id)
+    return {"blocked_days": days}
+
+@app.post("/api/v1/schedule/blocked-days")
+async def v1_add_blocked_day(body: _BlockedDayBody, master_id: int = Depends(get_jwt_master_id)):
+    await add_blocked_day(master_id, body.date)
+    return {"ok": True}
+
+@app.delete("/api/v1/schedule/blocked-days/{date}")
+async def v1_remove_blocked_day(date: str, master_id: int = Depends(get_jwt_master_id)):
+    await remove_blocked_day(master_id, date)
+    return {"ok": True}
 
 # ── Страница онлайн-записи для клиентов ──────────────────────────────
 @app.get("/book/{link}")

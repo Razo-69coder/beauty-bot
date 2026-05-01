@@ -157,6 +157,14 @@ async def init_db():
                 await conn.execute(sql)
             except Exception:
                 pass
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS blocked_days (
+                id SERIAL PRIMARY KEY,
+                master_id INTEGER REFERENCES masters(id) ON DELETE CASCADE,
+                date TEXT NOT NULL,
+                UNIQUE(master_id, date)
+            )
+        """)
 
 
 # ── Мастера ───────────────────────────────────────────────────────────
@@ -1298,3 +1306,33 @@ async def delete_expense(expense_id: int, master_id: int) -> bool:
             expense_id, master_id
         )
     return result != "DELETE 0"
+
+
+# ── Нерабочие дни ────────────────────────────────────────────────────
+
+async def get_blocked_days(master_id: int) -> list[str]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT date FROM blocked_days WHERE master_id=$1 ORDER BY date",
+            master_id
+        )
+    return [r['date'] for r in rows]
+
+
+async def add_blocked_day(master_id: int, date: str) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO blocked_days (master_id, date) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            master_id, date
+        )
+
+
+async def remove_blocked_day(master_id: int, date: str) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "DELETE FROM blocked_days WHERE master_id=$1 AND date=$2",
+            master_id, date
+        )
