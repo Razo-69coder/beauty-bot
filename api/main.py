@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 import jwt
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, Header, HTTPException, Depends, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
@@ -24,6 +24,8 @@ from database import (
     get_schedule, get_all_masters,
     # Email/password auth
     get_master_by_email, create_master_with_email,
+    # Blocked days
+    get_blocked_days, add_blocked_day, remove_blocked_day,
 )
 from api.database import get_client_by_phone
 from models import (
@@ -592,3 +594,28 @@ async def export_excel(master_id: int = Depends(get_master_id)):
         )
     except ImportError:
         raise HTTPException(status_code=500, detail="Установи openpyxl: pip install openpyxl")
+
+
+# ─── Нерабочие дни ───────────────────────────────────────────────────
+
+@app.get("/api/v1/schedule/blocked-days")
+async def get_blocked_days_endpoint(master_id: int = Depends(get_jwt_master_id)):
+    days = await get_blocked_days(master_id)
+    return {"blocked_days": days}
+
+
+@app.post("/api/v1/schedule/blocked-days", status_code=201)
+async def add_blocked_day_endpoint(
+    date: str = Body(..., embed=True),
+    master_id: int = Depends(get_jwt_master_id)
+):
+    if not date:
+        raise HTTPException(400, "Поле date обязательно")
+    await add_blocked_day(master_id, date)
+    return {"ok": True}
+
+
+@app.delete("/api/v1/schedule/blocked-days/{date_str}")
+async def remove_blocked_day_endpoint(date_str: str, master_id: int = Depends(get_jwt_master_id)):
+    await remove_blocked_day(master_id, date_str)
+    return {"ok": True}

@@ -61,6 +61,14 @@ async def init_db():
                 used INTEGER DEFAULT 0
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS blocked_days (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                master_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                UNIQUE(master_id, date)
+            )
+        """)
         # Миграции для существующих баз
         for migration in [
             "ALTER TABLE masters ADD COLUMN reminder_days INTEGER DEFAULT 40",
@@ -478,11 +486,14 @@ async def get_available_slots(master_id: int, date_str: str,
 
 
 async def get_available_dates(master_id: int, work_start: int,
-                               work_end: int, slot_duration: int) -> list[str]:
+                                work_end: int, slot_duration: int, days: int = 60) -> list:
     today = date.today()
+    blocked = await get_blocked_days(master_id)
     result = []
-    for i in range(14):
+    for i in range(days):
         d = (today + timedelta(days=i)).isoformat()
+        if d in blocked:
+            continue
         slots = await get_available_slots(master_id, d, work_start, work_end, slot_duration)
         if slots:
             result.append(d)
@@ -632,3 +643,35 @@ async def verify_login_code(telegram_id: int, code: str) -> bool:
         await db.execute("UPDATE login_codes SET used=1 WHERE id=?", (row[0],))
         await db.commit()
     return True
+
+
+async def get_blocked_days(master_id: int) -> list:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT date FROM blocked_days WHERE master_id=? ORDER BY date", (master_id,)
+        ) as c:
+            rows = await c.fetchall()
+    return [r[0] for r in rows]
+
+
+async def add_blocked_day(master_id: int, date_str: str) -> bool:
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "INSERT OR IGNORE INTO blocked_days (master_id, date) VALUES (?, ?)",
+                (master_id, date_str)
+            )
+            await db.commit()
+        return True
+    except Exception:
+        return False
+
+
+async def remove_blocked_day(master_id: int, date_str: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        result = await db.execute(
+            "DELETE FROM blocked_days WHERE master_id=? AND date=?",
+            (master_id, date_str)
+        )
+        await db.commit()
+        return result.rowcount > 0
