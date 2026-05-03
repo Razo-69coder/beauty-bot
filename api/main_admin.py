@@ -1,4 +1,5 @@
 # Admin endpoints — подключаются в main.py
+import os
 
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel
@@ -44,4 +45,5 @@ def init_admin(app, verify_admin_token, create_admin_token, ADMIN_SECRET, _jwt_s
     @app.get("/admin/")
     async def serve_admin():
         from fastapi.responses import FileResponse
-        return FileResponse("webapp/admin.html")
+        html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "webapp", "admin.html")
+        return FileResponse(html_path)
