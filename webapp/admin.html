@@ -178,6 +178,10 @@ async function loadMaster(id) {
             <div class="info-row"><span class="info-label">Телефон</span><span class="info-value">${m.phone || '-'}</span></div>
             <div class="info-row"><span class="info-label">Тема</span><span class="info-value">${m.theme || 'pink'}</span></div>
             <div class="info-row"><span class="info-label">Booking Link</span><span class="info-value"><a href="/book/${m.booking_link}" target="_blank">${m.booking_link || '-'}</a></span></div>
+            <div class="info-row">
+                <span class="info-label">Статус</span>
+                <span class="info-value" style="color:${m.is_active ? '#2ecc71' : '#ff4757'}">${m.is_active ? '✅ Активен' : '🔴 Заблокирован'}</span>
+            </div>
         </div>
         <div class="section">
             <h3>💳 Реквизиты</h3>
@@ -204,7 +208,19 @@ async function loadMaster(id) {
             </div>
             ${(data.total_clients || 0) === 0 ? '<div class="empty">Нет клиентов</div>' : ''}
         </div>
+        <button class="btn-primary" style="margin-top:16px" onclick="toggleActive(${m.id}, ${m.is_active})">
+            ${m.is_active ? '🔴 Заблокировать' : '✅ Активировать'}
+        </button>
     `;
+}
+
+async function toggleActive(id, currentState) {
+    const action = currentState ? 'Заблокировать' : 'Активировать';
+    if (!confirm(`${action} мастера?`)) return;
+    const data = await apiFetch(`/api/admin/master/${id}/toggle-active`, { method: 'POST' });
+    if (data && data.ok) {
+        loadMaster(id);
+    }
 }
 
 // Init

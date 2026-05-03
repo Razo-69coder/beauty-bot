@@ -86,6 +86,7 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN password_hash TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN theme TEXT DEFAULT 'pink'",
             "ALTER TABLE masters ADD COLUMN booking_link TEXT DEFAULT ''",
+            "ALTER TABLE masters ADD COLUMN is_active INTEGER DEFAULT 1",
         ]:
             try:
                 await db.execute(migration)
@@ -332,19 +333,25 @@ async def update_reminder_days(telegram_id: int, days: int):
 async def get_master_full(master_id: int) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
-            "SELECT id, telegram_id, name, reminder_days, work_start, work_end, slot_duration, payment_card, payment_phone, payment_banks "
+            "SELECT id, telegram_id, name, reminder_days, work_start, work_end, "
+            "slot_duration, payment_card, payment_phone, payment_banks, is_active "
             "FROM masters WHERE id=?", (master_id,)
         ) as c:
             row = await c.fetchone()
     if not row:
         return None
     return {
-        "id": row[0], "telegram_id": row[1], "name": row[2],
-        "reminder_days": row[3] or 40, "work_start": row[4] or 10,
-        "work_end": row[5] or 20, "slot_duration": row[6] or 60,
+        "id": row[0],
+        "telegram_id": row[1],
+        "name": row[2],
+        "reminder_days": row[3] or 40,
+        "work_start": row[4] or 10,
+        "work_end": row[5] or 20,
+        "slot_duration": row[6] or 60,
         "payment_card": row[7] or "",
         "payment_phone": row[8] or "",
         "payment_banks": row[9] or "",
+        "is_active": bool(row[10]) if row[10] is not None else True,
     }
 
 
@@ -439,6 +446,15 @@ async def update_booking_link(master_id: int, link: str) -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             "UPDATE masters SET booking_link = ? WHERE id = ?", (link, master_id)
+        )
+        await db.commit()
+
+
+async def set_master_active(master_id: int, is_active: bool) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE masters SET is_active = ? WHERE id = ?",
+            (1 if is_active else 0, master_id)
         )
         await db.commit()
 
@@ -632,7 +648,7 @@ async def get_all_masters() -> list[dict]:
         async with db.execute("""
             SELECT m.id, m.name, m.email, m.phone, m.created_at,
                    m.payment_card, m.payment_phone, m.payment_banks,
-                   m.booking_link, m.theme,
+                   m.booking_link, m.theme, m.is_active,
                    COUNT(DISTINCT c.id) as clients_count,
                    COUNT(DISTINCT a.id) as appointments_count
             FROM masters m

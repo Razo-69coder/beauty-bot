@@ -26,14 +26,12 @@ from database import (
     get_master_public_info, get_available_dates, get_available_slots,
     public_book, create_login_code, verify_login_code,
     get_master_full, update_master_settings, update_master_payment,
-    get_schedule, get_all_masters, set_master_active,
+    get_schedule, get_all_masters,
     # Email/password auth
     get_master_by_email, create_master_with_email,
     # Blocked days
     get_blocked_days, add_blocked_day, remove_blocked_day,
-    DB_PATH,
 )
-import aiosqlite
 from api.database import get_client_by_phone
 from models import (
     ClientCreate, ClientUpdate, AppointmentCreate, ReminderUpdate,
@@ -41,9 +39,6 @@ from models import (
     DashboardAppointmentCreate, EmailRegisterRequest, EmailLoginRequest,
     _V1AppointmentCreate,
 )
-
-# Admin endpoints
-from main_admin import init_admin, AdminLoginBody
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
@@ -59,9 +54,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Beauty Book API", lifespan=lifespan)
-
-# Init admin endpoints
-init_admin(app, verify_admin_token, create_admin_token, ADMIN_SECRET, _jwt_secret)
 
 app.add_middleware(
     CORSMiddleware,
@@ -132,14 +124,7 @@ async def get_jwt_master_id(authorization: str = Header(None)) -> int:
     payload = decode_jwt(authorization[7:])
     if not payload:
         raise HTTPException(401, "Неверный или устаревший токен")
-    master_id = int(payload["mid"])
-    # Проверка подписки
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT is_active FROM masters WHERE id = ?", (master_id,)) as c:
-            row = await c.fetchone()
-            if row and row[0] == 0:
-                raise HTTPException(status_code=403, detail="subscription_required")
-    return master_id
+    return int(payload["mid"])
 
 
 def _get_jwt_payload(authorization: str = Header(None)) -> dict:
@@ -169,9 +154,6 @@ async def send_tg_message(chat_id: int, text: str):
             )
         except Exception:
             pass
-
-async def send_telegram(text: str):
-    await send_tg_message(ADMIN_TG_ID, text)
 
 
 # ─── Авторизация (Telegram Mini App) ─────────────────────────────────
@@ -558,17 +540,6 @@ async def create_appointment_v1(
         body.client_id, master_id, body.procedure,
         body.appointment_date, body.price, body.notes, "", body.time,
     )
-    return {"ok": True}
-
-
-@app.post("/api/v1/subscription/notify")
-async def subscription_notify(master_id: int = Depends(get_jwt_master_id)):
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT name, email FROM masters WHERE id = ?", (master_id,)) as c:
-            row = await c.fetchone()
-    name = row[0] if row else "Неизвестно"
-    email = row[1] if row else "—"
-    await send_telegram(f"💳 Мастер сообщил об оплате подписки!\n\nИмя: {name}\nEmail: {email}\nID: {master_id}\n\nАктивируй в /admin")
     return {"ok": True}
 
 

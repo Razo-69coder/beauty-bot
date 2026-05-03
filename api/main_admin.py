@@ -30,6 +30,16 @@ def init_admin(app, verify_admin_token, create_admin_token, ADMIN_SECRET, _jwt_s
         clients, total = await get_clients_page(master_id, 0, 10000)
         return {"master": master, "stats": stats, "clients": clients, "total_clients": total}
 
+    @app.post("/api/admin/master/{master_id}/toggle-active", dependencies=[Depends(verify_admin_token)])
+    async def admin_toggle_active(master_id: int):
+        from database import set_master_active, get_master_full
+        master = await get_master_full(master_id)
+        if not master:
+            raise HTTPException(404, "Мастер не найден")
+        new_state = not bool(master.get("is_active", 1))
+        await set_master_active(master_id, new_state)
+        return {"ok": True, "is_active": new_state}
+
     @app.get("/admin")
     @app.get("/admin/")
     async def serve_admin():
