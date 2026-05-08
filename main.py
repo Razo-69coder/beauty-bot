@@ -275,6 +275,16 @@ async def get_jwt_master_id(
     return master_id
 
 
+async def get_jwt_master_id_any(authorization: str = Header(None)) -> int:
+    """Как get_jwt_master_id, но без проверки is_active — для subscription/notify"""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Требуется авторизация")
+    payload = _decode_jwt(authorization[7:])
+    if not payload:
+        raise HTTPException(401, "Неверный или устаревший токен")
+    return int(payload["mid"])
+
+
 # ── Pydantic models ───────────────────────────────────────────────────
 class ClientCreate(BaseModel):
     name: str
@@ -797,7 +807,7 @@ class _V1ServiceCreate(BaseModel):
 
 
 @app.post("/api/v1/subscription/notify")
-async def v1_subscription_notify(master_id: int = Depends(get_jwt_master_id)):
+async def v1_subscription_notify(master_id: int = Depends(get_jwt_master_id_any)):
     await send_telegram(
         f"💳 Мастер (ID {master_id}) отправил уведомление об оплате подписки.\n"
         f"Проверь и активируй в /admin"
