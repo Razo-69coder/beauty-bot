@@ -527,6 +527,11 @@ async def _send_tg(chat_id: int, text: str):
             pass
 
 
+async def send_telegram(text: str):
+    """Отправка сообщения администратору (ADMIN_TG_ID)"""
+    await _send_tg(ADMIN_TG_ID, text)
+
+
 # ── Авторизация веб-панели ────────────────────────────────────────────
 
 class _RequestCode(BaseModel):
@@ -789,6 +794,15 @@ class _V1ServiceCreate(BaseModel):
     price_default: int = 0
     duration_min: int = 60
     category: str = "Основные"
+
+
+@app.post("/api/v1/subscription/notify")
+async def v1_subscription_notify(master_id: int = Depends(get_jwt_master_id)):
+    await send_telegram(
+        f"💳 Мастер (ID {master_id}) отправил уведомление об оплате подписки.\n"
+        f"Проверь и активируй в /admin"
+    )
+    return {"ok": True}
 
 
 @app.get("/api/v1/masters/me")
