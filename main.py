@@ -3,6 +3,7 @@ import hmac
 import hashlib
 import json
 import os
+from typing import Optional
 from contextlib import asynccontextmanager
 from urllib.parse import unquote
 
