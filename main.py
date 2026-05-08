@@ -129,17 +129,6 @@ async def get_all_v6():
     masters = await gam()
     return {"masters": masters}
 
-@app.get("/api/admin/master/{master_id}/data")
-async def admin_master_data(master_id: int):
-    from database import get_master_full, get_statistics, get_clients
-    master = await get_master_full(master_id)
-    if not master:
-        from fastapi import HTTPException
-        raise HTTPException(404, "Мастер не найден")
-    stats = await get_statistics(master_id)
-    clients = await get_clients(master_id)
-    return {"master": master, "stats": stats, "clients": clients, "total_clients": len(clients)}
-
 
 @app.get("/api/admin/master/{master_id}/appointment/{appt_id}")
 async def admin_get_appointment(master_id: int, appt_id: int):
@@ -1557,7 +1546,23 @@ async def admin_login(body: _AdminLoginBody):
 
 @app.get("/api/admin/masters", dependencies=[Depends(_verify_admin_token)])
 async def admin_list_masters():
-    masters = await get_all_masters()
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, name, email, phone, booking_link, is_active FROM masters ORDER BY name"
+        )
+    masters = [
+        {
+            "id": r["id"],
+            "name": r["name"] or "Без имени",
+            "email": r["email"] or "",
+            "phone": r["phone"] or "",
+            "booking_link": r["booking_link"] or "",
+            "is_active": bool(r["is_active"]) if r["is_active"] is not None else True,
+        }
+        for r in rows
+    ]
     return {"masters": masters}
 
 
