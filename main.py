@@ -1568,13 +1568,24 @@ async def admin_list_masters():
 
 @app.get("/api/admin/master/{master_id}/data", dependencies=[Depends(_verify_admin_token)])
 async def admin_master_data(master_id: int):
-    from database import get_master_full, get_statistics, get_clients_page
-    master = await get_master_full(master_id)
-    if not master:
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, name, email, phone, booking_link, is_active FROM masters WHERE id=$1",
+            master_id
+        )
+    if not row:
         raise HTTPException(404, "Мастер не найден")
-    stats = await get_statistics(master_id)
-    clients, total = await get_clients_page(master_id, 0, 10000)
-    return {"master": master, "stats": stats, "clients": clients, "total_clients": total}
+    master = {
+        "id": row["id"],
+        "name": row["name"] or "",
+        "email": row["email"] or "",
+        "phone": row["phone"] or "",
+        "booking_link": row["booking_link"] or "",
+        "is_active": bool(row["is_active"]) if row["is_active"] is not None else True,
+    }
+    return {"master": master, "stats": {}, "clients": [], "total_clients": 0}
 
 
 @app.post("/api/admin/master/{master_id}/toggle-active", dependencies=[Depends(_verify_admin_token)])
