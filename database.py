@@ -241,14 +241,14 @@ async def get_master_by_email(email: str) -> dict | None:
     }
 
 
-async def create_master_with_email(email: str, password_hash: str, name: str) -> int:
+async def create_master_with_email(email: str, password_hash: str, name: str, phone: str = "") -> int:
     import time
     telegram_id = -int(time.time())
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "INSERT INTO masters (email, password_hash, name, telegram_id, is_active) VALUES ($1, $2, $3, $4, 0) RETURNING id",
-            email, password_hash, name, telegram_id
+            "INSERT INTO masters (email, password_hash, name, telegram_id, is_active, phone) VALUES ($1, $2, $3, $4, 0, $5) RETURNING id",
+            email, password_hash, name, telegram_id, phone
         )
     return row['id'] if row else 0
 

@@ -287,6 +287,7 @@ class EmailRegisterRequest(BaseModel):
     email: str
     password: str
     name: str
+    phone: Optional[str] = None
 
 
 class EmailLoginRequest(BaseModel):
@@ -604,7 +605,7 @@ async def register(body: EmailRegisterRequest):
         if existing:
             raise HTTPException(400, "Email уже занят")
 
-        master_id = await create_master_with_email(body.email, password_hash, body.name)
+        master_id = await create_master_with_email(body.email, password_hash, body.name, body.phone)
         master = await get_master_by_email(body.email)
         if not master:
             raise HTTPException(500, "Ошибка создания мастера")
