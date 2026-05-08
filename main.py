@@ -801,9 +801,19 @@ class _V1ServiceCreate(BaseModel):
 async def v1_subscription_notify(master_id: int = Depends(get_jwt_master_id_any)):
     await send_telegram(
         f"💳 Мастер (ID {master_id}) отправил уведомление об оплате подписки.\n"
-        f"Проверь и активируй в /admin"
+        f"Проверь и активуй в /admin"
     )
     return {"ok": True}
+
+
+@app.get("/api/v1/subscription/status")
+async def v1_subscription_status(master_id: int = Depends(get_jwt_master_id_any)):
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT is_active FROM masters WHERE id=$1", master_id)
+    is_active = bool(row["is_active"]) if row and row["is_active"] is not None else False
+    return {"is_active": is_active}
 
 
 @app.get("/api/v1/masters/me")
