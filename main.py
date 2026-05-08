@@ -1600,13 +1600,15 @@ async def admin_master_data(master_id: int):
 
 @app.post("/api/admin/master/{master_id}/toggle-active", dependencies=[Depends(_verify_admin_token)])
 async def admin_toggle_active(master_id: int):
-    from database import set_master_active, get_master_full
-    master = await get_master_full(master_id)
-    if not master:
-        raise HTTPException(404, "Мастер не найден")
-    new_state = not bool(master.get("is_active", 1))
-    await set_master_active(master_id, new_state)
-    return {"ok": True, "is_active": new_state}
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT is_active FROM masters WHERE id=$1", master_id)
+        if not row:
+            raise HTTPException(404, "Мастер не найден")
+        new_state = 0 if row["is_active"] else 1
+        await conn.execute("UPDATE masters SET is_active=$1 WHERE id=$2", new_state, master_id)
+    return {"ok": True, "is_active": bool(new_state)}
 
 
 @app.get("/admin/")
