@@ -40,6 +40,7 @@ from database import (
     get_master_by_email, create_master_with_email,
     get_expenses, add_expense, delete_expense,
     get_blocked_days, add_blocked_day, remove_blocked_day,
+    get_pool,
 )
 
 from scheduler import setup_scheduler
@@ -262,7 +263,16 @@ async def get_jwt_master_id(
         if admin_tg == ADMIN_TG_ID:
             return master_id
     
-    return int(payload["mid"])
+    master_id = int(payload["mid"])
+    
+    # Проверка подписки (is_active)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT is_active FROM masters WHERE id=$1", master_id)
+        if row and row['is_active'] == 0:
+            raise HTTPException(status_code=403, detail="subscription_required")
+    
+    return master_id
 
 
 # ── Pydantic models ───────────────────────────────────────────────────

@@ -152,6 +152,7 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS booking_link TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS loyalty_threshold INTEGER DEFAULT 10",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT ''",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1",
         ]:
             try:
                 await conn.execute(sql)
@@ -246,7 +247,7 @@ async def create_master_with_email(email: str, password_hash: str, name: str) ->
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "INSERT INTO masters (email, password_hash, name, telegram_id) VALUES ($1, $2, $3, $4) RETURNING id",
+            "INSERT INTO masters (email, password_hash, name, telegram_id, is_active) VALUES ($1, $2, $3, $4, 0) RETURNING id",
             email, password_hash, name, telegram_id
         )
     return row['id'] if row else 0
