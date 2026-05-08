@@ -2,6 +2,7 @@ import asyncio
 import hmac
 import hashlib
 import json
+import os
 from contextlib import asynccontextmanager
 from urllib.parse import unquote
 
@@ -15,6 +16,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import Update
 
 ADMIN_TG_ID = 550421233  # Telegram ID администратора
+ADMIN_SECRET = os.getenv("ADMIN_PASSWORD", "")
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import BOT_TOKEN, WEBHOOK_URL, WEBHOOK_SECRET
@@ -1518,5 +1520,72 @@ async def serve_booking_page(link: str):
     from fastapi.responses import FileResponse
     return FileResponse("webapp/book.html")
 
-# ── Остальная статика (webapp) ────────────────────────────────────────
+# ── Остальная статика (webapp) ────────────────────────────────
 app.mount("/app", StaticFiles(directory="webapp", html=True), name="webapp")
+
+
+# ── Admin Panel ─────────────────────────────────────────────
+
+def _create_admin_token():
+    return jwt.encode(
+        {"admin": True, "exp": _dt.utcnow() + _td(hours=8)},
+        _jwt_secret(), algorithm="HS256"
+    )
+
+
+def _verify_admin_token(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Требуется авторизация")
+    try:
+        payload = jwt.decode(authorization[7:], _jwt_secret(), algorithms=["HS256"])
+        if not payload.get("admin"):
+            raise HTTPException(401, "Неверный токен")
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "Неверный или устаревший токен")
+
+
+class _AdminLoginBody(BaseModel):
+    password: str
+
+
+@app.post("/admin/api/login")
+async def admin_login(body: _AdminLoginBody):
+    if body.password != ADMIN_SECRET:
+        raise HTTPException(401, "Неверный пароль")
+    return {"token": _create_admin_token()}
+
+
+@app.get("/api/admin/masters", dependencies=[Depends(_verify_admin_token)])
+async def admin_list_masters():
+    masters = await get_all_masters()
+    return {"masters": masters}
+
+
+@app.get("/api/admin/master/{master_id}/data", dependencies=[Depends(_verify_admin_token)])
+async def admin_master_data(master_id: int):
+    from database import get_master_full, get_statistics, get_clients_page
+    master = await get_master_full(master_id)
+    if not master:
+        raise HTTPException(404, "Мастер не найден")
+    stats = await get_statistics(master_id)
+    clients, total = await get_clients_page(master_id, 0, 10000)
+    return {"master": master, "stats": stats, "clients": clients, "total_clients": total}
+
+
+@app.post("/api/admin/master/{master_id}/toggle-active", dependencies=[Depends(_verify_admin_token)])
+async def admin_toggle_active(master_id: int):
+    from database import set_master_active, get_master_full
+    master = await get_master_full(master_id)
+    if not master:
+        raise HTTPException(404, "Мастер не найден")
+    new_state = not bool(master.get("is_active", 1))
+    await set_master_active(master_id, new_state)
+    return {"ok": True, "is_active": new_state}
+
+
+@app.get("/admin/")
+@app.get("/admin")
+async def serve_admin():
+    from fastapi.responses import FileResponse
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp", "admin.html")
+    return FileResponse(html_path)
