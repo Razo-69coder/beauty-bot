@@ -618,6 +618,7 @@ async def register(body: EmailRegisterRequest):
     
     return {"token": token, "master": {
         "id": master["id"], "name": master["name"], "email": master["email"],
+        "phone": master.get("phone") or "",
         "work_start": master["work_start"], "work_end": master["work_end"],
         "slot_duration": master["slot_duration"], "timezone": master["timezone"],
         "reminder_days": master["reminder_days"], "payment_card": master["payment_card"],
