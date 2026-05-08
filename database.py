@@ -247,7 +247,7 @@ async def create_master_with_email(email: str, password_hash: str, name: str, ph
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "INSERT INTO masters (email, password_hash, name, telegram_id, is_active, phone) VALUES ($1, $2, $3, $4, 0, $5) RETURNING id",
+            "INSERT INTO masters (email, password_hash, name, telegram_id, is_active, phone) VALUES ($1, $2, $3, $4, 1, $5) RETURNING id",
             email, password_hash, name, telegram_id, phone
         )
     return row['id'] if row else 0
