@@ -104,7 +104,7 @@ async def get_or_create_master(telegram_id: int, name: str) -> int:
             if row:
                 return row[0]
         await db.execute(
-            "INSERT INTO masters (telegram_id, name, is_active) VALUES (?, ?, 0)", (telegram_id, name)
+            "INSERT INTO masters (telegram_id, name, is_active) VALUES (?, ?, 1)", (telegram_id, name)
         )
         await db.commit()
         async with db.execute(
@@ -402,7 +402,7 @@ async def create_master_with_email(email: str, password_hash: str, name: str) ->
     telegram_id = -int(time.time())
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
-            "INSERT INTO masters (email, password_hash, name, telegram_id, is_active) VALUES (?, ?, ?, ?, 0)",
+            "INSERT INTO masters (email, password_hash, name, telegram_id, is_active) VALUES (?, ?, ?, ?, 1)",
             (email, password_hash, name, telegram_id)
         )
         await db.commit()
