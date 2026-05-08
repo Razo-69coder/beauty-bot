@@ -351,6 +351,19 @@ async def update_reminder_days_by_master(master_id: int, days: int):
 async def add_client(master_id: int, name: str, phone: str, notes: str = "") -> int:
     pool = await get_pool()
     async with pool.acquire() as conn:
+        # Нормализуем телефон — только цифры
+        digits = ''.join(filter(str.isdigit, phone or ''))
+        if digits.startswith('8') and len(digits) == 11:
+            digits = '7' + digits[1:]
+
+        # Проверяем дубль
+        existing = await conn.fetchrow(
+            "SELECT id FROM clients WHERE master_id=$1 AND regexp_replace(phone, '[^0-9]', '', 'g') = $2",
+            master_id, digits
+        )
+        if existing:
+            return existing['id']  # возвращаем существующего клиента
+
         row = await conn.fetchrow(
             "INSERT INTO clients (master_id, name, phone, notes) VALUES ($1,$2,$3,$4) RETURNING id",
             master_id, name, phone, notes
