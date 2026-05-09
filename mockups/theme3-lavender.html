@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beauty Book — Тема 3: Лавандовая</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #EDEDF5;
+    display: flex;
+    gap: 20px;
+    padding: 30px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .phone {
+    width: 375px;
+    background: #F4F3FA;
+    border-radius: 40px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    border: 8px solid #222;
+    min-height: 700px;
+    display: flex;
+    flex-direction: column;
+  }
+  .phone-label {
+    text-align: center;
+    font-size: 13px;
+    color: #888;
+    margin-top: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .header {
+    background: linear-gradient(135deg, #7C6FA0, #A990CC);
+    padding: 24px 20px 20px;
+    color: white;
+  }
+  .header h1 { font-size: 22px; font-weight: 700; }
+  .header p { font-size: 14px; opacity: 0.9; margin-top: 4px; }
+
+  .content { padding: 16px; flex: 1; }
+
+  .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .menu-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px 16px;
+    text-align: center;
+    box-shadow: 0 2px 12px rgba(120,100,160,0.1);
+    cursor: pointer;
+  }
+  .menu-card .icon { font-size: 28px; margin-bottom: 8px; }
+  .menu-card .label { font-size: 13px; font-weight: 600; color: #2D2540; }
+  .menu-card .sub { font-size: 11px; color: #A090C0; margin-top: 2px; }
+  .menu-card.accent { background: linear-gradient(135deg, #A990CC, #7C6FA0); }
+  .menu-card.accent .label { color: white; }
+  .menu-card.accent .sub { color: rgba(255,255,255,0.8); }
+
+  .search-bar {
+    background: white;
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .search-bar input { border: none; outline: none; font-size: 14px; color: #2D2540; background: transparent; flex: 1; }
+
+  .client-card {
+    background: white;
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+  }
+  .client-avatar {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, #CFC5E8, #A990CC);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .client-info { flex: 1; }
+  .client-name { font-size: 15px; font-weight: 600; color: #2D2540; }
+  .client-meta { font-size: 12px; color: #A090C0; margin-top: 2px; }
+  .client-badge { background: #F0ECFA; color: #7C6FA0; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 600; }
+  .client-badge.vip { background: #EDE0FF; color: #5A3FA0; }
+
+  .back-btn { display: flex; align-items: center; gap: 6px; color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 600; margin-bottom: 16px; cursor: pointer; }
+
+  .profile-header {
+    background: white; border-radius: 16px;
+    padding: 20px; margin-bottom: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    text-align: center;
+  }
+  .profile-avatar {
+    width: 72px; height: 72px;
+    background: linear-gradient(135deg, #CFC5E8, #A990CC);
+    border-radius: 50%; margin: 0 auto 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+  }
+  .profile-name { font-size: 20px; font-weight: 700; color: #2D2540; }
+  .profile-phone { font-size: 14px; color: #A090C0; margin-top: 4px; }
+  .profile-note { background: #F0ECFA; border-radius: 10px; padding: 8px 12px; margin-top: 10px; font-size: 12px; color: #7C6FA0; }
+
+  .action-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .btn { flex: 1; padding: 12px; border-radius: 12px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .btn-primary { background: linear-gradient(135deg, #A990CC, #7C6FA0); color: white; }
+  .btn-secondary { background: white; color: #7C6FA0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+  .history-title { font-size: 14px; font-weight: 700; color: #2D2540; margin-bottom: 10px; }
+  .history-item {
+    background: white; border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .history-proc { font-size: 14px; font-weight: 600; color: #2D2540; }
+  .history-date { font-size: 12px; color: #A090C0; margin-top: 2px; }
+  .history-price { font-size: 14px; font-weight: 700; color: #7C6FA0; }
+
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .stat-card { background: white; border-radius: 14px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .stat-value { font-size: 28px; font-weight: 800; color: #7C6FA0; }
+  .stat-label { font-size: 12px; color: #A090C0; margin-top: 4px; }
+  .stat-wide { background: linear-gradient(135deg, #A990CC, #7C6FA0); border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 12px; box-shadow: 0 4px 16px rgba(120,100,160,0.3); }
+  .stat-wide .amount { font-size: 36px; font-weight: 800; color: white; }
+  .stat-wide .sublabel { font-size: 13px; color: rgba(255,255,255,0.85); margin-top: 4px; }
+
+  .top-list { background: white; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .top-title { font-size: 14px; font-weight: 700; color: #2D2540; margin-bottom: 12px; }
+  .top-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .top-medal { font-size: 20px; width: 28px; }
+  .top-name { flex: 1; font-size: 13px; color: #2D2540; font-weight: 500; }
+  .top-count { font-size: 13px; font-weight: 700; color: #7C6FA0; }
+
+  .export-btn {
+    width: 100%; padding: 14px;
+    background: white; border: 2px solid #A990CC;
+    border-radius: 12px; color: #7C6FA0;
+    font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-top: 12px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+
+  .bottom-nav { background: white; padding: 10px 20px 16px; display: flex; justify-content: space-around; border-top: 1px solid #EAE5F5; }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+  .nav-icon { font-size: 22px; }
+  .nav-label { font-size: 10px; color: #ccc; font-weight: 500; }
+  .nav-item.active .nav-label { color: #7C6FA0; }
+</style>
+</head>
+<body>
+
+<div>
+  <p class="phone-label">Экран 1 — Главная</p>
+  <div class="phone">
+    <div class="header">
+      <h1>✨ Beauty Book</h1>
+      <p>Привет, Анастасия! 👋</p>
+    </div>
+    <div class="content">
+      <div class="menu-grid">
+        <div class="menu-card accent">
+          <div class="icon">👥</div>
+          <div class="label">Клиенты</div>
+          <div class="sub">15 человек</div>
+        </div>
+        <div class="menu-card">
+          <div class="icon">📅</div>
+          <div class="label">Записать</div>
+          <div class="sub">новую процедуру</div>
+        </div>
+        <div class="menu-card">
+          <div class="icon">🔔</div>
+          <div class="label">Не приходили</div>
+          <div class="sub">5 клиентов</div>
+        </div>
+        <div class="menu-card">
+          <div class="icon">📊</div>
+          <div class="label">Статистика</div>
+          <div class="sub">за месяц</div>
+        </div>
+      </div>
+      <div class="menu-grid">
+        <div class="menu-card" style="grid-column: span 2">
+          <div class="icon">⚙️</div>
+          <div class="label">Настройки напоминаний</div>
+        </div>
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item active"><div class="nav-icon">🏠</div><div class="nav-label">Главная</div></div>
+      <div class="nav-item"><div class="nav-icon">👥</div><div class="nav-label">Клиенты</div></div>
+      <div class="nav-item"><div class="nav-icon">📊</div><div class="nav-label">Статистика</div></div>
+      <div class="nav-item"><div class="nav-icon">⚙️</div><div class="nav-label">Настройки</div></div>
+    </div>
+  </div>
+</div>
+
+<div>
+  <p class="phone-label">Экран 2 — Клиенты</p>
+  <div class="phone">
+    <div class="header">
+      <h1>👥 Мои клиенты</h1>
+      <p>15 человек в базе</p>
+    </div>
+    <div class="content">
+      <div class="search-bar">
+        <span>🔍</span>
+        <input type="text" placeholder="Найти клиента по имени...">
+      </div>
+      <div class="client-card">
+        <div class="client-avatar">💅</div>
+        <div class="client-info">
+          <div class="client-name">Ирина Кузнецова</div>
+          <div class="client-meta">Последний визит: 14 апр 2026</div>
+        </div>
+        <div class="client-badge vip">VIP</div>
+      </div>
+      <div class="client-card">
+        <div class="client-avatar">💅</div>
+        <div class="client-info">
+          <div class="client-name">Анастасия Королёва</div>
+          <div class="client-meta">Последний визит: 07 апр 2026</div>
+        </div>
+        <div class="client-badge">активна</div>
+      </div>
+      <div class="client-card">
+        <div class="client-avatar">💅</div>
+        <div class="client-info">
+          <div class="client-name">Мария Волкова</div>
+          <div class="client-meta">Последний визит: 12 апр 2026</div>
+        </div>
+        <div class="client-badge">активна</div>
+      </div>
+      <button class="btn btn-primary" style="width:100%; margin-top:8px">➕ Новый клиент</button>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item"><div class="nav-icon">🏠</div><div class="nav-label">Главная</div></div>
+      <div class="nav-item active"><div class="nav-icon">👥</div><div class="nav-label">Клиенты</div></div>
+      <div class="nav-item"><div class="nav-icon">📊</div><div class="nav-label">Статистика</div></div>
+      <div class="nav-item"><div class="nav-icon">⚙️</div><div class="nav-label">Настройки</div></div>
+    </div>
+  </div>
+</div>
+
+<div>
+  <p class="phone-label">Экран 3 — Клиент</p>
+  <div class="phone">
+    <div class="header" style="padding-bottom:14px">
+      <div class="back-btn">← Назад</div>
+    </div>
+    <div class="content">
+      <div class="profile-header">
+        <div class="profile-avatar">👤</div>
+        <div class="profile-name">Ирина Кузнецова</div>
+        <div class="profile-phone">📱 +7 917 123 45 05</div>
+        <div class="profile-note">⭐ VIP клиент, скидка 10%</div>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-primary">📅 Записать</button>
+        <button class="btn btn-secondary">✏️ Изменить</button>
+      </div>
+      <div class="history-title">📋 История процедур</div>
+      <div class="history-item">
+        <div><div class="history-proc">Маникюр с покрытием</div><div class="history-date">14 апр 2026</div></div>
+        <div class="history-price">1 200 ₽</div>
+      </div>
+      <div class="history-item">
+        <div><div class="history-proc">Педикюр</div><div class="history-date">12 мар 2026</div></div>
+        <div class="history-price">1 500 ₽</div>
+      </div>
+      <div class="history-item">
+        <div><div class="history-proc">Маникюр с покрытием</div><div class="history-date">06 фев 2026</div></div>
+        <div class="history-price">1 200 ₽</div>
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item"><div class="nav-icon">🏠</div><div class="nav-label">Главная</div></div>
+      <div class="nav-item active"><div class="nav-icon">👥</div><div class="nav-label">Клиенты</div></div>
+      <div class="nav-item"><div class="nav-icon">📊</div><div class="nav-label">Статистика</div></div>
+      <div class="nav-item"><div class="nav-icon">⚙️</div><div class="nav-label">Настройки</div></div>
+    </div>
+  </div>
+</div>
+
+<div>
+  <p class="phone-label">Экран 4 — Статистика</p>
+  <div class="phone">
+    <div class="header">
+      <h1>📊 Статистика</h1>
+      <p>Апрель 2026</p>
+    </div>
+    <div class="content">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value">15</div><div class="stat-label">клиентов</div></div>
+        <div class="stat-card"><div class="stat-value">28</div><div class="stat-label">процедур</div></div>
+      </div>
+      <div class="stat-wide">
+        <div class="sublabel">Выручка за месяц</div>
+        <div class="amount">8 400 ₽</div>
+      </div>
+      <div class="stat-wide" style="background: linear-gradient(135deg, #8070B0, #5A4A80);">
+        <div class="sublabel">Общая выручка</div>
+        <div class="amount">34 200 ₽</div>
+      </div>
+      <div class="top-list">
+        <div class="top-title">🏆 Топ процедуры</div>
+        <div class="top-item"><div class="top-medal">🥇</div><div class="top-name">Маникюр с покрытием</div><div class="top-count">12 раз</div></div>
+        <div class="top-item"><div class="top-medal">🥈</div><div class="top-name">Педикюр</div><div class="top-count">8 раз</div></div>
+        <div class="top-item"><div class="top-medal">🥉</div><div class="top-name">Наращивание ресниц</div><div class="top-count">5 раз</div></div>
+      </div>
+      <button class="export-btn">📥 Скачать Excel</button>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item"><div class="nav-icon">🏠</div><div class="nav-label">Главная</div></div>
+      <div class="nav-item"><div class="nav-icon">👥</div><div class="nav-label">Клиенты</div></div>
+      <div class="nav-item active"><div class="nav-icon">📊</div><div class="nav-label">Статистика</div></div>
+      <div class="nav-item"><div class="nav-icon">⚙️</div><div class="nav-label">Настройки</div></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
