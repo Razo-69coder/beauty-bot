@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solva Beauty — умная запись для мастеров красоты</title>
+<meta name="description" content="Нативное iOS-приложение для мастеров красоты. Записи, клиенты, аналитика — всё в одном месте.">
+
+<!-- Open Graph -->
+<meta property="og:title" content="Solva Beauty — умная запись для мастеров красоты">
+<meta property="og:description" content="Нативное iOS-приложение для мастеров красоты. Записи, клиенты, аналитика — всё в одном месте.">
+<meta property="og:image" content="https://beauty-bot-44ou.onrender.com/images/bratz-doll-1.png">
+<meta property="og:url" content="https://landing-gules-nine-56.vercel.app">
+<meta property="og:type" content="website">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Solva Beauty — умная запись для мастеров красоты">
+<meta name="twitter:description" content="iOS-приложение для мастеров красоты. Клиенты записываются сами!">
+
+<!-- Schema.org LocalBusiness -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "name": "Solva Beauty",
+  "description": "Нативное iOS-приложение для мастеров красоты",
+  "url": "https://landing-gules-nine-56.vercel.app",
+  "telephone": "+79000000000",
+  "email": "beautybook@rambler.ru",
+  "priceRange": "₽₽₽",
+  "areaServed": {
+    "@type": "Country",
+    "name": "Russia"
+  },
+  "serviceType": "iOS-приложение для записи клиентов"
+}
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Nunito:wght@400;600;700;800;900&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --pink:#FF69B4;--purple:#9370DB;
+  --bg1:#0d0015;--bg2:#130820;--bg3:#0a1220;
+  --white:#fff;
+}
+
+html{scroll-behavior:smooth;}
+
+body{
+  background:linear-gradient(150deg,#1e0030 0%,#160025 35%,#120020 65%,#1a0028 100%);
+  background-attachment:fixed;
+  color:var(--white);font-family:'Nunito',sans-serif;overflow-x:hidden;
+}
+
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(147,112,219,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(147,112,219,.035) 1px,transparent 1px);
+  background-size:52px 52px;pointer-events:none;z-index:0;
+}
+
+.glitter{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+.spark{
+  position:absolute;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,105,180,.85),transparent 70%);
+  animation:twinkle 4s ease-in-out infinite;
+}
+@keyframes twinkle{0%,100%{opacity:0;transform:scale(.4);}50%{opacity:1;transform:scale(1);}}
+
+/* ─── NAV ─── */
+nav{
+  position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:200;
+  background:rgba(13,0,21,.8);backdrop-filter:blur(20px);
+  border:1px solid rgba(255,105,180,.22);border-radius:50px;
+  display:flex;align-items:center;gap:6px;
+  padding:8px 8px 8px 28px;width:fit-content;max-width:calc(100% - 32px);
+}
+.logo-wrap{display:flex;align-items:center;gap:10px;margin-right:20px;}
+.logo-icon{
+  width:30px;height:30px;border-radius:8px;
+  background:linear-gradient(135deg,var(--pink),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;flex-shrink:0;
+}
+.logo{
+  font-family:'Black Han Sans',sans-serif;font-size:18px;letter-spacing:1px;
+  background:linear-gradient(90deg,var(--pink),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.nav-links{display:flex;gap:2px;}
+.nav-links a{
+  text-decoration:none;color:rgba(255,255,255,.55);font-size:13px;font-weight:700;
+  padding:8px 16px;border-radius:30px;transition:all .2s;
+}
+.nav-links a:hover{background:rgba(255,105,180,.12);color:var(--pink);}
+.nav-cta{
+  background:linear-gradient(135deg,var(--pink),var(--purple));color:#fff;border:none;
+  padding:12px 26px;border-radius:30px;font-size:13px;font-weight:800;cursor:pointer;
+  font-family:'Nunito',sans-serif;transition:opacity .2s;letter-spacing:.5px;
+}
+.nav-cta:hover{opacity:.85;}
+
+/* ─── HERO ─── */
+.hero{
+  min-height:100vh;
+  display:grid;grid-template-columns:1fr 520px 1fr;
+  align-items:end;
+  padding:80px 0 0;
+  position:relative;z-index:1;
+  max-width:1320px;margin:0 auto;
+  overflow:hidden;
+}
+.hero::before{
+  content:'';position:absolute;
+  width:620px;height:700px;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(255,105,180,.22) 0%,rgba(255,105,180,.07) 50%,transparent 70%);
+  top:50%;left:5%;transform:translateY(-50%);pointer-events:none;z-index:0;
+}
+.hero::after{
+  content:'';position:absolute;
+  width:620px;height:700px;border-radius:50%;
+  background:radial-gradient(ellipse,rgba(147,112,219,.22) 0%,rgba(147,112,219,.07) 50%,transparent 70%);
+  top:50%;right:5%;transform:translateY(-50%);pointer-events:none;z-index:0;
+}
+.hero-center{
+  text-align:center;padding:0 24px 80px;
+  display:flex;flex-direction:column;align-items:center;
+  position:relative;z-index:2;
+}
+.hero-pill{
+  display:inline-flex;align-items:center;gap:8px;
+  border:1px solid rgba(255,105,180,.35);
+  background:rgba(255,105,180,.07);
+  color:var(--pink);font-size:11px;font-weight:800;
+  letter-spacing:3px;text-transform:uppercase;
+  padding:8px 22px;border-radius:6px;margin-bottom:28px;
+}
+.hero h1{
+  font-family:'Black Han Sans',sans-serif;
+  font-size:clamp(44px,5.5vw,80px);
+  line-height:.9;letter-spacing:-2px;margin-bottom:14px;
+}
+.h1-white{color:#fff;display:block;}
+.h1-pink{
+  display:block;
+  background:linear-gradient(90deg,var(--pink) 0%,#d060ff 50%,var(--pink) 100%);
+  background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  animation:shimmer 5s linear infinite;
+}
+.h1-outline{display:block;color:transparent;-webkit-text-stroke:2px rgba(147,112,219,.65);}
+@keyframes shimmer{from{background-position:0 center;}to{background-position:200% center;}}
+
+.hero-tagline{
+  font-family:'Black Han Sans',sans-serif;
+  font-size:clamp(13px,1.4vw,17px);
+  letter-spacing:4px;text-transform:uppercase;
+  background:linear-gradient(90deg,var(--pink),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:18px;opacity:.9;
+}
+.hero-desc{
+  font-size:16px;color:rgba(255,255,255,.55);
+  max-width:400px;margin:0 auto 32px;line-height:1.75;font-weight:600;
+}
+.btn-glow{
+  background:linear-gradient(135deg,var(--pink),var(--purple));color:#fff;border:none;
+  padding:18px 44px;border-radius:8px;font-size:15px;font-weight:800;cursor:pointer;
+  font-family:'Nunito',sans-serif;letter-spacing:.5px;
+  box-shadow:0 0 30px rgba(255,105,180,.35);transition:transform .2s,box-shadow .2s;
+}
+.btn-glow:hover{transform:scale(1.04);box-shadow:0 0 50px rgba(255,105,180,.55);}
+.hero-for{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:24px;}
+.for-tag{
+  font-size:12px;font-weight:700;
+  border:1px solid rgba(255,255,255,.12);
+  color:rgba(255,255,255,.5);
+  padding:5px 14px;border-radius:20px;
+  transition:all .2s;cursor:default;
+}
+.for-tag:hover{border-color:rgba(255,105,180,.4);color:var(--pink);}
+
+.doll-col{position:relative;display:flex;align-items:flex-end;overflow:visible;z-index:2;}
+.doll-col-left{justify-content:flex-end;padding-right:0;}
+.doll-col-right{justify-content:flex-end;padding-left:0;}
+.doll-glow{
+  position:absolute;bottom:0;
+  width:280px;height:350px;border-radius:50%;
+  filter:blur(70px);opacity:.3;pointer-events:none;
+}
+.doll-col-left .doll-glow{background:radial-gradient(var(--pink),transparent 70%);right:-30px;}
+.doll-col-right .doll-glow{background:radial-gradient(var(--purple),transparent 70%);right:-30px;}
+.doll-img{display:block;position:relative;z-index:1;object-fit:contain;object-position:bottom;}
+.hero-mobile-doll{display:none;}
+.doll-col-left .doll-img{width:280px;height:360px;}
+.doll-col-right .doll-img{width:280px;height:360px;}
+.doll-badge{
+  position:absolute;z-index:3;
+  background:rgba(13,0,21,.75);backdrop-filter:blur(12px);
+  border:1px solid rgba(255,105,180,.3);border-radius:12px;
+  padding:10px 14px;font-size:12px;font-weight:700;
+  white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.4);
+  animation:float 4s ease-in-out infinite;
+}
+.doll-badge .badge-icon{font-size:16px;display:block;margin-bottom:2px;}
+.doll-badge .badge-label{color:rgba(255,255,255,.9);}
+.doll-badge .badge-sub{color:rgba(255,255,255,.45);font-size:10px;font-weight:600;}
+@keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+.badge-1{top:80px;right:10px;animation-delay:0s;}
+.badge-2{top:200px;right:-20px;animation-delay:1.5s;}
+.badge-3{top:90px;left:10px;animation-delay:.8s;}
+.badge-4{top:210px;left:-20px;animation-delay:2.2s;}
+
+/* ─── WAITLIST FORM ─── */
+.waitlist-form{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+.waitlist-input{
+  padding:16px 20px;border-radius:8px;border:1.5px solid rgba(255,105,180,.4);
+  background:rgba(255,255,255,.05);color:#fff;font-size:15px;
+  font-family:'Nunito',sans-serif;outline:none;min-width:260px;
+  transition:border-color .2s;
+}
+.waitlist-input:focus{border-color:var(--pink);}
+.waitlist-input::placeholder{color:rgba(255,255,255,.35);}
+
+/* ─── MARQUEE ─── */
+.marquee-wrap{
+  background:linear-gradient(90deg,var(--pink),var(--purple));
+  overflow:hidden;padding:13px 0;position:relative;z-index:1;
+}
+.marquee-track{display:flex;white-space:nowrap;animation:marquee 24s linear infinite;}
+.m-item{font-size:13px;font-weight:800;color:#fff;letter-spacing:3px;text-transform:uppercase;padding:0 26px;}
+.m-item::after{content:'✦';margin-left:26px;}
+@keyframes marquee{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+
+/* ─── SECTIONS ─── */
+.section{padding:88px 20px;max-width:1100px;margin:0 auto;position:relative;z-index:1;}
+.section-divider{border-top:1px solid rgba(255,105,180,.1);}
+.s-label{
+  font-size:11px;font-weight:800;letter-spacing:4px;text-transform:uppercase;
+  color:var(--pink);margin-bottom:12px;
+  display:flex;align-items:center;gap:12px;justify-content:center;
+}
+.s-label::before,.s-label::after{content:'';flex:1;max-width:34px;height:1px;background:var(--pink);opacity:.4;}
+.s-title{
+  font-family:'Black Han Sans',sans-serif;
+  font-size:clamp(28px,3.8vw,50px);
+  line-height:.95;letter-spacing:-1px;
+  text-align:center;margin-bottom:50px;
+}
+.s-title span{color:var(--pink);}
+
+/* ─── FOR WHO ─── */
+.for-who-strip{
+  background:rgba(255,105,180,.05);
+  border-top:1px solid rgba(255,105,180,.1);
+  border-bottom:1px solid rgba(255,105,180,.1);
+  padding:32px 20px;position:relative;z-index:1;
+}
+.for-who-inner{
+  max-width:960px;margin:0 auto;
+  display:flex;flex-direction:column;align-items:center;gap:14px;
+}
+.for-who-desc{
+  font-size:15px;font-weight:700;color:rgba(255,255,255,.6);
+  text-align:center;line-height:1.6;max-width:680px;
+}
+.for-who-chips{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;}
+.for-who-label{font-size:13px;font-weight:800;color:rgba(255,255,255,.4);letter-spacing:1px;text-transform:uppercase;margin-right:4px;}
+.for-chip{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,105,180,.2);
+  border-radius:30px;padding:10px 20px;
+  font-size:14px;font-weight:800;transition:all .3s;
+}
+.for-chip:hover{background:rgba(255,105,180,.1);border-color:rgba(255,105,180,.5);}
+.for-chip-icon{font-size:18px;}
+
+/* ─── FEATURES ─── */
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;
+  background:rgba(255,105,180,.08);border:1px solid rgba(255,105,180,.1);
+  border-radius:16px;overflow:hidden;}
+.feat-card{
+  background:var(--bg1);padding:32px 26px;
+  transition:background .3s;position:relative;overflow:hidden;
+}
+.feat-card::before{
+  content:'';position:absolute;top:0;left:0;width:100%;height:2px;
+  background:linear-gradient(90deg,var(--pink),var(--purple));opacity:0;transition:opacity .3s;
+}
+.feat-card:hover::before{opacity:1;}
+.feat-card:hover{background:rgba(255,105,180,.04);}
+.feat-icon{
+  width:52px;height:52px;border-radius:13px;
+  background:linear-gradient(135deg,rgba(255,105,180,.12),rgba(147,112,219,.12));
+  border:1px solid rgba(255,105,180,.2);
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:18px;
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1);
+}
+.feat-card:hover .feat-icon{transform:scale(1.1) rotate(-4deg);}
+.feat-title{font-size:17px;font-weight:800;margin-bottom:8px;}
+.feat-text{font-size:14px;color:rgba(255,255,255,.45);line-height:1.7;}
+
+/* ─── HOW IT WORKS ─── */
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;position:relative;}
+.steps-grid::before{
+  content:'';position:absolute;
+  top:36px;left:calc(16.6% + 10px);right:calc(16.6% + 10px);
+  height:1px;background:linear-gradient(90deg,var(--pink),var(--purple));
+  opacity:.3;pointer-events:none;
+}
+.step{text-align:center;padding:32px 20px;}
+.step-num{
+  width:72px;height:72px;border-radius:50%;
+  background:linear-gradient(135deg,var(--pink),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  font-size:30px;
+  margin:0 auto 20px;
+  box-shadow:0 0 24px rgba(255,105,180,.35);
+}
+.step-title{font-size:18px;font-weight:800;margin-bottom:8px;}
+.step-text{font-size:14px;color:rgba(255,255,255,.45);line-height:1.65;}
+
+/* ─── MID CTA ─── */
+.mid-cta{
+  position:relative;z-index:1;overflow:hidden;padding:80px 20px;
+  border-top:1px solid rgba(255,105,180,.1);
+}
+.mid-cta-inner{
+  max-width:1100px;margin:0 auto;
+  display:grid;grid-template-columns:1fr 340px;
+  gap:60px;align-items:center;
+}
+.mid-cta-title{
+  font-family:'Black Han Sans',sans-serif;
+  font-size:clamp(32px,4vw,56px);
+  line-height:.95;letter-spacing:-1px;margin-bottom:20px;
+}
+.mid-cta-title span{color:var(--pink);}
+.mid-cta-desc{font-size:16px;color:rgba(255,255,255,.5);line-height:1.75;margin-bottom:32px;max-width:480px;}
+.mid-cta-stats{display:flex;gap:28px;margin-bottom:36px;}
+.mstat{border-left:2px solid var(--pink);padding-left:16px;}
+.mstat-n{font-family:'Black Han Sans',sans-serif;font-size:34px;color:var(--pink);display:block;line-height:1;}
+.mstat-l{font-size:12px;color:rgba(255,255,255,.4);font-weight:700;letter-spacing:1px;}
+.mid-doll-wrap{position:relative;display:flex;justify-content:center;align-items:flex-end;}
+.mid-doll-glow{
+  position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  width:260px;height:320px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,105,180,.25),rgba(147,112,219,.15) 50%,transparent 70%);
+  filter:blur(50px);pointer-events:none;
+}
+.mid-doll-img{
+  width:300px;height:380px;
+  object-fit:contain;object-position:bottom;
+  position:relative;z-index:1;
+  filter:drop-shadow(0 10px 40px rgba(255,105,180,.3));
+}
+
+/* ─── PRICING ─── */
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.p-card{
+  border:1px solid rgba(255,255,255,.08);border-radius:16px;
+  padding:36px 28px;position:relative;overflow:hidden;
+  transition:border-color .3s,transform .2s;
+}
+.p-card::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(160deg,rgba(255,105,180,.03),transparent 55%);pointer-events:none;
+}
+.p-card:hover{border-color:rgba(255,105,180,.35);transform:translateY(-4px);}
+.p-card.featured{border-color:rgba(255,105,180,.45);background:rgba(255,105,180,.04);}
+.p-hot{
+  position:absolute;top:18px;right:18px;
+  background:var(--pink);color:#fff;
+  font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
+  padding:4px 10px;border-radius:4px;
+}
+.p-tier{font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:16px;}
+.p-amount{font-family:'Black Han Sans',sans-serif;font-size:52px;line-height:1;margin-bottom:4px;}
+.p-amount small{font-size:20px;color:rgba(255,255,255,.3);}
+.p-period{font-size:12px;color:rgba(255,255,255,.3);margin-bottom:8px;}
+.saving-badge{
+  display:inline-block;background:rgba(255,105,180,.15);
+  border:1px solid rgba(255,105,180,.4);color:var(--pink);
+  font-size:11px;font-weight:800;padding:4px 12px;
+  border-radius:20px;margin-bottom:16px;letter-spacing:.5px;
+}
+.p-hr{height:1px;background:linear-gradient(90deg,transparent,rgba(255,105,180,.3),transparent);margin-bottom:20px;}
+.p-list{list-style:none;margin-bottom:28px;}
+.p-list li{
+  font-size:14px;color:rgba(255,255,255,.6);padding:8px 0;
+  border-bottom:1px solid rgba(255,255,255,.05);
+  display:flex;align-items:center;gap:10px;
+}
+.p-list li::before{content:'◆';color:var(--pink);font-size:8px;flex-shrink:0;}
+.p-card .waitlist-form{flex-direction:column;align-items:stretch;}
+.p-card .waitlist-input{min-width:auto;}
+.p-card .btn-glow{
+  width:100%;padding:14px;border-radius:8px;font-size:13px;letter-spacing:1px;
+  box-shadow:none;
+}
+.p-card.featured .btn-glow{box-shadow:0 8px 24px rgba(255,105,180,.25);}
+
+/* ─── REVIEWS ─── */
+.reviews-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+.review-card{
+  background:rgba(255,105,180,.04);
+  border:1px solid rgba(255,105,180,.14);
+  border-radius:16px;padding:28px;
+  position:relative;overflow:hidden;
+  transition:border-color .3s,transform .2s;
+}
+.review-card:hover{border-color:rgba(255,105,180,.35);transform:translateY(-4px);}
+.review-card::before{
+  content:'"';position:absolute;top:-14px;right:20px;
+  font-size:120px;font-family:'Black Han Sans',sans-serif;
+  color:rgba(255,105,180,.06);line-height:1;pointer-events:none;
+}
+.review-header{display:flex;align-items:center;gap:14px;margin-bottom:16px;}
+.review-avatar{
+  width:52px;height:52px;border-radius:50%;flex-shrink:0;
+  overflow:hidden;display:block;
+}
+.review-meta{}
+.review-name{font-size:15px;font-weight:800;line-height:1.2;}
+.review-role{font-size:12px;color:rgba(255,255,255,.4);font-weight:600;margin-top:3px;}
+.review-stars{color:var(--pink);font-size:13px;letter-spacing:2px;margin-bottom:12px;}
+.review-text{font-size:14px;color:rgba(255,255,255,.55);line-height:1.75;font-style:italic;}
+
+/* ─── FAQ ─── */
+.faq-list{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:12px;}
+.faq-item{
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,105,180,.12);
+  border-radius:12px;overflow:hidden;
+  transition:border-color .2s;
+}
+.faq-item.open{border-color:rgba(255,105,180,.4);}
+.faq-q{
+  width:100%;display:flex;align-items:center;justify-content:space-between;
+  padding:20px 24px;background:transparent;border:none;cursor:pointer;
+  font-family:'Nunito',sans-serif;font-size:16px;font-weight:800;color:#fff;
+  text-align:left;gap:16px;
+}
+.faq-q:hover{background:rgba(255,105,180,.04);}
+.faq-arrow{
+  width:28px;height:28px;border-radius:50%;flex-shrink:0;
+  background:rgba(255,105,180,.12);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;transition:transform .3s,background .2s;
+  color:var(--pink);
+}
+.faq-item.open .faq-arrow{transform:rotate(180deg);background:rgba(255,105,180,.25);}
+.faq-a{
+  max-height:0;overflow:hidden;
+  transition:max-height .35s ease,padding .35s ease;
+  font-size:14px;color:rgba(255,255,255,.5);line-height:1.75;
+  padding:0 24px;
+}
+.faq-item.open .faq-a{max-height:200px;padding:0 24px 20px;}
+
+/* ─── FINAL CTA ─── */
+.final-cta{
+  padding:110px 20px;text-align:center;
+  position:relative;z-index:1;overflow:hidden;
+  border-top:1px solid rgba(255,105,180,.1);
+}
+.final-cta::before{
+  content:'SB';position:absolute;
+  font-family:'Black Han Sans',sans-serif;font-size:280px;letter-spacing:-10px;
+  color:rgba(255,105,180,.025);top:50%;left:50%;transform:translate(-50%,-50%);
+  pointer-events:none;
+}
+.cta-inner{position:relative;z-index:1;}
+.cta-tag{
+  display:inline-block;border:1px solid rgba(255,105,180,.35);color:var(--pink);
+  font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;
+  padding:6px 20px;border-radius:4px;margin-bottom:28px;
+}
+.cta-h{
+  font-family:'Black Han Sans',sans-serif;
+  font-size:clamp(36px,5.5vw,76px);line-height:.92;letter-spacing:-2px;margin-bottom:18px;
+}
+.cta-h span{color:var(--pink);}
+.cta-sub{
+  font-size:16px;color:rgba(255,255,255,.45);
+  margin-bottom:40px;max-width:400px;margin-left:auto;margin-right:auto;line-height:1.7;
+}
+.cta-small{font-size:12px;color:rgba(255,255,255,.25);margin-top:14px;letter-spacing:.5px;}
+
+/* ─── STATS ─── */
+.stats-strip{
+  padding:72px 20px;
+  background:rgba(255,105,180,.03);
+  border-top:1px solid rgba(255,105,180,.1);
+  border-bottom:1px solid rgba(255,105,180,.1);
+  position:relative;z-index:1;
+}
+.stats-inner{
+  max-width:900px;margin:0 auto;
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:32px;text-align:center;
+}
+.stat-num{
+  font-family:'Black Han Sans',sans-serif;
+  font-size:clamp(52px,6.5vw,80px);
+  line-height:1;
+  background:linear-gradient(135deg,var(--pink),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  display:block;margin-bottom:10px;
+}
+.stat-label{font-size:16px;font-weight:700;color:rgba(255,255,255,.6);line-height:1.4;}
+.stat-sub{font-size:12px;color:rgba(255,255,255,.3);margin-top:5px;font-weight:600;letter-spacing:.5px;}
+
+/* ─── MOBILE ─── */
+@media(max-width:768px){
+  nav{padding:8px 8px 8px 16px;gap:4px;}
+  .nav-links{display:none;}
+  .logo{font-size:16px;}
+  .nav-cta{padding:10px 18px;font-size:12px;}
+
+  .hero{
+    grid-template-columns:1fr;
+    padding:100px 20px 56px;
+    min-height:auto;
+  }
+  .doll-col{display:none;}
+  .hero::before,.hero::after{display:none;}
+  .hero-center{padding:0;}
+  .hero h1{font-size:clamp(40px,12vw,60px);}
+  .hero-desc{font-size:14px;}
+  .btn-glow{padding:16px 32px;font-size:14px;}
+
+  .hero-mobile-doll{
+    display:block;
+    width:230px;
+    height:auto;
+    margin:0 auto 20px;
+  }
+
+  .section{padding:56px 16px;}
+  .s-title{font-size:clamp(24px,7vw,38px);}
+
+  .features-grid{grid-template-columns:1fr;}
+  .steps-grid{grid-template-columns:1fr;gap:0;}
+  .steps-grid::before{display:none;}
+
+  .mid-cta{padding:56px 16px;}
+  .mid-cta-inner{grid-template-columns:1fr;gap:32px;}
+  .mid-doll-wrap{display:flex;justify-content:center;margin-top:32px;}
+  .mid-doll-img{width:220px;height:auto;}
+  .mid-cta-stats{gap:16px;flex-wrap:wrap;}
+  .mid-cta-title{font-size:clamp(28px,8vw,44px);}
+
+  .pricing-grid{grid-template-columns:1fr;}
+  .reviews-grid{grid-template-columns:1fr;}
+
+  .stats-inner{grid-template-columns:1fr;gap:28px;}
+
+  .final-cta{padding:72px 16px;}
+  .cta-h{font-size:clamp(32px,9vw,52px);}
+
+  .footer-tags{gap:6px;}
+  .footer-social{gap:10px;}
+
+  .waitlist-form{flex-direction:column;align-items:center;}
+  .waitlist-input{min-width:auto;width:100%;max-width:320px;}
+}
+
+/* ─── FOOTER ─── */
+footer{border-top:1px solid rgba(255,255,255,.05);padding:44px 20px;text-align:center;position:relative;z-index:1;}
+.footer-social{display:flex;justify-content:center;gap:12px;margin-bottom:24px;}
+.social-link{
+  width:44px;height:44px;border-radius:12px;
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,105,180,.2);
+  display:flex;align-items:center;justify-content:center;
+  transition:all .25s;text-decoration:none;
+}
+.social-link:hover{background:rgba(255,105,180,.15);border-color:rgba(255,105,180,.5);transform:translateY(-2px);}
+.social-link svg{width:20px;height:20px;}
+.footer-tags{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:24px;}
+.ftag{
+  font-size:12px;font-weight:700;letter-spacing:.5px;
+  color:rgba(255,255,255,.28);border:1px solid rgba(255,255,255,.07);
+  padding:5px 13px;border-radius:4px;transition:all .2s;cursor:default;
+}
+.ftag:hover{color:var(--pink);border-color:rgba(255,105,180,.3);}
+.footer-contacts{
+  font-size:13px;font-weight:700;
+  color:rgba(255,255,255,.35);
+  margin-bottom:20px;letter-spacing:.3px;
+}
+.footer-contacts a{
+  color:rgba(255,255,255,.45);text-decoration:none;
+  transition:color .2s;
+}
+.footer-contacts a:hover{color:var(--pink);}
+.footer-copy{font-size:12px;color:rgba(255,255,255,.18);letter-spacing:1px;}
+</style>
+</head>
+<body>
+
+<div class="glitter" id="glitter"></div>
+
+<!-- ─── NAV ─── -->
+<nav>
+  <div class="logo-wrap">
+    <div class="logo-icon">💅</div>
+    <div class="logo">Solva Beauty</div>
+  </div>
+  <div class="nav-links">
+    <a href="#features">Функции</a>
+    <a href="#pricing">Цены</a>
+    <a href="#cta">Попробовать</a>
+  </div>
+  <button class="nav-cta" onclick="document.getElementById('cta').scrollIntoView({behavior:'smooth'})">
+    Получить первой 🍎
+  </button>
+</nav>
+
+<!-- ─── HERO ─── -->
+<section class="hero">
+
+  <!-- LEFT DOLL -->
+  <div class="doll-col doll-col-left">
+    <div class="doll-glow"></div>
+    <div class="doll-badge badge-1">
+      <span class="badge-icon">📅</span>
+      <span class="badge-label">Запись 24/7</span><br>
+      <span class="badge-sub">клиенты пишут сами</span>
+    </div>
+    <div class="doll-badge badge-2">
+      <span class="badge-icon">🔔</span>
+      <span class="badge-label">Напоминания</span><br>
+      <span class="badge-sub">авто-отправка</span>
+    </div>
+    <img src="images/bratz-doll-1.png" alt="Мастер маникюра Solva Beauty - розовая кукла" class="doll-img"
+         style="filter:drop-shadow(0 0 30px rgba(255,105,180,.35)) drop-shadow(0 20px 40px rgba(0,0,0,.5));">
+  </div>
+
+  <!-- CENTER -->
+  <div class="hero-center">
+    <img src="images/bratz-doll-1.png" alt="Мастер маникюра Solva Beauty - мобильная версия" class="hero-mobile-doll"
+         style="filter:drop-shadow(0 0 24px rgba(255,105,180,.4)) drop-shadow(0 10px 30px rgba(0,0,0,.5));">
+    <div class="hero-pill">✦ iOS ПРИЛОЖЕНИЕ ДЛЯ МАСТЕРОВ КРАСОТЫ ✦</div>
+    <h1>
+      <span class="h1-white">SOLVA</span>
+      <span class="h1-pink">BEAUTY</span>
+      <span class="h1-outline">APP</span>
+    </h1>
+    <p class="hero-tagline">Клиенты сами идут к тебе</p>
+    <p class="hero-desc">Нативное iOS-приложение для мастеров красоты. Записи, клиенты, аналитика — всё в одном месте.</p>
+    <form class="waitlist-form" onsubmit="handleWaitlist(event)">
+      <input type="email" placeholder="Твой email" class="waitlist-input" required>
+      <button type="submit" class="btn-glow">🍎 Получить первой</button>
+    </form>
+    <div class="hero-for">
+      <span class="for-tag">💅 Мастера маникюра</span>
+      <span class="for-tag">🎨 Бровистки</span>
+      <span class="for-tag">👁 Лешмейкеры</span>
+      <span class="for-tag">✨ Визажисты</span>
+    </div>
+  </div>
+
+  <!-- RIGHT DOLL -->
+  <div class="doll-col doll-col-right">
+    <div class="doll-glow"></div>
+    <div class="doll-badge badge-3">
+      <span class="badge-icon">👤</span>
+      <span class="badge-label">Карточка клиента</span><br>
+      <span class="badge-sub">история + фото работ</span>
+    </div>
+    <div class="doll-badge badge-4">
+      <span class="badge-icon">📊</span>
+      <span class="badge-label">Аналитика</span><br>
+      <span class="badge-sub">доход и клиенты</span>
+    </div>
+    <img src="images/bratz-doll-2.png" alt="Мастер бровист Solva Beauty - фиолетовая кукла" class="doll-img"
+         style="filter:drop-shadow(0 0 30px rgba(147,112,219,.35)) drop-shadow(0 20px 40px rgba(0,0,0,.5));">
+  </div>
+
+</section>
+
+<!-- ─── MARQUEE ─── -->
+<div class="marquee-wrap" style="position:relative;z-index:1;">
+  <div class="marquee-track">
+    <span class="m-item">Маникюр</span><span class="m-item">Брови</span>
+    <span class="m-item">Ресницы</span><span class="m-item">Макияж</span>
+    <span class="m-item">Запись 24/7</span><span class="m-item">Напоминания</span>
+    <span class="m-item">Аналитика</span><span class="m-item">Solva Beauty</span>
+    <span class="m-item">Маникюр</span><span class="m-item">Брови</span>
+    <span class="m-item">Ресницы</span><span class="m-item">Макияж</span>
+    <span class="m-item">Запись 24/7</span><span class="m-item">Напоминания</span>
+    <span class="m-item">Аналитика</span><span class="m-item">Solva Beauty</span>
+  </div>
+</div>
+
+<!-- ─── FOR WHO ─── -->
+<div class="for-who-strip">
+  <div class="for-who-inner">
+    <p class="for-who-desc">Для мастеров маникюра и педикюра, бровистов, лешмейкеров, визажистов и других beauty-специалистов</p>
+    <div class="for-who-chips">
+      <span class="for-who-label">Для кого</span>
+      <div class="for-chip"><span class="for-chip-icon">💅</span>Мастера маникюра и педикюра</div>
+      <div class="for-chip"><span class="for-chip-icon">🎨</span>Бровистки</div>
+      <div class="for-chip"><span class="for-chip-icon">👁</span>Лешмейкеры</div>
+      <div class="for-chip"><span class="for-chip-icon">✨</span>Визажисты</div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── FEATURES ─── -->
+<section class="section section-divider" id="features">
+  <p class="s-label">Возможности</p>
+  <h2 class="s-title">ЧТО УМЕЕТ <span>SOLVA BEAUTY</span></h2>
+  <div class="features-grid">
+
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <defs><linearGradient id="fi1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF69B4"/><stop offset="1" stop-color="#9370DB"/></linearGradient></defs>
+          <rect x="8" y="2" width="8" height="3" rx="1.5" fill="url(#fi1)"/>
+          <path d="M7 5h10l1.5 14a1 1 0 01-1 1H6.5a1 1 0 01-1-1L7 5z" fill="url(#fi1)" opacity=".85"/>
+          <ellipse cx="10.5" cy="9" rx="1.5" ry="3" fill="white" opacity=".22" transform="rotate(-15 10.5 9)"/>
+        </svg>
+      </div>
+      <div class="feat-title">Запись 24/7</div>
+      <p class="feat-text">Клиенты записываются через твою ссылку в любое время суток. Приложение показывает расписание и подтверждает запись автоматически.</p>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <defs><linearGradient id="fi2" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF69B4"/><stop offset="1" stop-color="#9370DB"/></linearGradient></defs>
+          <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" fill="url(#fi2)" opacity=".85"/>
+          <path d="M13.73 21a2 2 0 01-3.46 0" stroke="url(#fi2)" stroke-width="1.5" stroke-linecap="round"/>
+          <ellipse cx="9.5" cy="10" rx="1.5" ry="3" fill="white" opacity=".2" transform="rotate(-20 9.5 10)"/>
+        </svg>
+      </div>
+      <div class="feat-title">Авто-напоминания</div>
+      <p class="feat-text">Приложение автоматически напоминает клиенту о записи за день и за час. И напоминает о коррекции через нужное количество недель.</p>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <defs><linearGradient id="fi3" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF69B4"/><stop offset="1" stop-color="#9370DB"/></linearGradient></defs>
+          <rect x="2" y="4" width="20" height="16" rx="3" fill="url(#fi3)" opacity=".18"/>
+          <rect x="2" y="4" width="20" height="16" rx="3" stroke="url(#fi3)" stroke-width="1.5"/>
+          <circle cx="8" cy="12" r="3" fill="url(#fi3)"/>
+          <path d="M13 9.5h5M13 13.5h4" stroke="url(#fi3)" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="feat-title">Карточка клиента</div>
+      <p class="feat-text">Полная история посещений, заметки мастера, фото выполненных работ. Всё в одном месте — открываешь и сразу помнишь всё о клиенте.</p>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <defs><linearGradient id="fi4" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF69B4"/><stop offset="1" stop-color="#9370DB"/></linearGradient></defs>
+          <rect x="3" y="4" width="18" height="17" rx="3" fill="url(#fi4)" opacity=".15"/>
+          <rect x="3" y="4" width="18" height="17" rx="3" stroke="url(#fi4)" stroke-width="1.5"/>
+          <path d="M3 9.5h18" stroke="url(#fi4)" stroke-width="1.5"/>
+          <path d="M8 2v4M16 2v4" stroke="url(#fi4)" stroke-width="1.5" stroke-linecap="round"/>
+          <rect x="7" y="13.5" width="3" height="3" rx="1" fill="url(#fi4)"/>
+          <rect x="14" y="13.5" width="3" height="3" rx="1" fill="url(#fi4)" opacity=".5"/>
+        </svg>
+      </div>
+      <div class="feat-title">Календарь мастера</div>
+      <p class="feat-text">Наглядное расписание на день, неделю, месяц. Видишь все записи, свободные окна и загрузку — управляй временем легко.</p>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <defs><linearGradient id="fi5" x1="0" y1="1" x2="0" y2="0"><stop stop-color="#FF69B4"/><stop offset="1" stop-color="#9370DB"/></linearGradient></defs>
+          <rect x="3" y="13" width="4" height="8" rx="2" fill="url(#fi5)"/>
+          <rect x="10" y="8" width="4" height="13" rx="2" fill="url(#fi5)" opacity=".8"/>
+          <rect x="17" y="4" width="4" height="17" rx="2" fill="url(#fi5)" opacity=".6"/>
+          <path d="M2 21.5h20" stroke="url(#fi5)" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="feat-title">Статистика и аналитика</div>
+      <p class="feat-text">Сколько клиентов, какой доход, кто возвращается, кто пропал. Данные помогают развивать бизнес осознанно.</p>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <defs><linearGradient id="fi6" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF69B4"/><stop offset="1" stop-color="#9370DB"/></linearGradient></defs>
+          <path d="M17 2H7a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V4a2 2 0 00-2-2z" fill="url(#fi6)" opacity=".18" stroke="url(#fi6)" stroke-width="1.5"/>
+          <circle cx="12" cy="18" r="1.2" fill="url(#fi6)"/>
+          <path d="M9 6h6M9 9h4" stroke="url(#fi6)" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="feat-title">Нативный iOS</div>
+      <p class="feat-text">Красивый нативный интерфейс на iPhone. Никаких тормозов и багов — приложение работает быстро и стабильно.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ─── HOW IT WORKS ─── -->
+<section class="section section-divider">
+  <p class="s-label">Как это работает</p>
+  <h2 class="s-title">3 ШАГА ДО <span>ПЕРВОЙ ЗАПИСИ</span></h2>
+  <div class="steps-grid">
+    <div class="step">
+      <div class="step-num">📱</div>
+      <div class="step-title">Скачай приложение</div>
+      <p class="step-text">Устанавливаешь Solva Beauty из App Store. Регистрация за 2 минуты — и ты готова к работе.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">🔗</div>
+      <div class="step-title">Поделись ссылкой</div>
+      <p class="step-text">Отправь клиентам свою ссылку в Instagram, ВКонтакте или Telegram — они сами выберут время.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">✨</div>
+      <div class="step-title">Работай спокойно</div>
+      <p class="step-text">Приложение ведёт расписание, напоминает клиентам и собирает статистику. Ты занимаешься творчеством.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ─── MID DOLL CTA ─── -->
+<section class="mid-cta">
+  <div class="mid-cta-inner">
+    <div class="mid-cta-content">
+      <p class="s-label" style="justify-content:flex-start;">Почему мастера выбирают нас</p>
+      <h2 class="mid-cta-title">ЗАБУДЬ ПРО<br><span>«ЗАПИШИТЕ МЕНЯ»</span><br>В 23:00</h2>
+      <p class="mid-cta-desc">Больше не нужно отвечать ночью на «Есть ли у вас место в пятницу?». Приложение покажет расписание и запишет клиента само — даже пока ты спишь.</p>
+      <div class="mid-cta-stats">
+        <div class="mstat"><span class="mstat-n" data-target="500" data-suffix="+">500+</span><span class="mstat-l">Мастеров</span></div>
+        <div class="mstat"><span class="mstat-n">5★</span><span class="mstat-l">Рейтинг</span></div>
+        <div class="mstat"><span class="mstat-n" data-target="3" data-prefix="-" data-suffix="ч">-3ч</span><span class="mstat-l">Время на рутину</span></div>
+      </div>
+      <form class="waitlist-form" onsubmit="handleWaitlist(event)">
+        <input type="email" placeholder="Твой email" class="waitlist-input" required>
+        <button type="submit" class="btn-glow">🍎 Получить первой</button>
+      </form>
+    </div>
+    <div class="mid-doll-wrap">
+      <div class="mid-doll-glow"></div>
+      <img src="images/bratz-doll-3.png" alt="Мастер красоты Solva Beauty - промо изображение" class="mid-doll-img"
+           style="filter:drop-shadow(0 0 40px rgba(255,105,180,.4)) drop-shadow(0 20px 50px rgba(0,0,0,.6));">
+    </div>
+  </div>
+</section>
+
+<!-- ─── PRICING ─── -->
+<section class="section section-divider" id="pricing">
+  <p class="s-label">Тарифы</p>
+  <h2 class="s-title">ПРОСТЫЕ <span>ЦЕНЫ</span></h2>
+  <div class="pricing-grid">
+
+    <div class="p-card">
+      <div class="p-tier">МЕСЯЦ</div>
+      <div class="p-amount">590<small> ₽</small></div>
+      <div class="p-period">оплата ежемесячно</div>
+      <div class="p-hr"></div>
+      <ul class="p-list">
+        <li>Все функции без ограничений</li>
+        <li>Онлайн-запись по ссылке</li>
+        <li>Авто-напоминания клиентам</li>
+        <li>Карточки клиентов</li>
+        <li>Статистика и аналитика</li>
+        <li>Поддержка в Telegram</li>
+      </ul>
+      <form class="waitlist-form" onsubmit="handleWaitlist(event)">
+        <input type="email" placeholder="Твой email" class="waitlist-input" required>
+        <button type="submit" class="btn-glow">🍎 Получить первой</button>
+      </form>
+    </div>
+
+    <div class="p-card featured">
+      <div class="p-hot">ХИТ</div>
+      <div class="p-tier">6 МЕСЯЦЕВ</div>
+      <div class="p-amount">450<small> ₽</small></div>
+      <div class="p-period">итого 2 700 ₽ · экономия 840 ₽</div>
+      <span class="saving-badge">Экономия 840 ₽</span>
+      <div class="p-hr"></div>
+      <ul class="p-list">
+        <li>Всё из тарифа Месяц</li>
+        <li>Приоритетная поддержка</li>
+        <li>Ранний доступ к новым функциям</li>
+      </ul>
+      <form class="waitlist-form" onsubmit="handleWaitlist(event)">
+        <input type="email" placeholder="Твой email" class="waitlist-input" required>
+        <button type="submit" class="btn-glow">🍎 Получить первой</button>
+      </form>
+    </div>
+
+    <div class="p-card">
+      <div class="p-tier">ГОД</div>
+      <div class="p-amount">350<small> ₽</small></div>
+      <div class="p-period">итого 4 200 ₽ · экономия 2 880 ₽</div>
+      <span class="saving-badge">Экономия 2 880 ₽</span>
+      <div class="p-hr"></div>
+      <ul class="p-list">
+        <li>Всё из тарифа Месяц</li>
+        <li>Максимальная экономия</li>
+        <li>Приоритетная поддержка</li>
+        <li>Ранний доступ к функциям</li>
+      </ul>
+      <form class="waitlist-form" onsubmit="handleWaitlist(event)">
+        <input type="email" placeholder="Твой email" class="waitlist-input" required>
+        <button type="submit" class="btn-glow">🍎 Получить первой</button>
+      </form>
+    </div>
+
+  </div>
+</section>
+
+<!-- ─── REVIEWS ─── -->
+<section class="section section-divider" id="reviews">
+  <p class="s-label">Отзывы</p>
+  <h2 class="s-title">ЧТО ГОВОРЯТ <span>МАСТЕРА</span></h2>
+  <div class="reviews-grid">
+
+    <div class="review-card">
+      <div class="review-header">
+        <svg class="review-avatar" viewBox="0 0 52 52">
+          <defs><linearGradient id="av1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF69B4"/><stop offset="1" stop-color="#d060ff"/></linearGradient></defs>
+          <circle cx="26" cy="26" r="26" fill="url(#av1)"/>
+          <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="22" font-weight="900" font-family="Arial,sans-serif">А</text>
+        </svg>
+        <div class="review-meta">
+          <div class="review-name">Анна</div>
+          <div class="review-role">Мастер маникюра и педикюра</div>
+        </div>
+      </div>
+      <div class="review-stars">★★★★★</div>
+      <p class="review-text">«Клиенты теперь записываются ночью, а я сплю спокойно. Напоминания приходят — никто не забывает. Удобно как никогда!»</p>
+    </div>
+
+    <div class="review-card">
+      <div class="review-header">
+        <svg class="review-avatar" viewBox="0 0 52 52">
+          <defs><linearGradient id="av2" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#9370DB"/><stop offset="1" stop-color="#c040ff"/></linearGradient></defs>
+          <circle cx="26" cy="26" r="26" fill="url(#av2)"/>
+          <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="22" font-weight="900" font-family="Arial,sans-serif">Е</text>
+        </svg>
+        <div class="review-meta">
+          <div class="review-name">Екатерина</div>
+          <div class="review-role">Бровист</div>
+        </div>
+      </div>
+      <div class="review-stars">★★★★★</div>
+      <p class="review-text">«Боялась, что будет сложно, но настроила приложение за 5 минут. Теперь всё в одном месте: клиенты, фото, записи. Очень довольна!»</p>
+    </div>
+
+    <div class="review-card">
+      <div class="review-header">
+        <svg class="review-avatar" viewBox="0 0 52 52">
+          <defs><linearGradient id="av3" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FF69B4"/><stop offset="1" stop-color="#9370DB"/></linearGradient></defs>
+          <circle cx="26" cy="26" r="26" fill="url(#av3)"/>
+          <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="22" font-weight="900" font-family="Arial,sans-serif">М</text>
+        </svg>
+        <div class="review-meta">
+          <div class="review-name">Мария</div>
+          <div class="review-role">Лешмейкер</div>
+        </div>
+      </div>
+      <div class="review-stars">★★★★★</div>
+      <p class="review-text">«Раньше теряла 30% клиентов, потому что забывала написать про коррекцию. Приложение напоминает само — возвращаемость выросла в 2 раза!»</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ─── STATS ─── -->
+<div class="stats-strip">
+  <div class="stats-inner">
+    <div class="stat-item">
+      <span class="stat-num" data-target="500" data-suffix="+">500+</span>
+      <div class="stat-label">мастеров уже работают</div>
+      <div class="stat-sub">по всей России</div>
+    </div>
+    <div class="stat-item">
+      <span class="stat-num" data-target="30" data-prefix="−" data-suffix="%">−30%</span>
+      <div class="stat-label">времени на рутину</div>
+      <div class="stat-sub">в среднем по мастерам</div>
+    </div>
+    <div class="stat-item">
+      <span class="stat-num" data-target="40" data-prefix="+" data-suffix="%">+40%</span>
+      <div class="stat-label">клиентов возвращаются</div>
+      <div class="stat-sub">благодаря авто-напоминаниям</div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── FAQ ─── -->
+<section class="section section-divider" id="faq">
+  <p class="s-label">FAQ</p>
+  <h2 class="s-title">ЧАСТЫЕ <span>ВОПРОСЫ</span></h2>
+  <div class="faq-list">
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Когда приложение появится в App Store?
+        <span class="faq-arrow">▼</span>
+      </button>
+      <div class="faq-a">Мы активно работаем над финальной версией. Оставь email — напишем тебе первой, как только выйдем.</div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Как клиенты записываются?
+        <span class="faq-arrow">▼</span>
+      </button>
+      <div class="faq-a">По вашей личной ссылке. Вы получаете уникальный адрес — клиент переходит, видит ваше расписание и выбирает удобное время.</div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Что если клиент не пришёл?
+        <span class="faq-arrow">▼</span>
+      </button>
+      <div class="faq-a">Приложение напомнит за сутки и за час до записи — и вы не потеряете деньги. Статистика пропусков также сохраняется в карточке клиента.</div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Как получить поддержку?
+        <span class="faq-arrow">▼</span>
+      </button>
+      <div class="faq-a">Напишите нам на почту: <strong style="color:var(--pink)">beautybook@rambler.ru</strong>. Мы отвечаем в течение нескольких часов и помогаем с любыми вопросами.</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ─── FINAL CTA ─── -->
+<div class="final-cta" id="cta">
+  <div class="cta-inner">
+    <div class="cta-tag">СКОРО В APP STORE</div>
+    <h2 class="cta-h">ГОТОВА РАБОТАТЬ<br><span>БЕЗ ХАОСА?</span></h2>
+    <p class="cta-sub">Оставь email — напишем первой, когда Solva Beauty появится в App Store.</p>
+    <form class="waitlist-form" onsubmit="handleWaitlist(event)">
+      <input type="email" placeholder="Твой email" class="waitlist-input" required>
+      <button type="submit" class="btn-glow">🍎 Получить первой</button>
+    </form>
+    <p class="cta-small">Бесплатно · Без спама · Напишем первыми</p>
+  </div>
+</div>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+  <div class="footer-social">
+    <!-- Email -->
+    <a href="mailto:beautybook@rambler.ru" class="social-link" aria-label="Email">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="sg3" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#FF69B4"/><stop offset="1" stop-color="#9370DB"/></linearGradient></defs>
+        <rect x="2" y="4" width="20" height="16" rx="3" stroke="url(#sg3)" stroke-width="1.5"/>
+        <path d="M2 8l10 7 10-7" stroke="url(#sg3)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+  </div>
+  <p class="footer-contacts">📧 <a href="mailto:beautybook@rambler.ru">beautybook@rambler.ru</a></p>
+  <div class="footer-tags">
+    <span class="ftag">#solvabeauty</span>
+    <span class="ftag">#маникюр</span>
+    <span class="ftag">#бровист</span>
+    <span class="ftag">#лешмейкер</span>
+    <span class="ftag">#визажист</span>
+    <span class="ftag">#записьклиентов</span>
+    <span class="ftag">#crmдлямастера</span>
+    <span class="ftag">#бизнескрасоты</span>
+    <span class="ftag">#мастеркрасоты</span>
+  </div>
+  <p class="footer-copy">© 2026 SOLVA BEAUTY · ВСЕ ПРАВА ЗАЩИЩЕНЫ</p>
+</footer>
+
+<script>
+(function(){
+  const g=document.getElementById('glitter');
+  for(let i=0;i<24;i++){
+    const s=document.createElement('div');s.className='spark';
+    const sz=Math.random()*3+2;
+    s.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}%;top:${Math.random()*100}%;animation-delay:${Math.random()*6}s;animation-duration:${3+Math.random()*5}s;`;
+    g.appendChild(s);
+  }
+})();
+
+function toggleFaq(btn){
+  const item=btn.closest('.faq-item');
+  const isOpen=item.classList.contains('open');
+  document.querySelectorAll('.faq-item.open').forEach(el=>el.classList.remove('open'));
+  if(!isOpen)item.classList.add('open');
+}
+
+function handleWaitlist(e){
+  e.preventDefault();
+  const email=e.target.querySelector('input').value;
+  e.target.innerHTML='<p style="color:#FF2D78;font-weight:800;font-size:16px;">✓ Записали! Напишем когда выйдем в App Store 🍎</p>';
+  console.log('Waitlist email:',email);
+}
+
+// Stats counter animation
+(function(){
+  const statNums=document.querySelectorAll('.stat-num[data-target]');
+  if(!statNums.length)return;
+  const observer=new IntersectionObserver((entries)=>{
+    entries.forEach(entry=>{
+      if(!entry.isIntersecting)return;
+      const el=entry.target;
+      const target=parseInt(el.dataset.target,10);
+      const prefix=el.dataset.prefix||'';
+      const suffix=el.dataset.suffix||'';
+      const duration=1400;
+      const start=performance.now();
+      function step(now){
+        const elapsed=now-start;
+        const progress=Math.min(elapsed/duration,1);
+        const eased=1-Math.pow(1-progress,3);
+        const value=Math.round(eased*target);
+        el.textContent=prefix+value+suffix;
+        if(progress<1)requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+      observer.unobserve(el);
+    });
+  },{threshold:0.5});
+  statNums.forEach(el=>observer.observe(el));
+})();
+</script>
+</body>
+</html>
