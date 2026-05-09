@@ -60,6 +60,7 @@ class MasterSettings(BaseModel):
     work_end: int = 20
     slot_duration: int = 60
     reminder_days: int = 40
+    specialization: str = ""
 
 
 class PaymentUpdate(BaseModel):

@@ -455,6 +455,7 @@ async def dashboard_settings(
     await update_master_settings(
         master_id, body.work_start, body.work_end,
         body.slot_duration, body.reminder_days, body.name,
+        body.specialization,
     )
     return {"ok": True}
 

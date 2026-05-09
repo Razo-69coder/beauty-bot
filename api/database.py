@@ -87,6 +87,7 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN theme TEXT DEFAULT 'pink'",
             "ALTER TABLE masters ADD COLUMN booking_link TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN is_active INTEGER DEFAULT 1",
+            "ALTER TABLE masters ADD COLUMN specialization TEXT DEFAULT ''",
         ]:
             try:
                 await db.execute(migration)
@@ -334,7 +335,7 @@ async def get_master_full(master_id: int) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
             "SELECT id, telegram_id, name, reminder_days, work_start, work_end, "
-            "slot_duration, payment_card, payment_phone, payment_banks, is_active "
+            "slot_duration, payment_card, payment_phone, payment_banks, is_active, specialization "
             "FROM masters WHERE id=?", (master_id,)
         ) as c:
             row = await c.fetchone()
@@ -352,15 +353,17 @@ async def get_master_full(master_id: int) -> dict | None:
         "payment_phone": row[8] or "",
         "payment_banks": row[9] or "",
         "is_active": bool(row[10]) if row[10] is not None else True,
+        "specialization": row[11] or "",
     }
 
 
 async def update_master_settings(master_id: int, work_start: int, work_end: int,
-                                  slot_duration: int, reminder_days: int, name: str):
+                                  slot_duration: int, reminder_days: int, name: str,
+                                  specialization: str = ""):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
-            "UPDATE masters SET work_start=?, work_end=?, slot_duration=?, reminder_days=?, name=? WHERE id=?",
-            (work_start, work_end, slot_duration, reminder_days, name, master_id)
+            "UPDATE masters SET work_start=?, work_end=?, slot_duration=?, reminder_days=?, name=?, specialization=? WHERE id=?",
+            (work_start, work_end, slot_duration, reminder_days, name, specialization, master_id)
         )
         await db.commit()
 
