@@ -41,6 +41,52 @@ async def cmd_start(message: Message, state: FSMContext):
                 )
                 return
 
+    elif param.startswith('master_'):
+        token = param[7:]
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT master_id FROM telegram_link_tokens WHERE token=$1 AND expires_at > NOW()",
+                token
+            )
+            if row:
+                await conn.execute(
+                    "UPDATE masters SET telegram_id=$1 WHERE id=$2",
+                    message.from_user.id, row['master_id']
+                )
+                await conn.execute(
+                    "DELETE FROM telegram_link_tokens WHERE token=$1", token
+                )
+                await message.answer("✅ Telegram успешно привязан! Теперь вы будете получать уведомления.")
+            else:
+                await message.answer("❌ Ссылка недействительна или устарела. Создайте новую в приложении.")
+        return
+
+    elif param.startswith('client_'):
+        try:
+            appointment_id = int(param[7:])
+        except ValueError:
+            await message.answer("❌ Неверная ссылка.")
+            return
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            appt = await conn.fetchrow(
+                "SELECT a.client_id, c.name FROM appointments a "
+                "JOIN clients c ON c.id = a.client_id "
+                "WHERE a.id = $1", appointment_id
+            )
+            if appt:
+                await conn.execute(
+                    "UPDATE clients SET telegram_id=$1 WHERE id=$2",
+                    message.from_user.id, appt['client_id']
+                )
+                await message.answer(
+                    f"✅ Отлично, {appt['name']}! Буду напоминать о вашей записи. До встречи! 💅"
+                )
+            else:
+                await message.answer("❌ Запись не найдена.")
+        return
+
     await state.set_state(PhoneState.waiting_for_phone)
     await message.answer(
         "👋 Привет! Я помогу вам не пропустить запись к мастеру.\n\n"

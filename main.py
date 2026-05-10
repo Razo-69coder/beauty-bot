@@ -3,6 +3,7 @@ import hmac
 import hashlib
 import json
 import os
+import secrets
 from typing import Optional
 from contextlib import asynccontextmanager
 from urllib.parse import unquote
@@ -762,7 +763,21 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
     except Exception:
         pass  # Don't fail if bot message fails
     
-    return {"ok": True, "appointment_id": appt_id}
+    return {"ok": True, "appointment_id": appt_id, "client_id": client_id, "bot_username": config.BOT_USERNAME}
+
+
+@app.get("/api/v1/telegram-link-token")
+async def v1_telegram_link_token(master_id: int = Depends(get_jwt_master_id)):
+    from datetime import datetime, timedelta
+    token = secrets.token_urlsafe(16)
+    expires_at = datetime.utcnow() + timedelta(minutes=10)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO telegram_link_tokens (master_id, token, expires_at) VALUES ($1, $2, $3)",
+            master_id, token, expires_at
+        )
+    return {"token": token, "bot_username": config.BOT_USERNAME}
 
 
 # ─── iOS API v1 — все маршруты для приложения ────────────────────────

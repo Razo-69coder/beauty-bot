@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Вариант 1 — Dark Glam</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --pink: #FF69B4;
+    --purple: #9370DB;
+    --black: #0a0a0a;
+    --white: #ffffff;
+  }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 20px;
+    overflow: hidden;
+  }
+
+  header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 20% 50%, rgba(255,105,180,0.25) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 50% at 80% 50%, rgba(147,112,219,0.25) 0%, transparent 70%);
+  }
+
+  .nav {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 48px;
+    z-index: 10;
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 900;
+    background: linear-gradient(90deg, var(--pink), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .nav-btn {
+    border: 1.5px solid var(--pink);
+    color: var(--pink);
+    background: transparent;
+    padding: 10px 24px;
+    border-radius: 30px;
+    font-size: 14px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all .3s;
+  }
+  .nav-btn:hover { background: var(--pink); color: var(--black); }
+
+  .badge {
+    display: inline-block;
+    background: linear-gradient(90deg, var(--pink), var(--purple));
+    color: var(--white);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 6px 20px;
+    border-radius: 20px;
+    margin-bottom: 28px;
+    position: relative;
+    z-index: 1;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(52px, 8vw, 96px);
+    font-weight: 900;
+    line-height: 1;
+    position: relative;
+    z-index: 1;
+    margin-bottom: 8px;
+  }
+
+  h1 .line-pink { color: var(--pink); display: block; }
+  h1 .line-white { color: var(--white); display: block; }
+  h1 .line-grad {
+    display: block;
+    background: linear-gradient(90deg, var(--purple), var(--pink));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero-sub {
+    font-size: 18px;
+    color: rgba(255,255,255,0.6);
+    margin: 24px auto;
+    max-width: 520px;
+    line-height: 1.6;
+    position: relative;
+    z-index: 1;
+  }
+
+  .hero-cta {
+    position: relative; z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    color: var(--white);
+    font-size: 16px;
+    font-weight: 600;
+    padding: 18px 44px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 1px;
+    box-shadow: 0 0 40px rgba(255,105,180,0.4);
+    transition: transform .2s, box-shadow .2s;
+    text-transform: uppercase;
+  }
+  .hero-cta:hover { transform: scale(1.04); box-shadow: 0 0 60px rgba(255,105,180,0.6); }
+
+  .scroll-hint {
+    position: absolute;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.4;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .scroll-hint::after {
+    content: '';
+    width: 1px;
+    height: 40px;
+    background: var(--pink);
+  }
+
+  /* ─── SECTION SHARED ─── */
+  section { padding: 100px 20px; max-width: 1100px; margin: 0 auto; }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--pink);
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(32px, 4vw, 52px);
+    font-weight: 900;
+    line-height: 1.1;
+    margin-bottom: 20px;
+  }
+
+  /* ─── ABOUT ─── */
+  .about-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+  }
+
+  .about-img {
+    width: 100%;
+    aspect-ratio: 4/5;
+    background: linear-gradient(160deg, rgba(255,105,180,0.15), rgba(147,112,219,0.15));
+    border: 1px solid rgba(255,105,180,0.2);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 80px;
+  }
+
+  .about-text { color: rgba(255,255,255,0.65); line-height: 1.8; font-size: 16px; margin-bottom: 24px; }
+
+  .about-stats {
+    display: flex;
+    gap: 32px;
+    margin-top: 32px;
+  }
+
+  .stat-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 40px;
+    font-weight: 900;
+    color: var(--pink);
+    display: block;
+  }
+
+  .stat-label { font-size: 13px; color: rgba(255,255,255,0.5); }
+
+  /* ─── BENEFITS ─── */
+  .benefits-wrap { border-top: 1px solid rgba(255,255,255,0.06); }
+
+  .benefits-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 48px;
+  }
+
+  .benefit-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,105,180,0.15);
+    border-radius: 16px;
+    padding: 32px 28px;
+    transition: border-color .3s, background .3s;
+  }
+  .benefit-card:hover {
+    border-color: rgba(255,105,180,0.5);
+    background: rgba(255,105,180,0.05);
+  }
+
+  .benefit-icon {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, rgba(255,105,180,0.2), rgba(147,112,219,0.2));
+    border: 1px solid rgba(255,105,180,0.3);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-bottom: 20px;
+  }
+
+  .benefit-title { font-size: 18px; font-weight: 600; margin-bottom: 10px; }
+  .benefit-text { font-size: 14px; color: rgba(255,255,255,0.5); line-height: 1.7; }
+
+  /* ─── PRICING ─── */
+  .pricing-wrap { border-top: 1px solid rgba(255,255,255,0.06); text-align: center; }
+
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 48px;
+    text-align: left;
+  }
+
+  .price-card {
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 36px 32px;
+    position: relative;
+    overflow: hidden;
+    transition: transform .2s;
+  }
+  .price-card:hover { transform: translateY(-4px); }
+
+  .price-card.featured {
+    border-color: var(--pink);
+    background: linear-gradient(160deg, rgba(255,105,180,0.08), rgba(147,112,219,0.08));
+  }
+
+  .popular-tag {
+    position: absolute;
+    top: 20px; right: 20px;
+    background: linear-gradient(90deg, var(--pink), var(--purple));
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 20px;
+  }
+
+  .plan-name { font-size: 13px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 16px; }
+  .plan-price { font-family: 'Playfair Display', serif; font-size: 52px; font-weight: 900; color: var(--white); line-height: 1; }
+  .plan-price span { font-size: 20px; color: rgba(255,255,255,0.5); }
+  .plan-period { font-size: 13px; color: rgba(255,255,255,0.4); margin-bottom: 28px; }
+
+  .plan-features { list-style: none; margin-bottom: 32px; }
+  .plan-features li {
+    font-size: 14px;
+    color: rgba(255,255,255,0.65);
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .plan-features li::before { content: '✦'; color: var(--pink); font-size: 10px; flex-shrink: 0; }
+
+  .plan-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1.5px solid rgba(255,255,255,0.2);
+    background: transparent;
+    color: var(--white);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .3s;
+    letter-spacing: 1px;
+  }
+  .price-card.featured .plan-btn {
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    border-color: transparent;
+    box-shadow: 0 8px 24px rgba(255,105,180,0.3);
+  }
+  .plan-btn:hover { opacity: 0.8; }
+
+  /* ─── FOOTER CTA ─── */
+  .footer-cta {
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 100px 20px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .footer-cta::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 100%, rgba(147,112,219,0.2), transparent);
+  }
+
+  .footer-cta .section-title { position: relative; z-index: 1; max-width: 600px; margin: 0 auto 32px; }
+
+  .footer-cta .hero-cta { position: relative; z-index: 1; }
+
+  footer {
+    text-align: center;
+    padding: 32px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.25);
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+
+  @media (max-width: 768px) {
+    .about-grid, .benefits-grid, .pricing-grid { grid-template-columns: 1fr; }
+    .nav { padding: 20px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── HEADER ─── -->
+<header>
+  <nav class="nav">
+    <div class="logo">Glam Studio</div>
+    <button class="nav-btn">Записаться</button>
+  </nav>
+
+  <span class="badge">✦ Beauty Salon ✦</span>
+  <h1>
+    <span class="line-white">Твоя</span>
+    <span class="line-pink">Красота</span>
+    <span class="line-grad">Наш Стиль</span>
+  </h1>
+  <p class="hero-sub">Профессиональный уход, который делает из тебя главную героиню. Современные техники, безупречный результат.</p>
+  <button class="hero-cta">✦ Записаться сейчас</button>
+
+  <div class="scroll-hint">scroll</div>
+</header>
+
+<!-- ─── ABOUT ─── -->
+<section>
+  <div class="about-grid">
+    <div class="about-img">💅</div>
+    <div>
+      <p class="section-label">О нас</p>
+      <h2 class="section-title">Салон, где рождается<br><span style="color:var(--pink)">настоящий стиль</span></h2>
+      <p class="about-text">Мы создаём образы, которые говорят за тебя ещё до первого слова. Каждая процедура — это путешествие к лучшей версии себя.</p>
+      <p class="about-text">Наши мастера — это художники с многолетним опытом, которые следят за мировыми трендами и привносят их в каждую работу.</p>
+      <div class="about-stats">
+        <div><span class="stat-num">500+</span><span class="stat-label">Довольных клиенток</span></div>
+        <div><span class="stat-num">5★</span><span class="stat-label">Средний рейтинг</span></div>
+        <div><span class="stat-num">3 года</span><span class="stat-label">На рынке</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── BENEFITS ─── -->
+<section class="benefits-wrap">
+  <p class="section-label">Преимущества</p>
+  <h2 class="section-title">Почему выбирают нас</h2>
+  <div class="benefits-grid">
+    <div class="benefit-card">
+      <div class="benefit-icon">✨</div>
+      <div class="benefit-title">Топ-мастера</div>
+      <p class="benefit-text">Сертифицированные специалисты с международным опытом и постоянным обучением новым техникам.</p>
+    </div>
+    <div class="benefit-card">
+      <div class="benefit-icon">💎</div>
+      <div class="benefit-title">Люкс-косметика</div>
+      <p class="benefit-text">Используем только профессиональные бренды: Kérastase, OPI, La Mer. Никаких компромиссов с качеством.</p>
+    </div>
+    <div class="benefit-card">
+      <div class="benefit-icon">🌸</div>
+      <div class="benefit-title">Атмосфера</div>
+      <p class="benefit-text">Уютное пространство в розово-фиолетовых тонах, где ты забудешь о суете и просто наслаждаешься.</p>
+    </div>
+    <div class="benefit-card">
+      <div class="benefit-icon">⚡</div>
+      <div class="benefit-title">Быстрая запись</div>
+      <p class="benefit-text">Онлайн-запись 24/7 прямо через Telegram. Никаких звонков — просто выбери время и подтверди.</p>
+    </div>
+    <div class="benefit-card">
+      <div class="benefit-icon">🎯</div>
+      <div class="benefit-title">Индивидуальный подход</div>
+      <p class="benefit-text">Каждый образ создаётся под тебя: форму лица, цветотип, образ жизни. Ты всегда уходишь довольной.</p>
+    </div>
+    <div class="benefit-card">
+      <div class="benefit-icon">🔒</div>
+      <div class="benefit-title">Гарантия результата</div>
+      <p class="benefit-text">Если что-то не понравилось — бесплатная корректировка в течение 7 дней. Мы отвечаем за свою работу.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PRICING ─── -->
+<section class="pricing-wrap">
+  <p class="section-label">Цены</p>
+  <h2 class="section-title">Выбери свой формат</h2>
+  <div class="pricing-grid">
+    <div class="price-card">
+      <div class="plan-name">Базовый</div>
+      <div class="plan-price"><span>от</span> 800 <span>₽</span></div>
+      <div class="plan-period">за процедуру</div>
+      <ul class="plan-features">
+        <li>Стрижка / укладка</li>
+        <li>Базовый маникюр</li>
+        <li>Консультация мастера</li>
+        <li>Кофе в подарок</li>
+      </ul>
+      <button class="plan-btn">Записаться</button>
+    </div>
+
+    <div class="price-card featured">
+      <div class="popular-tag">Хит</div>
+      <div class="plan-name">Премиум</div>
+      <div class="plan-price"><span>от</span> 2 500 <span>₽</span></div>
+      <div class="plan-period">за комплекс</div>
+      <ul class="plan-features">
+        <li>Окрашивание / блонд</li>
+        <li>Гель-лак + дизайн</li>
+        <li>Укладка в подарок</li>
+        <li>Уход за волосами</li>
+        <li>Приоритетная запись</li>
+      </ul>
+      <button class="plan-btn">Записаться</button>
+    </div>
+
+    <div class="price-card">
+      <div class="plan-name">VIP</div>
+      <div class="plan-price"><span>от</span> 5 000 <span>₽</span></div>
+      <div class="plan-period">полный день</div>
+      <ul class="plan-features">
+        <li>Полное преображение</li>
+        <li>Брови + ресницы</li>
+        <li>SPA-маникюр/педикюр</li>
+        <li>Персональный стилист</li>
+        <li>Фотосессия в подарок</li>
+      </ul>
+      <button class="plan-btn">Записаться</button>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOOTER CTA ─── -->
+<div class="footer-cta">
+  <h2 class="section-title">Готова к<br><span style="color:var(--pink)">преображению?</span></h2>
+  <button class="hero-cta">✦ Записаться в Telegram</button>
+</div>
+
+<footer>© 2025 Glam Studio · Все права защищены</footer>
+
+</body>
+</html>

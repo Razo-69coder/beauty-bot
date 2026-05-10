@@ -166,6 +166,14 @@ async def init_db():
                 UNIQUE(master_id, date)
             )
         """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS telegram_link_tokens (
+                id SERIAL PRIMARY KEY,
+                master_id INTEGER NOT NULL,
+                token TEXT NOT NULL UNIQUE,
+                expires_at TIMESTAMPTZ NOT NULL
+            )
+        """)
 
 
 # ── Мастера ───────────────────────────────────────────────────────────

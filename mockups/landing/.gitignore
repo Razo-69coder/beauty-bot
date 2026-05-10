@@ -1,0 +1,9 @@
+.vercel
+*.py
+*.pyc
+__pycache__/
+*.db
+*.sqlite
+config.py
+.env
+README.md

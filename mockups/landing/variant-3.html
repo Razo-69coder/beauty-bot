@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Вариант 3 — Y2K Bratz</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Nunito:wght@400;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --pink: #FF69B4;
+    --purple: #9370DB;
+    --black: #110010;
+    --white: #ffffff;
+    --hot: #ff2d78;
+    --chrome: #e8d5ff;
+  }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: 'Nunito', sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* ─── Y2K GRID BG ─── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(147,112,219,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(147,112,219,0.07) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── NAV ─── */
+  nav {
+    position: fixed;
+    top: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 100;
+    background: rgba(17,0,16,0.8);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,105,180,0.3);
+    border-radius: 50px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 8px 8px 24px;
+    width: fit-content;
+    max-width: calc(100% - 40px);
+  }
+
+  .logo {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 18px;
+    letter-spacing: 2px;
+    background: linear-gradient(90deg, var(--pink), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-right: 16px;
+  }
+
+  .nav-links { display: flex; gap: 4px; }
+  .nav-links a {
+    text-decoration: none;
+    color: rgba(255,255,255,0.6);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 8px 16px;
+    border-radius: 30px;
+    transition: all .2s;
+  }
+  .nav-links a:hover { background: rgba(255,105,180,0.15); color: var(--pink); }
+
+  .nav-cta {
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    color: var(--white);
+    border: none;
+    padding: 12px 24px;
+    border-radius: 30px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    letter-spacing: 0.5px;
+    transition: opacity .2s;
+  }
+  .nav-cta:hover { opacity: 0.85; }
+
+  /* ─── HERO ─── */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 120px 20px 80px;
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  .hero-glow-1 {
+    position: absolute;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(255,105,180,0.3) 0%, transparent 65%);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  .hero-glow-2 {
+    position: absolute;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(147,112,219,0.2) 0%, transparent 65%);
+    top: 20%; right: 10%;
+    pointer-events: none;
+  }
+
+  .hero-glow-3 {
+    position: absolute;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(147,112,219,0.2) 0%, transparent 65%);
+    bottom: 20%; left: 10%;
+    pointer-events: none;
+  }
+
+  .y2k-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    z-index: 1;
+    margin-bottom: 32px;
+  }
+
+  .y2k-tag-inner {
+    background: rgba(255,105,180,0.1);
+    border: 1px solid rgba(255,105,180,0.4);
+    color: var(--pink);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 8px 20px;
+    border-radius: 6px;
+    position: relative;
+  }
+
+  .y2k-tag-inner::before {
+    content: '★';
+    position: absolute;
+    left: -14px; top: 50%; transform: translateY(-50%);
+    font-size: 16px;
+    color: var(--pink);
+  }
+  .y2k-tag-inner::after {
+    content: '★';
+    position: absolute;
+    right: -14px; top: 50%; transform: translateY(-50%);
+    font-size: 16px;
+    color: var(--pink);
+  }
+
+  .hero h1 {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: clamp(56px, 10vw, 120px);
+    line-height: 0.9;
+    position: relative;
+    z-index: 1;
+    margin-bottom: 24px;
+    letter-spacing: -2px;
+  }
+
+  .hero h1 .word-1 {
+    display: block;
+    color: var(--white);
+    -webkit-text-stroke: 2px rgba(255,255,255,0.1);
+  }
+
+  .hero h1 .word-2 {
+    display: block;
+    background: linear-gradient(90deg, var(--pink) 0%, var(--purple) 50%, var(--pink) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shine 4s linear infinite;
+  }
+
+  .hero h1 .word-3 {
+    display: block;
+    color: transparent;
+    -webkit-text-stroke: 2px var(--purple);
+  }
+
+  @keyframes shine {
+    from { background-position: 0% center; }
+    to { background-position: 200% center; }
+  }
+
+  .hero-desc {
+    font-size: 17px;
+    color: rgba(255,255,255,0.55);
+    max-width: 480px;
+    line-height: 1.7;
+    position: relative;
+    z-index: 1;
+    margin-bottom: 40px;
+  }
+
+  .hero-btns {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+    flex-wrap: wrap;
+  }
+
+  .btn-glow {
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    color: var(--white);
+    border: none;
+    padding: 18px 44px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    position: relative;
+    transition: transform .2s;
+    box-shadow: 0 0 0 0 rgba(255,105,180,0.5);
+    animation: pulse-glow 3s ease infinite;
+  }
+
+  .btn-glow:hover { transform: scale(1.04); animation: none; box-shadow: 0 0 40px rgba(255,105,180,0.6); }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 20px rgba(255,105,180,0.3); }
+    50% { box-shadow: 0 0 50px rgba(255,105,180,0.6); }
+  }
+
+  .btn-outline {
+    background: transparent;
+    color: rgba(255,255,255,0.7);
+    border: 1.5px solid rgba(255,255,255,0.2);
+    padding: 18px 36px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    transition: all .2s;
+  }
+  .btn-outline:hover { border-color: var(--pink); color: var(--pink); }
+
+  .hero-tags {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 40px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .htag {
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.5);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 6px 14px;
+    border-radius: 4px;
+  }
+
+  /* ─── SECTION SHARED ─── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+  section { padding: 80px 0; position: relative; z-index: 1; }
+
+  .s-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--pink);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .s-label::before, .s-label::after { content: ''; flex: 1; max-width: 40px; height: 1px; background: var(--pink); opacity: 0.4; }
+
+  .s-title {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: clamp(32px, 4vw, 56px);
+    line-height: 1;
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+  }
+
+  /* ─── BENEFITS ─── */
+  .benefits { border-top: 1px solid rgba(255,105,180,0.12); }
+
+  .benefits-header { text-align: center; margin-bottom: 56px; }
+
+  .benefits-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    background: rgba(255,105,180,0.1);
+    border: 1px solid rgba(255,105,180,0.1);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .b-card {
+    background: var(--black);
+    padding: 36px 28px;
+    transition: background .3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .b-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 2px;
+    background: linear-gradient(90deg, var(--pink), var(--purple));
+    opacity: 0;
+    transition: opacity .3s;
+  }
+
+  .b-card:hover::before { opacity: 1; }
+  .b-card:hover { background: rgba(255,105,180,0.05); }
+
+  .b-num {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 56px;
+    line-height: 1;
+    background: linear-gradient(180deg, rgba(255,105,180,0.3), transparent);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 16px;
+  }
+
+  .b-title { font-size: 17px; font-weight: 800; margin-bottom: 10px; color: var(--white); }
+  .b-text { font-size: 14px; color: rgba(255,255,255,0.45); line-height: 1.7; }
+
+  /* ─── PRICING ─── */
+  .pricing { border-top: 1px solid rgba(255,105,180,0.12); }
+
+  .pricing-header { text-align: center; margin-bottom: 56px; }
+
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .p-card {
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 40px 32px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .3s, transform .2s;
+  }
+  .p-card:hover { border-color: rgba(255,105,180,0.4); transform: translateY(-4px); }
+
+  .p-card.featured {
+    border-color: rgba(255,105,180,0.5);
+    background: rgba(255,105,180,0.04);
+  }
+
+  .p-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, rgba(255,105,180,0.04), transparent 60%);
+    pointer-events: none;
+  }
+
+  .p-hot {
+    position: absolute;
+    top: 20px; right: 20px;
+    background: var(--pink);
+    color: var(--white);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+
+  .p-name {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 20px;
+  }
+
+  .p-price {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 60px;
+    line-height: 1;
+    color: var(--white);
+    margin-bottom: 4px;
+  }
+
+  .p-price-small { font-size: 24px; color: rgba(255,255,255,0.4); }
+  .p-period { font-size: 12px; color: rgba(255,255,255,0.3); margin-bottom: 28px; }
+
+  .p-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,105,180,0.3), transparent);
+    margin-bottom: 24px;
+  }
+
+  .p-list { list-style: none; margin-bottom: 32px; }
+  .p-list li {
+    font-size: 14px;
+    color: rgba(255,255,255,0.6);
+    padding: 9px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .p-list li::before { content: '◆'; color: var(--pink); font-size: 8px; flex-shrink: 0; }
+
+  .p-btn {
+    width: 100%;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1.5px solid rgba(255,105,180,0.3);
+    background: transparent;
+    color: rgba(255,255,255,0.7);
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: all .2s;
+  }
+  .p-card.featured .p-btn {
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    border-color: transparent;
+    color: var(--white);
+    box-shadow: 0 8px 24px rgba(255,105,180,0.25);
+  }
+  .p-btn:hover { background: rgba(255,105,180,0.15); color: var(--pink); }
+  .p-card.featured .p-btn:hover { opacity: 0.9; background: linear-gradient(135deg, var(--pink), var(--purple)); }
+
+  /* ─── FINAL CTA ─── */
+  .final-cta {
+    border-top: 1px solid rgba(255,105,180,0.12);
+    padding: 120px 20px;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .final-cta::before {
+    content: 'GLAM';
+    position: absolute;
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 200px;
+    color: rgba(255,105,180,0.04);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .cta-inner { position: relative; z-index: 1; }
+
+  .cta-label {
+    display: inline-block;
+    border: 1px solid rgba(255,105,180,0.4);
+    color: var(--pink);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 6px 20px;
+    border-radius: 4px;
+    margin-bottom: 28px;
+  }
+
+  .cta-title {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: clamp(40px, 6vw, 80px);
+    line-height: 0.95;
+    letter-spacing: -2px;
+    margin-bottom: 24px;
+  }
+
+  .cta-title span { color: var(--pink); }
+
+  .cta-sub {
+    font-size: 17px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 40px;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.7;
+  }
+
+  footer {
+    text-align: center;
+    padding: 28px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.2);
+    border-top: 1px solid rgba(255,255,255,0.05);
+    position: relative;
+    z-index: 1;
+    letter-spacing: 1px;
+  }
+
+  @media (max-width: 768px) {
+    nav { top: 8px; padding: 8px 8px 8px 16px; }
+    .nav-links { display: none; }
+    .benefits-grid, .pricing-grid { grid-template-columns: 1fr; }
+    .benefits-grid { gap: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── NAV ─── -->
+<nav>
+  <div class="logo">GLAM</div>
+  <div class="nav-links">
+    <a href="#">Услуги</a>
+    <a href="#">Цены</a>
+    <a href="#">Контакты</a>
+  </div>
+  <button class="nav-cta">Записаться ✦</button>
+</nav>
+
+<!-- ─── HERO ─── -->
+<section class="hero">
+  <div class="hero-glow-1"></div>
+  <div class="hero-glow-2"></div>
+  <div class="hero-glow-3"></div>
+
+  <div class="y2k-tag"><div class="y2k-tag-inner">Beauty Studio</div></div>
+
+  <h1>
+    <span class="word-1">ТЫ</span>
+    <span class="word-2">ГЛАВНАЯ</span>
+    <span class="word-3">ГЕРОИНЯ</span>
+  </h1>
+
+  <p class="hero-desc">Салон красоты в стиле Bratz — дерзко, ярко и профессионально. Создаём образы, которые невозможно не заметить.</p>
+
+  <div class="hero-btns">
+    <button class="btn-glow">✦ Записаться сейчас</button>
+    <button class="btn-outline">Смотреть услуги</button>
+  </div>
+
+  <div class="hero-tags">
+    <span class="htag">#волосы</span>
+    <span class="htag">#маникюр</span>
+    <span class="htag">#брови</span>
+    <span class="htag">#ресницы</span>
+    <span class="htag">#макияж</span>
+    <span class="htag">#spa</span>
+  </div>
+</section>
+
+<!-- ─── BENEFITS ─── -->
+<section class="benefits">
+  <div class="container">
+    <div class="benefits-header">
+      <p class="s-label">Преимущества</p>
+      <h2 class="s-title">ПОЧЕМУ МЫ?</h2>
+    </div>
+    <div class="benefits-grid">
+      <div class="b-card">
+        <div class="b-num">01</div>
+        <div class="b-title">Топ-мастера</div>
+        <p class="b-text">Сертифицированные специалисты с международным опытом. Следят за трендами — от Y2K до минимализма.</p>
+      </div>
+      <div class="b-card">
+        <div class="b-num">02</div>
+        <div class="b-title">Люкс-косметика</div>
+        <p class="b-text">Только профессиональные бренды: Kérastase, OPI, La Mer. Твои волосы и кожа заслуживают лучшего.</p>
+      </div>
+      <div class="b-card">
+        <div class="b-num">03</div>
+        <div class="b-title">Онлайн-запись</div>
+        <p class="b-text">Записывайся 24/7 прямо в Telegram. Никаких звонков — выбрала время, подтвердила, пришла.</p>
+      </div>
+      <div class="b-card">
+        <div class="b-num">04</div>
+        <div class="b-title">Твой образ</div>
+        <p class="b-text">Каждый визит начинается с разбора твоего стиля. Результат — это именно то, что ты хотела.</p>
+      </div>
+      <div class="b-card">
+        <div class="b-num">05</div>
+        <div class="b-title">Атмосфера</div>
+        <p class="b-text">Розово-фиолетовое пространство, музыка и кофе. Приходишь отдохнуть — уходишь трансформированной.</p>
+      </div>
+      <div class="b-card">
+        <div class="b-num">06</div>
+        <div class="b-title">Гарантия</div>
+        <p class="b-text">Бесплатная корректировка 7 дней. Мы уверены в качестве своей работы и готовы это доказать.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PRICING ─── -->
+<section class="pricing">
+  <div class="container">
+    <div class="pricing-header">
+      <p class="s-label">Цены</p>
+      <h2 class="s-title">ВЫБЕРИ ФОРМАТ</h2>
+    </div>
+    <div class="pricing-grid">
+      <div class="p-card">
+        <div class="p-name">Базовый</div>
+        <div class="p-price">800<span class="p-price-small">₽</span></div>
+        <div class="p-period">за процедуру</div>
+        <div class="p-divider"></div>
+        <ul class="p-list">
+          <li>Стрижка / Укладка</li>
+          <li>Базовый маникюр</li>
+          <li>Консультация мастера</li>
+          <li>Комплимент от салона</li>
+        </ul>
+        <button class="p-btn">Записаться</button>
+      </div>
+
+      <div class="p-card featured">
+        <div class="p-hot">★ Хит</div>
+        <div class="p-name">Премиум</div>
+        <div class="p-price">2 500<span class="p-price-small">₽</span></div>
+        <div class="p-period">комплексная процедура</div>
+        <div class="p-divider"></div>
+        <ul class="p-list">
+          <li>Окрашивание + уход</li>
+          <li>Гель-лак + дизайн</li>
+          <li>Укладка в подарок</li>
+          <li>Брови / Ресницы</li>
+          <li>Приоритетная запись</li>
+        </ul>
+        <button class="p-btn">Записаться</button>
+      </div>
+
+      <div class="p-card">
+        <div class="p-name">VIP</div>
+        <div class="p-price">5 000<span class="p-price-small">₽</span></div>
+        <div class="p-period">день красоты</div>
+        <div class="p-divider"></div>
+        <ul class="p-list">
+          <li>Полное преображение</li>
+          <li>SPA маникюр + педикюр</li>
+          <li>Брови + Ресницы + Макияж</li>
+          <li>Персональный стилист</li>
+          <li>Фотосессия в подарок</li>
+        </ul>
+        <button class="p-btn">Записаться</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FINAL CTA ─── -->
+<div class="final-cta">
+  <div class="cta-inner">
+    <div class="cta-label">Запись открыта</div>
+    <h2 class="cta-title">ГОТОВА К<br><span>ПРЕОБРАЖЕНИЮ?</span></h2>
+    <p class="cta-sub">Первый визит — скидка 15%. Записывайся прямо сейчас через Telegram.</p>
+    <button class="btn-glow">✦ Открыть в Telegram</button>
+  </div>
+</div>
+
+<footer>© 2025 GLAM STUDIO · ВСЕ ПРАВА ЗАЩИЩЕНЫ · 9:00 — 21:00</footer>
+
+</body>
+</html>
