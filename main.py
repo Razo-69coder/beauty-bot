@@ -840,7 +840,7 @@ async def v1_master_me(master_id: int = Depends(get_jwt_master_id)):
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT id, name, email, COALESCE(phone,'') as phone, work_start, work_end, slot_duration, reminder_days, "
+            "SELECT id, name, email, telegram_id, COALESCE(phone,'') as phone, work_start, work_end, slot_duration, reminder_days, "
             "COALESCE(timezone,'Europe/Moscow') as timezone, "
             "COALESCE(payment_card,'') as payment_card, "
             "COALESCE(payment_phone,'') as payment_phone, "
@@ -854,6 +854,7 @@ async def v1_master_me(master_id: int = Depends(get_jwt_master_id)):
         raise HTTPException(404, "Мастер не найден")
     return {
         "id": row['id'], "name": row['name'] or "", "email": row['email'] or "", "phone": row['phone'],
+        "telegram_id": row['telegram_id'],
         "work_start": row['work_start'] or 10, "work_end": row['work_end'] or 20,
         "slot_duration": row['slot_duration'] or 60,
         "reminder_days": row['reminder_days'] or 40,
