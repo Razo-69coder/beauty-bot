@@ -463,6 +463,24 @@ async def api_public_master(telegram_id: int):
     return {"name": master["name"], "master_id": master["id"], "available_dates": available_dates}
 
 
+@app.post("/api/debug/test-notification")
+async def debug_test_notification(telegram_id: int, type: str = "2h", secret: str = ""):
+    if secret != ADMIN_SECRET:
+        raise HTTPException(403, "Forbidden")
+    messages = {
+        "2h": "⏰ *Через 2 часа ваша запись!*\n\n📅 Тест-дата в *Тест-время*\n📋 Тест-процедура\n\nНе забудьте!",
+        "24h": "🔔 *Напоминание о записи*\n\nЗавтра, *Тест-дата* в *Тест-время*\n📋 Тест-процедура\n\nЖдём вас!",
+        "review": "💅 *Тест-клиент, как прошёл визит?*\n\nОцените процедуру «Тест-процедура»:",
+        "correction": "💅 *Привет!*\n\nПрошло 3 недели после визита — самое время на коррекцию!\n\nЗапишитесь к мастеру заранее 🗓",
+        "birthday": "🎂 *С днём рождения!*\n\nМастер поздравляет вас с праздником! 🎉\n\nЖдём вас на любимой процедуре 💅",
+        "loyalty": "🏆 Вы у нас уже 10 раз!\n\nВы заработали скидку на следующий визит 🎉\n\nЗапишитесь и скажите мастеру что вы постоянный клиент 💅",
+        "booking": "🔔 *Новая запись через ссылку!*\n\n👤 Тест-клиент\n📱 +7 (999) 000-00-00\n📅 Тест-дата в Тест-время\n💅 Тест-процедура",
+    }
+    text = messages.get(type, f"🔔 Тест-уведомление типа: {type}")
+    await bot.send_message(telegram_id, text, parse_mode="Markdown")
+    return {"ok": True, "sent_to": telegram_id, "type": type}
+
+
 @app.get("/api/public/slots")
 async def api_public_slots(master: int, date: str):
     master_info = await get_master_info_by_telegram(master)
