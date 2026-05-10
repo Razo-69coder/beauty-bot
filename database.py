@@ -265,7 +265,7 @@ async def get_master_by_booking_link(link: str) -> dict | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT id, name, work_start, work_end, slot_duration, booking_link "
+            "SELECT id, name, work_start, work_end, slot_duration, booking_link, telegram_id "
             "FROM masters WHERE booking_link=$1",
             link
         )
@@ -275,6 +275,7 @@ async def get_master_by_booking_link(link: str) -> dict | None:
         "id": row['id'], "name": row['name'] or "",
         "work_start": row['work_start'] or 9, "work_end": row['work_end'] or 20,
         "slot_duration": row['slot_duration'] or 60, "booking_link": row['booking_link'] or "",
+        "telegram_id": row['telegram_id'],
     }
 
 
