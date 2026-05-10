@@ -35,7 +35,7 @@ from database import (
     get_master_info, get_master_info_by_telegram, get_available_slots,
     get_master_schedule, update_appointment_status,
     create_login_code, verify_login_code, verify_login_code_by_code,
-    get_master_full, update_master_full_settings, update_master_payment, update_master_timezone,
+    get_master_full, update_master_full_settings, update_master_loyalty_settings, update_master_payment, update_master_timezone,
     search_clients,
     get_services, add_service, delete_service,
     get_earnings_by_service, get_earnings_by_client, get_earnings_by_day, get_earnings_by_period,
@@ -308,6 +308,15 @@ class PublicBookingRequest(BaseModel):
     procedure: str = ""
     date: str
     time: str
+    birthday: str = ""
+
+
+class LoyaltySettingsRequest(BaseModel):
+    loyalty_enabled: bool = False
+    loyalty_threshold: int = 10
+    loyalty_discount_percent: int = 10
+    birthday_enabled: bool = False
+    birthday_discount_percent: int = 10
 
 
 class ClientUpdate(BaseModel):
@@ -754,7 +763,7 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
     if existing:
         client_id = existing["id"]
     else:
-        client_id = await add_client(master["id"], body.client_name, body.client_phone)
+        client_id = await add_client(master["id"], body.client_name, body.client_phone, birthday=body.birthday)
     appt_id = await add_appointment(
         client_id=client_id,
         master_id=master["id"],
@@ -865,7 +874,12 @@ async def v1_master_me(master_id: int = Depends(get_jwt_master_id)):
             "COALESCE(payment_banks,'') as payment_banks, "
             "COALESCE(deposit_enabled,false) as deposit_enabled, "
             "COALESCE(deposit_percent,30) as deposit_percent, "
-            "COALESCE(theme,'pink') as theme "
+            "COALESCE(theme,'pink') as theme, "
+            "loyalty_threshold, "
+            "COALESCE(birthday_discount_enabled,false) as birthday_discount_enabled, "
+            "COALESCE(birthday_discount_percent,10) as birthday_discount_percent, "
+            "COALESCE(loyalty_discount_enabled,false) as loyalty_discount_enabled, "
+            "COALESCE(loyalty_discount_percent,10) as loyalty_discount_percent "
             "FROM masters WHERE id=$1", master_id
         )
     if not row:
@@ -881,6 +895,11 @@ async def v1_master_me(master_id: int = Depends(get_jwt_master_id)):
         "deposit_enabled": bool(row['deposit_enabled']),
         "deposit_percent": row['deposit_percent'] or 30,
         "theme": row['theme'],
+        "loyalty_threshold": row['loyalty_threshold'] or 10,
+        "birthday_discount_enabled": bool(row['birthday_discount_enabled']) if row['birthday_discount_enabled'] is not None else False,
+        "birthday_discount_percent": row['birthday_discount_percent'] or 10,
+        "loyalty_discount_enabled": bool(row['loyalty_discount_enabled']) if row['loyalty_discount_enabled'] is not None else False,
+        "loyalty_discount_percent": row['loyalty_discount_percent'] or 10,
     }
 
 
@@ -912,6 +931,15 @@ async def v1_update_profile(body: _V1ProfileUpdate, master_id: int = Depends(get
 @app.put("/api/v1/masters/me/payment")
 async def v1_update_payment(body: _V1PaymentUpdate, master_id: int = Depends(get_jwt_master_id)):
     await update_master_payment(master_id, body.payment_card, body.payment_phone, body.payment_banks)
+    return {"ok": True}
+
+
+@app.put("/api/v1/loyalty-settings")
+async def v1_update_loyalty_settings(body: LoyaltySettingsRequest, master_id: int = Depends(get_jwt_master_id)):
+    await update_master_loyalty_settings(
+        master_id, body.loyalty_enabled, body.loyalty_threshold,
+        body.loyalty_discount_percent, body.birthday_enabled, body.birthday_discount_percent
+    )
     return {"ok": True}
 
 

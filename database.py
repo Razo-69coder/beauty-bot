@@ -151,6 +151,11 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS password_hash TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS booking_link TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS loyalty_threshold INTEGER DEFAULT 10",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS birthday_discount_enabled BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS birthday_discount_percent INTEGER DEFAULT 10",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS loyalty_discount_enabled BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS loyalty_discount_percent INTEGER DEFAULT 10",
+            "ALTER TABLE clients ADD COLUMN IF NOT EXISTS birthday TEXT",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1",
         ]:
@@ -357,7 +362,7 @@ async def update_reminder_days_by_master(master_id: int, days: int):
 
 # ── Клиенты ───────────────────────────────────────────────────────────
 
-async def add_client(master_id: int, name: str, phone: str, notes: str = "") -> int:
+async def add_client(master_id: int, name: str, phone: str, notes: str = "", birthday: str = "") -> int:
     pool = await get_pool()
     async with pool.acquire() as conn:
         # Нормализуем телефон — только цифры
@@ -374,8 +379,8 @@ async def add_client(master_id: int, name: str, phone: str, notes: str = "") -> 
             return existing['id']  # возвращаем существующего клиента
 
         row = await conn.fetchrow(
-            "INSERT INTO clients (master_id, name, phone, notes) VALUES ($1,$2,$3,$4) RETURNING id",
-            master_id, name, phone, notes
+            "INSERT INTO clients (master_id, name, phone, notes, birthday) VALUES ($1,$2,$3,$4,$5) RETURNING id",
+            master_id, name, phone, notes, birthday if birthday else None
         )
     return row['id']
 
@@ -825,7 +830,10 @@ async def get_master_full(master_id: int) -> dict | None:
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT id, telegram_id, name, reminder_days, work_start, work_end, slot_duration, "
-            "COALESCE(payment_card,'') as payment_card, COALESCE(payment_phone,'') as payment_phone, COALESCE(payment_banks,'') as payment_banks, COALESCE(timezone,'Europe/Moscow') as timezone "
+            "COALESCE(payment_card,'') as payment_card, COALESCE(payment_phone,'') as payment_phone, COALESCE(payment_banks,'') as payment_banks, "
+            "COALESCE(timezone,'Europe/Moscow') as timezone, "
+            "loyalty_threshold, birthday_discount_enabled, birthday_discount_percent, "
+            "loyalty_discount_enabled, loyalty_discount_percent "
             "FROM masters WHERE id=$1",
             master_id
         )
@@ -840,6 +848,11 @@ async def get_master_full(master_id: int) -> dict | None:
         "payment_phone": row['payment_phone'],
         "payment_banks": row['payment_banks'],
         "timezone": row['timezone'],
+        "loyalty_threshold": row['loyalty_threshold'] or 10,
+        "birthday_discount_enabled": row['birthday_discount_enabled'] or False,
+        "birthday_discount_percent": row['birthday_discount_percent'] or 10,
+        "loyalty_discount_enabled": row['loyalty_discount_enabled'] or False,
+        "loyalty_discount_percent": row['loyalty_discount_percent'] or 10,
     }
 
 
@@ -867,6 +880,20 @@ async def update_master_timezone(master_id: int, timezone: str):
     async with pool.acquire() as conn:
         await conn.execute(
             "UPDATE masters SET timezone=$1 WHERE id=$2", timezone, master_id
+        )
+
+
+async def update_master_loyalty_settings(master_id: int, loyalty_enabled: bool, loyalty_threshold: int,
+                                          loyalty_discount_percent: int, birthday_enabled: bool,
+                                          birthday_discount_percent: int):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE masters SET loyalty_discount_enabled=$1, loyalty_threshold=$2, "
+            "loyalty_discount_percent=$3, birthday_discount_enabled=$4, birthday_discount_percent=$5 "
+            "WHERE id=$6",
+            loyalty_enabled, loyalty_threshold, loyalty_discount_percent,
+            birthday_enabled, birthday_discount_percent, master_id
         )
 
 

@@ -267,6 +267,10 @@ body {
       <label>Номер телефона</label>
       <input type="tel" id="clientPhone" placeholder="+7 (999) 123-45-67" oninput="validateForm()">
     </div>
+    <div class="field">
+      <label>Дата рождения (для скидки именинникам)</label>
+      <input type="date" id="clientBirthday">
+    </div>
     <div id="bookError" class="error-msg hidden"></div>
   </div>
   <div style="margin:0 16px">
@@ -492,6 +496,8 @@ async function book() {
   errEl.classList.add('hidden');
 
   try {
+    const bday = document.getElementById('clientBirthday').value;
+    const birthday = bday ? bday.slice(5) : '';
     const r = await fetch(`${API}/api/v1/book/${slug}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -502,6 +508,7 @@ async function book() {
         procedure:    selectedService.name,
         date:         selectedDate.iso,
         time:         selectedTime,
+        birthday:     birthday,
       })
     });
     if (r.ok) {
