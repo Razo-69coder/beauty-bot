@@ -206,20 +206,22 @@ async def send_birthday_greetings(bot: Bot):
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
-            SELECT c.telegram_id, c.name, m.name as master_name
+            SELECT c.telegram_id, c.name, m.name as master_name, m.birthday_discount_percent
             FROM clients c JOIN masters m ON c.master_id = m.id
             WHERE c.telegram_id IS NOT NULL
             AND c.birthday IS NOT NULL
+            AND m.birthday_discount_enabled = TRUE
             AND TO_CHAR(CURRENT_DATE, 'MM-DD') = c.birthday
         """)
-    
-    for telegram_id, name, master_name in rows:
+
+    for telegram_id, name, master_name, discount_percent in rows:
         try:
             await bot.send_message(
                 telegram_id,
                 f"🎂 *С днём рождения, {name}!*\n\n"
                 f"Мастер {master_name} поздравляет вас с праздником! 🎉\n\n"
-                f"Ждём вас на любимой процедуре 💅",
+                f"🎁 Скидка *{discount_percent}%* на следующий визит ждёт вас!\n"
+                f"Запишитесь и напомните мастеру о скидке 💅",
                 parse_mode="Markdown"
             )
         except Exception:
@@ -234,21 +236,23 @@ async def send_loyalty_notifications(bot: Bot):
         rows = await conn.fetch("""
             SELECT c.telegram_id, c.name, m.name as master_name,
                    COUNT(a.id) as visit_count,
-                   COALESCE(m.loyalty_threshold, 10) as threshold
+                   COALESCE(m.loyalty_threshold, 10) as threshold,
+                   COALESCE(m.loyalty_discount_percent, 10) as discount_percent
             FROM clients c
             JOIN masters m ON c.master_id = m.id
             LEFT JOIN appointments a ON a.client_id = c.id AND a.status = 'completed'
             WHERE c.telegram_id IS NOT NULL
-            GROUP BY c.id, c.name, c.telegram_id, m.name, m.loyalty_threshold
+            AND m.loyalty_discount_enabled = TRUE
+            GROUP BY c.id, c.name, c.telegram_id, m.name, m.loyalty_threshold, m.loyalty_discount_percent
             HAVING COUNT(a.id) > 0 AND COUNT(a.id) % COALESCE(m.loyalty_threshold, 10) = 0
         """)
-    
-    for telegram_id, name, master_name, visit_count, threshold in rows:
+
+    for telegram_id, name, master_name, visit_count, threshold, discount_percent in rows:
         try:
             await bot.send_message(
                 telegram_id,
-                f"🏆 {name}, вы у нас уже {visit_count} раз!\n\n"
-                f"Вы заработали скидку на следующий визит 🎉\n\n"
+                f"🏆 *{name}, вы у нас уже {visit_count} раз!*\n\n"
+                f"Вы заработали скидку *{discount_percent}%* на следующий визит 🎉\n\n"
                 f"Запишитесь и скажите мастеру {master_name} что вы постоянный клиент 💅",
                 parse_mode="Markdown"
             )
