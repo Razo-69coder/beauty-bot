@@ -319,6 +319,10 @@ class LoyaltySettingsRequest(BaseModel):
     birthday_discount_percent: int = 10
 
 
+class FeedbackBody(BaseModel):
+    text: str
+
+
 class ClientUpdate(BaseModel):
     name: str | None = None
     phone: str | None = None
@@ -931,6 +935,22 @@ async def v1_update_profile(body: _V1ProfileUpdate, master_id: int = Depends(get
 @app.put("/api/v1/masters/me/payment")
 async def v1_update_payment(body: _V1PaymentUpdate, master_id: int = Depends(get_jwt_master_id)):
     await update_master_payment(master_id, body.payment_card, body.payment_phone, body.payment_banks)
+    return {"ok": True}
+
+
+@app.post("/api/v1/feedback")
+async def v1_feedback(body: FeedbackBody, master_id: int = Depends(get_jwt_master_id)):
+    from database import get_master_full
+    master = await get_master_full(master_id)
+    name = master["name"] if master else "Мастер"
+    try:
+        await bot.send_message(
+            550421233,
+            f"💬 *Фидбек от мастера*\n\n👤 {name}\n\n{body.text}",
+            parse_mode="Markdown"
+        )
+    except Exception:
+        pass
     return {"ok": True}
 
 
