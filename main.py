@@ -974,15 +974,16 @@ async def v1_earnings_by_day(period: str = "month", master_id: int = Depends(get
     days_map = {"week": 7, "month": 30, "year": 365}
     days = days_map.get(period, 30)
     today = date.today()
-    result = []
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = []
         for i in range(days - 1, -1, -1):
             d = (today - timedelta(days=i)).isoformat()
-            async with db.execute(
-                "SELECT COALESCE(SUM(price), 0) FROM appointments WHERE master_id=? AND appointment_date=? AND status != 'cancelled'",
-                (master_id, d)
-            ) as c:
-                amount = (await c.fetchone())[0]
+            row = await conn.fetchrow(
+                "SELECT COALESCE(SUM(price), 0) FROM appointments WHERE master_id=$1 AND appointment_date=$2 AND status != 'cancelled'",
+                master_id, d
+            )
+            amount = int(row[0]) if row and row[0] else 0
             result.append({"date": d[8:], "total": amount})
     return {"days": result}
 
