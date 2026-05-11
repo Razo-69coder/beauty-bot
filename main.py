@@ -968,6 +968,14 @@ async def v1_master_stats(master_id: int = Depends(get_jwt_master_id)):
     return await get_statistics(master_id)
 
 
+@app.get("/api/v1/masters/me/stats/earnings-by-day")
+async def v1_earnings_by_day(period: str = "month", master_id: int = Depends(get_jwt_master_id)):
+    days_map = {"week": 7, "month": 30, "year": 365}
+    days = days_map.get(period, 30)
+    rows = await get_earnings_by_day(master_id, days)
+    return {"days": [{"date": r[0], "total": r[1]} for r in rows]}
+
+
 # --- v1 clients ---
 
 @app.get("/api/v1/clients")
