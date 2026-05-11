@@ -970,10 +970,21 @@ async def v1_master_stats(master_id: int = Depends(get_jwt_master_id)):
 
 @app.get("/api/v1/masters/me/stats/earnings-by-day")
 async def v1_earnings_by_day(period: str = "month", master_id: int = Depends(get_jwt_master_id)):
+    from datetime import date, timedelta
     days_map = {"week": 7, "month": 30, "year": 365}
     days = days_map.get(period, 30)
-    rows = await get_earnings_by_day(master_id, days)
-    return {"days": [{"date": r[0], "total": r[1]} for r in rows]}
+    today = date.today()
+    result = []
+    async with aiosqlite.connect(DB_PATH) as db:
+        for i in range(days - 1, -1, -1):
+            d = (today - timedelta(days=i)).isoformat()
+            async with db.execute(
+                "SELECT COALESCE(SUM(price), 0) FROM appointments WHERE master_id=? AND appointment_date=? AND status != 'cancelled'",
+                (master_id, d)
+            ) as c:
+                amount = (await c.fetchone())[0]
+            result.append({"date": d[8:], "total": amount})
+    return {"days": result}
 
 
 # --- v1 clients ---
