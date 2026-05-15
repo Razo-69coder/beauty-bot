@@ -164,15 +164,27 @@ async def send_payment_reminders_24h(bot: Bot):
     tomorrow = (now_msk() + timedelta(days=1)).strftime("%Y-%m-%d")
     appointments = await get_appointments_pending_deposit_24h(tomorrow)
 
-    for appt_id, client_tg_id, client_name, master_tg_id, date, time, deposit_pct in appointments:
+    for appt_id, client_tg_id, client_name, master_tg_id, date, time, deposit_pct, payment_card, payment_phone, payment_banks in appointments:
         date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
         time_str = f" в *{time}*" if time else ""
+
+        rekv_parts = []
+        if payment_card:
+            rekv_parts.append(f"*Карта:* {payment_card}")
+        if payment_phone:
+            rekv_parts.append(f"*Телефон:* {payment_phone}")
+        if payment_banks:
+            rekv_parts.append(f"*Банки:* {payment_banks}")
+        rekv_block = ""
+        if rekv_parts:
+            rekv_block = "\n\nРеквизиты для оплаты:\n" + "\n".join(rekv_parts)
+
         try:
             await bot.send_message(
                 client_tg_id,
                 f"⚠️ *Напоминание об оплате*\n\n"
                 f"Завтра, *{date_fmt}*{time_str} у вас запись.\n\n"
-                f"Для подтверждения необходима предоплата *{deposit_pct}%*.\n\n"
+                f"Для подтверждения необходима предоплата *{deposit_pct}%*.{rekv_block}\n\n"
                 f"Пожалуйста, внесите оплату — мастер ждёт подтверждения 💳",
                 parse_mode="Markdown"
             )
@@ -184,15 +196,27 @@ async def send_payment_reminders_2h(bot: Bot):
     """Каждые 30 минут — напоминает об оплате через 2 часа после записи."""
     appointments = await get_appointments_pending_deposit_2h()
     
-    for appt_id, client_tg_id, client_name, master_tg_id, date, time, deposit_pct in appointments:
+    for appt_id, client_tg_id, client_name, master_tg_id, date, time, deposit_pct, payment_card, payment_phone, payment_banks in appointments:
         date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
         time_str = f" в *{time}*" if time else ""
+
+        rekv_parts = []
+        if payment_card:
+            rekv_parts.append(f"*Карта:* {payment_card}")
+        if payment_phone:
+            rekv_parts.append(f"*Телефон:* {payment_phone}")
+        if payment_banks:
+            rekv_parts.append(f"*Банки:* {payment_banks}")
+        rekv_block = ""
+        if rekv_parts:
+            rekv_block = "\n\nРеквизиты для оплаты:\n" + "\n".join(rekv_parts)
+
         try:
             await bot.send_message(
                 client_tg_id,
                 f"💳 *Напоминание об оплате*\n\n"
                 f"Вы записаны на *{date_fmt}*{time_str}.\n\n"
-                f"Для подтверждения записи внесите предоплату *{deposit_pct}%*.\n\n"
+                f"Для подтверждения записи внесите предоплату *{deposit_pct}%*.{rekv_block}\n\n"
                 f"После оплаты мастер подтвердит вашу запись ✅",
                 parse_mode="Markdown"
             )

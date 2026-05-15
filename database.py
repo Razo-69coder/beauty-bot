@@ -1251,7 +1251,10 @@ async def get_appointments_pending_deposit_24h(target_date: str) -> list:
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT a.id, c.telegram_id, c.name, m.telegram_id,
-                   a.appointment_date, a.time, m.deposit_percent
+                   a.appointment_date, a.time, m.deposit_percent,
+                   COALESCE(m.payment_card, '') as payment_card,
+                   COALESCE(m.payment_phone, '') as payment_phone,
+                   COALESCE(m.payment_banks, '') as payment_banks
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
             JOIN masters m ON m.id = a.master_id
@@ -1261,7 +1264,7 @@ async def get_appointments_pending_deposit_24h(target_date: str) -> list:
               AND c.telegram_id IS NOT NULL
               AND COALESCE(m.payment_reminder_enabled, TRUE) = TRUE
         """, target_date)
-    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
+    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]) for r in rows]
 
 
 async def get_appointments_pending_deposit_2h() -> list:
@@ -1270,7 +1273,10 @@ async def get_appointments_pending_deposit_2h() -> list:
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT a.id, c.telegram_id, c.name, m.telegram_id,
-                   a.appointment_date, a.time, m.deposit_percent
+                   a.appointment_date, a.time, m.deposit_percent,
+                   COALESCE(m.payment_card, '') as payment_card,
+                   COALESCE(m.payment_phone, '') as payment_phone,
+                   COALESCE(m.payment_banks, '') as payment_banks
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
             JOIN masters m ON m.id = a.master_id
@@ -1281,7 +1287,7 @@ async def get_appointments_pending_deposit_2h() -> list:
               AND c.telegram_id IS NOT NULL
               AND COALESCE(m.payment_reminder_enabled, TRUE) = TRUE
         """)
-    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
+    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]) for r in rows]
 
 
 # ── Часовые пояса ───────────────────────────────────────────────────────

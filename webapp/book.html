@@ -1,544 +1,1324 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Запись к мастеру</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: linear-gradient(135deg, #1a0a2e 0%, #2d1155 50%, #1a0a2e 100%);
-  min-height: 100vh;
-  color: #fff;
-}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Header */
-.header {
-  padding: 48px 20px 24px;
-  text-align: center;
-}
-.avatar {
-  width: 72px; height: 72px; border-radius: 50%;
-  background: linear-gradient(135deg, #FF2D78, #BF00FF);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28px; font-weight: 800; color: white;
-  margin: 0 auto 14px;
-  box-shadow: 0 8px 32px rgba(255,45,120,0.4);
-}
-.master-name { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-.master-sub  { font-size: 14px; color: rgba(255,255,255,0.55); }
+  :root {
+    --bg: #0D0D0D;
+    --bg2: #111117;
+    --surface: rgba(255,255,255,0.04);
+    --surface-hover: rgba(255,255,255,0.07);
+    --border: rgba(255,255,255,0.09);
+    --border-active: rgba(255,107,157,0.5);
+    --fg: #F5F0EB;
+    --muted: rgba(245,240,235,0.45);
+    --pink: #FF6B9D;
+    --rose: #E8B4B8;
+    --gold: #C9A96E;
+    --purple: #9B59B6;
+    --glow-pink: rgba(255,107,157,0.25);
+    --glow-gold: rgba(201,169,110,0.2);
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-body: 'Inter', -apple-system, system-ui, sans-serif;
+  }
 
-/* Steps indicator */
-.steps-bar {
-  display: flex; justify-content: center; gap: 6px;
-  padding: 0 20px 24px;
-}
-.step-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: rgba(255,255,255,0.2);
-  transition: all 0.3s;
-}
-.step-dot.active { background: #FF2D78; transform: scale(1.3); }
-.step-dot.done   { background: rgba(255,45,120,0.5); }
+  body {
+    background: #0D0D0D;
+    min-height: 100vh;
+    font-family: var(--font-body);
+  }
 
-/* Card */
-.card {
-  background: rgba(255,255,255,0.07);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 20px;
-  margin: 0 16px 16px;
-  padding: 20px;
-}
-.card-title {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
-  text-transform: uppercase; color: rgba(255,255,255,0.45);
-  margin-bottom: 16px;
-}
+  .screens-wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
 
-/* Services */
-.service-item {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; border-radius: 14px;
-  border: 1.5px solid rgba(255,255,255,0.1);
-  cursor: pointer; margin-bottom: 8px;
-  transition: all 0.15s;
-}
-.service-item:last-child { margin-bottom: 0; }
-.service-item:active { transform: scale(0.98); }
-.service-item.selected {
-  border-color: #FF2D78;
-  background: rgba(255,45,120,0.12);
-}
-.service-name { font-size: 15px; font-weight: 600; }
-.service-price { font-size: 14px; color: rgba(255,255,255,0.55); }
-.service-check { font-size: 18px; color: #FF2D78; display: none; }
-.service-item.selected .service-check { display: block; }
+  .screens {
+    position: relative;
+    min-height: 100vh;
+  }
 
-/* Calendar */
-.cal-nav {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 16px;
-}
-.cal-nav-btn {
-  width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.15);
-  background: rgba(255,255,255,0.07); color: #fff; font-size: 18px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.15s;
-}
-.cal-nav-btn:active { background: rgba(255,45,120,0.2); border-color: #FF2D78; }
-.cal-nav-btn:disabled { opacity: 0.25; cursor: default; }
-.cal-month-label { font-size: 16px; font-weight: 700; }
-.cal-weekdays {
-  display: grid; grid-template-columns: repeat(7,1fr);
-  margin-bottom: 6px;
-}
-.cal-wd {
-  text-align: center; font-size: 10px; font-weight: 700;
-  color: rgba(255,255,255,0.35); padding: 4px 0; letter-spacing: 0.4px;
-}
-.cal-grid {
-  display: grid; grid-template-columns: repeat(7,1fr); gap: 3px;
-}
-.cal-day {
-  aspect-ratio: 1; border-radius: 10px; display: flex; align-items: center;
-  justify-content: center; font-size: 14px; font-weight: 600;
-  cursor: pointer; border: 1.5px solid transparent;
-  transition: all 0.15s;
-}
-.cal-day:active { transform: scale(0.9); }
-.cal-day.today {
-  border-color: rgba(255,45,120,0.45);
-  color: #FF2D78;
-}
-.cal-day.selected {
-  background: rgba(255,45,120,0.25); border-color: #FF2D78; color: #FF2D78;
-}
-.cal-day.past { color: rgba(255,255,255,0.2); cursor: default; pointer-events: none; }
-.cal-day.empty { pointer-events: none; }
-.cal-day:not(.past):not(.empty):not(.selected):hover {
-  background: rgba(255,255,255,0.08);
-}
+  .screen {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: none;
+    flex-direction: column;
+    padding-bottom: 32px;
+    scroll-behavior: smooth;
+  }
+  .screen::-webkit-scrollbar { display: none; }
+  .screen.active { display: flex; }
 
-/* Time slots */
-.slots-grid {
-  display: grid; grid-template-columns: repeat(4,1fr); gap: 8px;
-}
-.slot {
-  background: rgba(255,255,255,0.06); border-radius: 12px;
-  padding: 11px 4px; text-align: center; cursor: pointer;
-  border: 1.5px solid rgba(255,255,255,0.1);
-  font-size: 14px; font-weight: 600;
-  transition: all 0.15s;
-}
-.slot:active { transform: scale(0.96); }
-.slot.selected { border-color: #FF2D78; background: rgba(255,45,120,0.15); color: #FF2D78; }
+  /* ── Progress bar ── */
+  .progress-wrap {
+    padding: 16px 24px 0;
+    flex-shrink: 0;
+  }
+  .progress-steps {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    position: relative;
+  }
+  .progress-step::after {
+    content: '';
+    position: absolute;
+    top: 13px;
+    left: calc(50% + 13px);
+    right: calc(-50% + 13px);
+    height: 1px;
+    background: var(--border);
+    transition: background 0.4s;
+  }
+  .progress-step:last-child::after { display: none; }
+  .progress-step.done::after {
+    background: linear-gradient(90deg, var(--pink), var(--rose));
+  }
+  .step-dot {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    background: var(--bg2);
+    transition: all 0.3s;
+    position: relative;
+    z-index: 1;
+  }
+  .progress-step.active .step-dot {
+    border-color: var(--pink);
+    color: var(--fg);
+    background: rgba(255,107,157,0.15);
+    box-shadow: 0 0 12px var(--glow-pink);
+  }
+  .progress-step.done .step-dot {
+    border-color: var(--pink);
+    background: var(--pink);
+    color: #fff;
+  }
+  .step-label {
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .progress-step.active .step-label { color: var(--pink); }
+  .progress-step.done .step-label { color: var(--rose); }
 
-/* Inputs */
-.field { margin-bottom: 12px; }
-.field label { font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 6px; display: block; }
-.field input {
-  width: 100%; background: rgba(255,255,255,0.08);
-  border: 1.5px solid rgba(255,255,255,0.12); border-radius: 14px;
-  padding: 14px 16px; font-size: 16px; color: white;
-  outline: none; transition: border 0.15s;
-  font-family: inherit;
-}
-.field input:focus { border-color: rgba(255,45,120,0.6); }
-.field input::placeholder { color: rgba(255,255,255,0.3); }
+  /* ── Master header ── */
+  .master-header {
+    padding: 20px 24px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .avatar-wrap {
+    position: relative;
+    width: 80px;
+    height: 80px;
+  }
+  .avatar-ring {
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: conic-gradient(from 180deg, var(--pink), var(--gold), var(--rose), var(--pink));
+    animation: spin-slow 6s linear infinite;
+  }
+  @keyframes spin-slow { to { transform: rotate(360deg); } }
+  .avatar-inner {
+    position: absolute;
+    inset: 2px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2A1520, #1A0E1A);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--rose);
+  }
+  .master-name {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--fg);
+    letter-spacing: 0.01em;
+    text-align: center;
+  }
+  .master-sub {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-top: -8px;
+  }
 
-/* Button */
-.btn {
-  width: 100%; padding: 16px; border-radius: 16px; border: none;
-  font-size: 16px; font-weight: 700; cursor: pointer;
-  background: linear-gradient(135deg, #FF2D78, #BF00FF);
-  color: white; margin-top: 8px;
-  box-shadow: 0 8px 24px rgba(255,45,120,0.35);
-  transition: opacity 0.15s, transform 0.1s;
-}
-.btn:active { transform: scale(0.98); opacity: 0.9; }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-.btn-back {
-  background: rgba(255,255,255,0.08); box-shadow: none;
-  margin-top: 0; margin-bottom: 8px;
-}
+  /* ── Section title ── */
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--fg);
+    padding: 20px 24px 4px;
+    letter-spacing: 0.01em;
+  }
+  .section-sub {
+    font-size: 13px;
+    color: var(--muted);
+    padding: 0 24px 16px;
+  }
 
-/* Summary row */
-.summary-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.07);
-}
-.summary-row:last-child { border-bottom: none; }
-.summary-label { font-size: 13px; color: rgba(255,255,255,0.5); }
-.summary-value { font-size: 14px; font-weight: 600; }
+  /* ── Glass card ── */
+  .glass {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    backdrop-filter: blur(12px);
+  }
 
-/* Success */
-.success-icon { font-size: 64px; text-align: center; margin-bottom: 16px; }
-.success-title { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 8px; }
-.success-text  { font-size: 15px; color: rgba(255,255,255,0.6); text-align: center; line-height: 1.5; }
+  /* ── Service items ── */
+  .services-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 16px;
+  }
 
-/* Utils */
-.hidden { display: none !important; }
-.loader { text-align: center; padding: 40px 0; font-size: 14px; color: rgba(255,255,255,0.5); }
-.error-msg { color: #FF4757; font-size: 13px; text-align: center; padding: 8px 0; }
+  .service-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+  }
+  .service-item::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,107,157,0.06), rgba(201,169,110,0.04));
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+  .service-item:hover::before, .service-item.selected::before { opacity: 1; }
+  .service-item.selected {
+    border-color: var(--pink);
+    box-shadow: 0 0 20px var(--glow-pink), inset 0 0 20px rgba(255,107,157,0.04);
+  }
+
+  .service-emoji {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255,107,157,0.15), rgba(201,169,110,0.1));
+    border: 1px solid rgba(255,107,157,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .service-info { flex: 1; min-width: 0; }
+  .service-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fg);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .service-meta {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .service-duration {
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .service-price {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    color: transparent;
+    background: linear-gradient(135deg, var(--pink), var(--gold));
+    -webkit-background-clip: text;
+    background-clip: text;
+    flex-shrink: 0;
+  }
+  .service-check {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.25s;
+  }
+  .service-item.selected .service-check {
+    background: var(--pink);
+    border-color: var(--pink);
+    box-shadow: 0 0 8px var(--glow-pink);
+  }
+  .service-check svg { display: none; }
+  .service-item.selected .service-check svg { display: block; }
+
+  /* ── Calendar ── */
+  .calendar-wrap {
+    margin: 0 16px;
+    padding: 20px;
+    border-radius: 22px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .cal-month {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--fg);
+  }
+  .cal-nav {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--muted);
+  }
+  .cal-nav:hover {
+    border-color: var(--pink);
+    color: var(--pink);
+    box-shadow: 0 0 10px var(--glow-pink);
+  }
+  .cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 10px;
+  }
+  .cal-wd {
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 4px 0;
+  }
+  .cal-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .cal-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .cal-day:hover:not(.empty):not(.past) {
+    background: rgba(255,107,157,0.1);
+  }
+  .cal-day.empty { pointer-events: none; }
+  .cal-day.past { color: rgba(245,240,235,0.18); pointer-events: none; }
+  .cal-day.today {
+    color: var(--gold);
+    font-weight: 700;
+  }
+  .cal-day.selected {
+    background: var(--pink);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 0 18px var(--glow-pink), 0 0 6px rgba(255,107,157,0.5);
+  }
+  .cal-day.selected::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,107,157,0.4);
+    animation: pulse-ring 2s ease-out infinite;
+  }
+  @keyframes pulse-ring {
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+
+  /* ── Time slots ── */
+  .time-slots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding: 0 16px;
+  }
+  .time-slot {
+    padding: 12px 8px;
+    border-radius: 30px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .time-slot:hover:not(.taken) {
+    border-color: rgba(255,107,157,0.3);
+    background: rgba(255,107,157,0.06);
+  }
+  .time-slot.selected {
+    background: rgba(255,107,157,0.15);
+    border-color: var(--pink);
+    color: var(--pink);
+    font-weight: 600;
+    box-shadow: 0 0 14px var(--glow-pink);
+  }
+
+  /* ── Form inputs ── */
+  .form-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 0 16px;
+  }
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .field-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-inline-start: 4px;
+  }
+  .field-input {
+    width: 100%;
+    padding: 14px 18px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--fg);
+    font-size: 15px;
+    font-family: var(--font-body);
+    outline: none;
+    transition: all 0.2s;
+    -webkit-appearance: none;
+  }
+  .field-input:focus {
+    border-color: var(--pink);
+    box-shadow: 0 0 0 3px rgba(255,107,157,0.12);
+    background: rgba(255,107,157,0.04);
+  }
+  .field-input::placeholder { color: rgba(245,240,235,0.25); }
+
+  /* ── Summary card ── */
+  .summary-card {
+    margin: 0 16px 16px;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(201,169,110,0.25);
+    background: linear-gradient(135deg, rgba(201,169,110,0.06), rgba(255,107,157,0.04));
+  }
+  .summary-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 10px;
+  }
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 13px;
+  }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-row-key { color: var(--muted); }
+  .summary-row-val { color: var(--fg); font-weight: 500; }
+
+  /* ── CTA button ── */
+  .cta-wrap {
+    padding: 16px 16px 8px;
+    flex-shrink: 0;
+  }
+  .btn-cta {
+    width: 100%;
+    padding: 17px;
+    border-radius: 16px;
+    border: none;
+    background: linear-gradient(135deg, #FF6B9D, #C9A96E 50%, #FF6B9D);
+    background-size: 200% 100%;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    font-family: var(--font-body);
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+    animation: shimmer 4s ease-in-out infinite;
+    box-shadow: 0 8px 30px rgba(255,107,157,0.35);
+  }
+  @keyframes shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  .btn-cta::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transform: skewX(-20deg);
+    animation: shine 4s ease-in-out infinite 2s;
+  }
+  @keyframes shine {
+    0% { left: -100%; }
+    100% { left: 200%; }
+  }
+  .btn-cta:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 40px rgba(255,107,157,0.45);
+  }
+  .btn-cta:active { transform: translateY(0); }
+  .btn-cta:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    animation: none;
+  }
+
+  .btn-back {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 13px;
+    font-family: var(--font-body);
+    cursor: pointer;
+    padding: 8px 0;
+    margin: 0 16px;
+    transition: color 0.2s;
+  }
+  .btn-back:hover { color: var(--pink); }
+
+  /* ── Booking summary (step 4) ── */
+  .booking-preview {
+    margin: 0 16px 16px;
+    padding: 18px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(255,107,157,0.05), rgba(201,169,110,0.04));
+  }
+  .booking-preview-title {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .booking-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,107,157,0.12);
+    border: 1px solid rgba(255,107,157,0.25);
+    border-radius: 30px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--rose);
+    font-weight: 500;
+    margin: 4px 4px 4px 0;
+  }
+
+  /* ── Success screen ── */
+  .success-screen {
+    align-items: center;
+    text-align: center;
+    padding: 24px 24px 40px;
+  }
+  .success-ring {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(255,107,157,0.15), rgba(201,169,110,0.1));
+    border: 2px solid rgba(255,107,157,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 44px;
+    margin: 8px auto 20px;
+    box-shadow: 0 0 40px rgba(255,107,157,0.2), 0 0 80px rgba(255,107,157,0.08);
+    animation: success-pop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes success-pop {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .success-title {
+    font-family: var(--font-display);
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--fg);
+    margin-bottom: 8px;
+    animation: fade-up 0.5s ease 0.2s both;
+  }
+  .success-sub {
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 24px;
+    animation: fade-up 0.5s ease 0.3s both;
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .success-card {
+    width: 100%;
+    padding: 20px;
+    border-radius: 22px;
+    border: 1px solid rgba(201,169,110,0.3);
+    background: linear-gradient(135deg, rgba(201,169,110,0.07), rgba(255,107,157,0.04));
+    margin-bottom: 20px;
+    animation: fade-up 0.5s ease 0.4s both;
+  }
+  .success-card-title {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 600;
+    margin-bottom: 14px;
+    text-align: start;
+  }
+  .success-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 13px;
+    text-align: start;
+  }
+  .success-row:last-child { border-bottom: none; }
+  .success-row-key { color: var(--muted); }
+  .success-row-val { color: var(--fg); font-weight: 600; }
+
+  .btn-telegram {
+    width: 100%;
+    padding: 16px;
+    border-radius: 16px;
+    border: none;
+    background: linear-gradient(135deg, #2AABEE, #1B7BC4);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: var(--font-body);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    box-shadow: 0 8px 24px rgba(42,171,238,0.3);
+    transition: all 0.2s;
+    animation: fade-up 0.5s ease 0.5s both;
+    text-decoration: none;
+  }
+  .btn-telegram:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(42,171,238,0.4); }
+
+  .confetti-wrap {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 999;
+  }
+  .confetti-piece {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    top: -10px;
+    border-radius: 2px;
+    animation: confetti-fall linear forwards;
+  }
+  @keyframes confetti-fall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* Selected service banner (steps 2,3,4) */
+  .selected-banner {
+    margin: 12px 16px 0;
+    padding: 12px 16px;
+    border-radius: 14px;
+    background: rgba(255,107,157,0.07);
+    border: 1px solid rgba(255,107,157,0.2);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--rose);
+  }
+  .selected-banner-icon { font-size: 18px; }
+
+  /* ── Date display ── */
+  .selected-date-display {
+    text-align: center;
+    padding: 10px 24px 0;
+    font-family: var(--font-display);
+    font-size: 15px;
+    color: var(--gold);
+    letter-spacing: 0.03em;
+  }
+
+  /* ── Decorative gradient lines ── */
+  .gradient-line {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--pink), var(--gold), transparent);
+    margin: 16px 24px;
+    opacity: 0.3;
+  }
 </style>
 </head>
 <body>
 
-<div class="header">
-  <div class="avatar" id="avatar">?</div>
-  <div class="master-name" id="masterName">Загрузка...</div>
-  <div class="master-sub" id="masterSub">Онлайн-запись</div>
-</div>
+<!-- Confetti container -->
+<div class="confetti-wrap" id="confetti"></div>
 
-<div class="steps-bar">
-  <div class="step-dot active" id="dot0"></div>
-  <div class="step-dot" id="dot1"></div>
-  <div class="step-dot" id="dot2"></div>
-  <div class="step-dot" id="dot3"></div>
-</div>
+<div class="screens-wrap">
+  <div class="screens">
 
-<!-- Step 0: Service -->
-<div id="step0">
-  <div class="card">
-    <div class="card-title">Выберите услугу</div>
-    <div id="servicesList"><div class="loader">Загружаем услуги...</div></div>
-  </div>
-  <div style="margin:0 16px">
-    <button class="btn" id="btnStep0" onclick="goStep(1)" disabled>Далее →</button>
-  </div>
-</div>
+    <!-- ═══ SCREEN 1: Choose service ═══ -->
+    <div class="screen active" id="screen-1">
+      <div class="progress-wrap">
+        <div class="progress-steps">
+          <div class="progress-step active" data-step="1">
+            <div class="step-dot">1</div>
+            <span class="step-label">Услуга</span>
+          </div>
+          <div class="progress-step" data-step="2">
+            <div class="step-dot">2</div>
+            <span class="step-label">Дата</span>
+          </div>
+          <div class="progress-step" data-step="3">
+            <div class="step-dot">3</div>
+            <span class="step-label">Время</span>
+          </div>
+          <div class="progress-step" data-step="4">
+            <div class="step-dot">4</div>
+            <span class="step-label">Данные</span>
+          </div>
+        </div>
+      </div>
 
-<!-- Step 1: Date -->
-<div id="step1" class="hidden">
-  <div class="card">
-    <div class="card-title">Выберите дату</div>
-    <div class="cal-nav">
-      <button class="cal-nav-btn" id="calPrev" onclick="calShift(-1)">‹</button>
-      <div class="cal-month-label" id="calMonthLabel"></div>
-      <button class="cal-nav-btn" id="calNext" onclick="calShift(1)">›</button>
-    </div>
-    <div class="cal-weekdays">
-      <div class="cal-wd">Пн</div><div class="cal-wd">Вт</div><div class="cal-wd">Ср</div>
-      <div class="cal-wd">Чт</div><div class="cal-wd">Пт</div><div class="cal-wd">Сб</div>
-      <div class="cal-wd">Вс</div>
-    </div>
-    <div class="cal-grid" id="calGrid"></div>
-  </div>
-  <div style="margin:0 16px">
-    <button class="btn btn-back" onclick="goStep(0)">← Назад</button>
-    <button class="btn" id="btnStep1" onclick="goStep(2)" disabled>Далее →</button>
-  </div>
-</div>
+      <div class="master-header">
+        <div class="avatar-wrap">
+          <div class="avatar-ring"></div>
+          <div class="avatar-inner"></div>
+        </div>
+        <div class="master-name"></div>
+        <div class="master-sub">Онлайн запись</div>
+      </div>
 
-<!-- Step 2: Time -->
-<div id="step2" class="hidden">
-  <div class="card">
-    <div class="card-title">Выберите время</div>
-    <div id="slotsList"><div class="loader">Загружаем время...</div></div>
-  </div>
-  <div style="margin:0 16px">
-    <button class="btn btn-back" onclick="goStep(1)">← Назад</button>
-    <button class="btn" id="btnStep2" onclick="goStep(3)" disabled>Далее →</button>
-  </div>
-</div>
+      <div class="gradient-line"></div>
 
-<!-- Step 3: Contact -->
-<div id="step3" class="hidden">
-  <div class="card">
-    <div class="card-title">Ваши данные</div>
-    <div class="summary-row">
-      <span class="summary-label">Услуга</span>
-      <span class="summary-value" id="sumService">—</span>
-    </div>
-    <div class="summary-row">
-      <span class="summary-label">Дата и время</span>
-      <span class="summary-value" id="sumDateTime">—</span>
-    </div>
-  </div>
-  <div class="card">
-    <div class="field">
-      <label>Ваше имя</label>
-      <input type="text" id="clientName" placeholder="Анна Иванова" oninput="validateForm()">
-    </div>
-    <div class="field">
-      <label>Номер телефона</label>
-      <input type="tel" id="clientPhone" placeholder="+7 (999) 123-45-67" oninput="validateForm()">
-    </div>
-    <div class="field">
-      <label>Дата рождения (для скидки именинникам)</label>
-      <input type="date" id="clientBirthday">
-    </div>
-    <div id="bookError" class="error-msg hidden"></div>
-  </div>
-  <div style="margin:0 16px">
-    <button class="btn btn-back" onclick="goStep(2)">← Назад</button>
-    <button class="btn" id="btnBook" onclick="book()" disabled>Записаться ✨</button>
-  </div>
-</div>
+      <div class="section-title">Выберите услугу</div>
+      <div class="section-sub">Все цены указаны с материалами</div>
 
-<!-- Success -->
-<div id="stepSuccess" class="hidden">
-  <div class="card" style="text-align:center; padding: 32px 20px;">
-    <div class="success-icon">🎉</div>
-    <div class="success-title">Вы записаны!</div>
-    <div class="success-text" id="successText">Мастер увидит вашу запись и свяжется для подтверждения.</div>
-  </div>
-  <div class="card" style="text-align:center; padding: 20px;">
-    <div style="font-size:28px; margin-bottom:10px;">🔔</div>
-    <div style="font-size:15px; font-weight:700; margin-bottom:8px;">Хотите напоминания о записи?</div>
-    <div style="font-size:13px; color:rgba(255,255,255,0.55); margin-bottom:16px; line-height:1.5;">
-      Получайте уведомления за 24 часа и за 2 часа до визита прямо в Telegram
+      <div class="services-list" id="services-list"></div>
+
+      <div class="cta-wrap" style="margin-top:20px">
+        <button class="btn-cta" id="btn-step1" onclick="goToStep(2)" disabled>Выбрать дату →</button>
+      </div>
     </div>
-    <a href="https://t.me/Beauty6699_bot?start=booking" target="_blank"
-       style="display:block; padding:14px; border-radius:14px; text-decoration:none; color:white; font-weight:700; font-size:15px;
-              background:linear-gradient(135deg,#FF2D78,#BF00FF);
-              box-shadow:0 8px 24px rgba(255,45,120,0.35);">
-      Включить напоминания в Telegram
-    </a>
+
+    <!-- ═══ SCREEN 2: Choose date ═══ -->
+    <div class="screen" id="screen-2">
+      <div class="progress-wrap">
+        <div class="progress-steps">
+          <div class="progress-step done" data-step="1"><div class="step-dot">✓</div><span class="step-label">Услуга</span></div>
+          <div class="progress-step active" data-step="2"><div class="step-dot">2</div><span class="step-label">Дата</span></div>
+          <div class="progress-step" data-step="3"><div class="step-dot">3</div><span class="step-label">Время</span></div>
+          <div class="progress-step" data-step="4"><div class="step-dot">4</div><span class="step-label">Данные</span></div>
+        </div>
+      </div>
+
+      <div id="s2-banner" class="selected-banner" style="display:none">
+        <span class="selected-banner-icon" id="s2-icon"></span>
+        <span id="s2-service-name" style="font-weight:600;color:#F5F0EB"></span>
+      </div>
+
+      <div class="section-title">Выберите дату</div>
+      <div class="section-sub">Доступные дни выделены</div>
+
+      <div class="calendar-wrap">
+        <div class="cal-header">
+          <button class="cal-nav" onclick="changeMonth(-1)">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 11L5 7L9 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="cal-month" id="cal-month-label"></div>
+          <button class="cal-nav" onclick="changeMonth(1)">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 3L9 7L5 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="cal-weekdays">
+          <div class="cal-wd">Пн</div>
+          <div class="cal-wd">Вт</div>
+          <div class="cal-wd">Ср</div>
+          <div class="cal-wd">Чт</div>
+          <div class="cal-wd">Пт</div>
+          <div class="cal-wd">Сб</div>
+          <div class="cal-wd">Вс</div>
+        </div>
+        <div class="cal-days" id="cal-days"></div>
+      </div>
+
+      <div class="selected-date-display" id="selected-date-display" style="display:none"></div>
+
+      <button class="btn-back" onclick="goToStep(1)">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 11L5 7L9 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Назад
+      </button>
+
+      <div class="cta-wrap">
+        <button class="btn-cta" id="btn-step2" onclick="goToStep(3)" disabled>Выбрать время →</button>
+      </div>
+    </div>
+
+    <!-- ═══ SCREEN 3: Choose time ═══ -->
+    <div class="screen" id="screen-3">
+      <div class="progress-wrap">
+        <div class="progress-steps">
+          <div class="progress-step done" data-step="1"><div class="step-dot">✓</div><span class="step-label">Услуга</span></div>
+          <div class="progress-step done" data-step="2"><div class="step-dot">✓</div><span class="step-label">Дата</span></div>
+          <div class="progress-step active" data-step="3"><div class="step-dot">3</div><span class="step-label">Время</span></div>
+          <div class="progress-step" data-step="4"><div class="step-dot">4</div><span class="step-label">Данные</span></div>
+        </div>
+      </div>
+
+      <div id="s3-banner" class="selected-banner" style="margin-bottom:0">
+        <span>📅</span>
+        <span id="s3-date-name" style="color:#F5F0EB;font-weight:500;font-size:13px"></span>
+      </div>
+
+      <div class="section-title">Выберите время</div>
+      <div class="section-sub">Свободные окна</div>
+
+      <div class="time-slots" id="time-slots-grid"></div>
+
+      <button class="btn-back" onclick="goToStep(2)">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 11L5 7L9 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Назад
+      </button>
+
+      <div class="cta-wrap">
+        <button class="btn-cta" id="btn-step3" onclick="goToStep(4)" disabled>Заполнить данные →</button>
+      </div>
+    </div>
+
+    <!-- ═══ SCREEN 4: Personal info ═══ -->
+    <div class="screen" id="screen-4">
+      <div class="progress-wrap">
+        <div class="progress-steps">
+          <div class="progress-step done" data-step="1"><div class="step-dot">✓</div><span class="step-label">Услуга</span></div>
+          <div class="progress-step done" data-step="2"><div class="step-dot">✓</div><span class="step-label">Дата</span></div>
+          <div class="progress-step done" data-step="3"><div class="step-dot">✓</div><span class="step-label">Время</span></div>
+          <div class="progress-step active" data-step="4"><div class="step-dot">4</div><span class="step-label">Данные</span></div>
+        </div>
+      </div>
+
+      <div class="booking-preview" style="margin-top:16px">
+        <div class="booking-preview-title">Ваша запись</div>
+        <div id="booking-tags"></div>
+      </div>
+
+      <div class="section-title">Ваши данные</div>
+      <div class="section-sub">Для подтверждения записи</div>
+
+      <div class="form-fields">
+        <div class="field-group">
+          <label class="field-label">Имя</label>
+          <input class="field-input" id="inp-name" type="text" placeholder="Как к вам обращаться?" oninput="validateStep4()">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Телефон</label>
+          <input class="field-input" id="inp-phone" type="tel" placeholder="+7 (___) ___-__-__" oninput="formatPhone(this); validateStep4()">
+        </div>
+        <div class="field-group">
+          <label class="field-label">День рождения</label>
+          <input class="field-input" id="inp-bday" type="text" placeholder="ДД.ММ.ГГГГ" oninput="formatBday(this); validateStep4()" maxlength="10">
+        </div>
+      </div>
+
+      <div style="padding:10px 16px;font-size:11px;color:rgba(245,240,235,0.3);line-height:1.5;text-align:center">
+        Нажимая «Записаться», вы соглашаетесь<br>на обработку персональных данных
+      </div>
+
+      <button class="btn-back" onclick="goToStep(3)" style="justify-content:center">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 11L5 7L9 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Назад
+      </button>
+
+      <div class="cta-wrap">
+        <button class="btn-cta" id="btn-step4" onclick="submitBooking()" disabled>Записаться ✦</button>
+      </div>
+    </div>
+
+    <!-- ═══ SCREEN 5: Success ═══ -->
+    <div class="screen success-screen" id="screen-5">
+      <div class="success-ring">🌸</div>
+      <div class="success-title">Вы записаны!</div>
+      <div class="success-sub" id="success-sub">Мастер подтвердит запись<br>в ближайшее время</div>
+
+      <div class="success-card" style="width:100%;text-align:start">
+        <div class="success-card-title">Детали записи</div>
+        <div class="success-row">
+          <span class="success-row-key">Услуга</span>
+          <span class="success-row-val" id="suc-service"></span>
+        </div>
+        <div class="success-row">
+          <span class="success-row-key">Дата</span>
+          <span class="success-row-val" id="suc-date"></span>
+        </div>
+        <div class="success-row">
+          <span class="success-row-key">Время</span>
+          <span class="success-row-val" id="suc-time"></span>
+        </div>
+        <div class="success-row">
+          <span class="success-row-key">Мастер</span>
+          <span class="success-row-val" id="suc-master"></span>
+        </div>
+        <div class="success-row">
+          <span class="success-row-key">Стоимость</span>
+          <span class="success-row-val" id="suc-price" style="color:#C9A96E"></span>
+        </div>
+      </div>
+
+      <a href="https://t.me/Beauty6699_bot" target="_blank" class="btn-telegram">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M17.5 3L2.5 8.5L8 10.5L10 17L12.5 12L17.5 3Z" fill="white"/><path d="M8 10.5L11.5 9" stroke="#1B7BC4" stroke-width="1" stroke-linecap="round"/></svg>
+        Написать в Telegram
+      </a>
+
+      <button class="btn-cta" style="background:var(--surface);background-image:none;animation:none;box-shadow:none;border:1px solid var(--border);color:var(--muted);font-weight:500" onclick="resetBooking()">
+        Новая запись
+      </button>
+    </div>
+
   </div>
 </div>
 
 <script>
+const slug = window.location.pathname.replace(/^\/book\//, '').replace(/\/$/, '');
 const API = '';
-const slug = location.pathname.replace('/book/', '').replace(/\/$/, '');
 
-let masterData = null;
-let selectedService = null;
-let selectedDate = null;
-let selectedTime = null;
-let currentStep = 0;
+const RU_MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const RU_MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const RU_DAYS = ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
 
-const MONTHS_RU      = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-const MONTHS_FULL_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-const DAYS_RU        = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+let state = { service: null, date: null, time: null, calYear: null, calMonth: null };
+let SERVICES = [];
+let masterName = '';
 
-let calYear  = 0;
-let calMonth = 0;
-const CAL_MAX_MONTHS = 4;
+const today = new Date();
 
 async function init() {
+  state.calYear = today.getFullYear();
+  state.calMonth = today.getMonth();
+
   try {
-    const r = await fetch(`${API}/api/v1/book/${slug}`);
-    if (!r.ok) { document.getElementById('masterName').textContent = 'Страница не найдена'; return; }
-    masterData = await r.json();
-    const name = masterData.master_name || 'Мастер';
-    document.getElementById('masterName').textContent = name;
-    document.getElementById('masterSub').textContent = 'Онлайн-запись';
-    const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-    document.getElementById('avatar').textContent = initials;
-    document.title = `Запись к ${name}`;
+    const r = await fetch(API + '/api/v1/book/' + slug);
+    if (!r.ok) { showError('Мастер не найден'); return; }
+    const data = await r.json();
+    masterName = data.master_name || 'Мастер';
+    SERVICES = (data.services || []).map(s => ({
+      id: s.id,
+      name: s.name,
+      price: s.price_default ? s.price_default + ' ₽' : '',
+      emoji: getEmoji(s.name),
+    }));
+    document.querySelectorAll('.master-name').forEach(el => el.textContent = masterName);
+    document.querySelectorAll('.avatar-inner').forEach(el => el.textContent = masterName[0] || 'М');
     renderServices();
-    renderDates();
+    renderCalendar();
   } catch(e) {
-    document.getElementById('masterName').textContent = 'Ошибка загрузки';
+    showError('Ошибка соединения');
   }
+}
+
+function getEmoji(name) {
+  const n = name.toLowerCase();
+  if (n.includes('маникюр')) return '💅';
+  if (n.includes('педикюр')) return '🦶';
+  if (n.includes('ресниц')) return '✨';
+  if (n.includes('макияж') || n.includes('мейкап')) return '💄';
+  if (n.includes('бровь') || n.includes('брови')) return '🌸';
+  if (n.includes('стрижк') || n.includes('волос')) return '✂️';
+  if (n.includes('массаж')) return '💆';
+  if (n.includes('коррекц')) return '🌸';
+  return '✨';
+}
+
+function showError(msg) {
+  document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#F5F0EB;font-family:Inter,sans-serif;text-align:center;padding:24px;background:#0D0D0D"><div><div style="font-size:48px;margin-bottom:16px">😕</div><div style="font-size:18px;font-weight:600">' + msg + '</div></div></div>';
 }
 
 function renderServices() {
-  const list = document.getElementById('servicesList');
-  const services = masterData.services || [];
-  if (!services.length) {
-    list.innerHTML = '<div class="loader">Услуги не указаны</div>';
-    return;
-  }
-  list.innerHTML = services.map(s => `
-    <div class="service-item" onclick="selectService(${s.id}, '${escHtml(s.name)}', ${s.price_default})" id="svc_${s.id}">
-      <div>
-        <div class="service-name">${escHtml(s.name)}</div>
-        ${s.price_default ? `<div class="service-price">${s.price_default.toLocaleString('ru')} ₽</div>` : ''}
-      </div>
-      <span class="service-check">✓</span>
-    </div>
-  `).join('');
-}
-
-function selectService(id, name, price) {
-  document.querySelectorAll('.service-item').forEach(el => el.classList.remove('selected'));
-  document.getElementById('svc_' + id).classList.add('selected');
-  selectedService = { id, name, price };
-  document.getElementById('btnStep0').disabled = false;
-}
-
-function renderDates() {
-  const now = new Date();
-  calYear  = now.getFullYear();
-  calMonth = now.getMonth();
-  renderCalendar();
-}
-
-function calShift(delta) {
-  const now   = new Date();
-  const base  = now.getMonth();
-  const baseY = now.getFullYear();
-  calMonth += delta;
-  if (calMonth > 11) { calMonth = 0; calYear++; }
-  if (calMonth < 0)  { calMonth = 11; calYear--; }
-  renderCalendar();
-}
-
-function renderCalendar() {
-  const now      = new Date();
-  const todayIso = now.toISOString().slice(0, 10);
-  const baseYear = now.getFullYear();
-  const baseMon  = now.getMonth();
-  const diffMons = (calYear - baseYear) * 12 + (calMonth - baseMon);
-
-  document.getElementById('calMonthLabel').textContent =
-    `${MONTHS_FULL_RU[calMonth]} ${calYear}`;
-  document.getElementById('calPrev').disabled = diffMons <= 0;
-  document.getElementById('calNext').disabled = diffMons >= CAL_MAX_MONTHS - 1;
-
-  const firstDay = new Date(calYear, calMonth, 1);
-  const lastDay  = new Date(calYear, calMonth + 1, 0);
-  let startWd = firstDay.getDay();
-  if (startWd === 0) startWd = 7;
-
-  let html = '';
-  for (let e = 1; e < startWd; e++) html += '<div class="cal-day empty"></div>';
-
-  for (let d = 1; d <= lastDay.getDate(); d++) {
-    const iso  = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const past = iso < todayIso;
-    const isTod = iso === todayIso;
-    const isSel = selectedDate && selectedDate.iso === iso;
-    let cls = 'cal-day';
-    if (past)  cls += ' past';
-    if (isTod) cls += ' today';
-    if (isSel) cls += ' selected';
-    const onclick = past ? '' : `onclick="selectDate('${iso}',${d})"`;
-    html += `<div class="${cls}" id="cald_${iso}" ${onclick}>${d}</div>`;
-  }
-
-  document.getElementById('calGrid').innerHTML = html;
-}
-
-function selectDate(iso, dn) {
-  document.querySelectorAll('.cal-day').forEach(el => el.classList.remove('selected'));
-  const el = document.getElementById('cald_' + iso);
-  if (el) el.classList.add('selected');
-  const mo  = MONTHS_RU[parseInt(iso.slice(5,7)) - 1];
-  const wd  = DAYS_RU[new Date(iso).getDay()];
-  selectedDate = { iso, label: `${dn} ${mo}, ${wd}` };
-  document.getElementById('btnStep1').disabled = false;
-}
-
-async function loadSlots() {
-  const el = document.getElementById('slotsList');
-  el.innerHTML = '<div class="loader">Загружаем время...</div>';
-  document.getElementById('btnStep2').disabled = true;
-  selectedTime = null;
-  try {
-    const r = await fetch(`${API}/api/v1/book/${slug}/slots?date=${selectedDate.iso}`);
-    const data = await r.json();
-    const slots = data.slots || [];
-    if (!slots.length) {
-      el.innerHTML = '<div class="loader">Нет свободного времени на эту дату</div>';
-      return;
-    }
-    el.innerHTML = `<div class="slots-grid">${slots.map(s =>
-      `<div class="slot" onclick="selectTime('${s}')" id="slot_${s.replace(':','-')}">${s}</div>`
-    ).join('')}</div>`;
-  } catch(e) {
-    el.innerHTML = '<div class="error-msg">Ошибка загрузки</div>';
-  }
-}
-
-function selectTime(t) {
-  document.querySelectorAll('.slot').forEach(el => el.classList.remove('selected'));
-  document.getElementById('slot_' + t.replace(':', '-')).classList.add('selected');
-  selectedTime = t;
-  document.getElementById('btnStep2').disabled = false;
-}
-
-function goStep(n) {
-  document.getElementById('step' + currentStep).classList.add('hidden');
-  currentStep = n;
-  document.getElementById('step' + n).classList.remove('hidden');
-  updateDots();
-  if (n === 2) loadSlots();
-  if (n === 3) {
-    document.getElementById('sumService').textContent = selectedService.name;
-    document.getElementById('sumDateTime').textContent = `${selectedDate.label}, ${selectedTime}`;
-    validateForm();
-  }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function updateDots() {
-  for (let i = 0; i < 4; i++) {
-    const dot = document.getElementById('dot' + i);
-    dot.classList.remove('active', 'done');
-    if (i < currentStep) dot.classList.add('done');
-    if (i === currentStep) dot.classList.add('active');
-  }
-}
-
-function validateForm() {
-  const name  = document.getElementById('clientName').value.trim();
-  const rawP = document.getElementById('clientPhone').value.trim();
-  const digs = rawP.replace(/\D/g, '');
-  document.getElementById('btnBook').disabled = !(name.length >= 2 && digs.length >= 10);
-}
-
-async function book() {
-  const name  = document.getElementById('clientName').value.trim();
-  const rawPhone = document.getElementById('clientPhone').value.trim();
-  const digits = rawPhone.replace(/\D/g, '');
-  const phone = '+7' + (digits.startsWith('8') ? digits.slice(1) : digits.startsWith('7') ? digits.slice(1) : digits);
-  const btn   = document.getElementById('btnBook');
-  const errEl = document.getElementById('bookError');
-
-  btn.disabled = true;
-  btn.textContent = 'Отправляем...';
-  errEl.classList.add('hidden');
-
-  try {
-    const bday = document.getElementById('clientBirthday').value;
-    const birthday = bday ? bday.slice(5) : '';
-    const r = await fetch(`${API}/api/v1/book/${slug}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_name:  name,
-        client_phone: phone,
-        service_id:   selectedService.id,
-        procedure:    selectedService.name,
-        date:         selectedDate.iso,
-        time:         selectedTime,
-        birthday:     birthday,
-      })
-    });
-    if (r.ok) {
-      document.getElementById('step3').classList.add('hidden');
-      document.getElementById('stepSuccess').classList.remove('hidden');
-      document.querySelector('.steps-bar').classList.add('hidden');
-      document.getElementById('successText').textContent =
-        `${selectedDate.label} в ${selectedTime} — услуга "${selectedService.name}". Мастер свяжется для подтверждения.`;
-      const tgLink = document.querySelector('#stepSuccess a[href*="t.me"]');
-      if (tgLink) {
-        const tgDigits = phone.replace(/\D/g, '');
-        tgLink.href = `https://t.me/Beauty6699_bot?start=phone${tgDigits}`;
-      }
-    } else {
-      const d = await r.json().catch(() => ({}));
-      errEl.textContent = d.detail || 'Этот слот уже занят. Выберите другое время.';
-      errEl.classList.remove('hidden');
-      btn.disabled = false;
-      btn.textContent = 'Записаться ✨';
-    }
-  } catch(e) {
-    errEl.textContent = 'Нет соединения. Проверьте интернет.';
-    errEl.classList.remove('hidden');
-    btn.disabled = false;
-    btn.textContent = 'Записаться ✨';
-  }
+  const list = document.getElementById('services-list');
+  list.innerHTML = '';
+  SERVICES.forEach((s, i) => {
+    const item = document.createElement('div');
+    item.className = 'service-item';
+    item.dataset.service = i;
+    item.onclick = () => selectService(item);
+    item.innerHTML =
+      '<div class="service-emoji">' + s.emoji + '</div>' +
+      '<div class="service-info">' +
+        '<div class="service-name">' + escHtml(s.name) + '</div>' +
+      '</div>' +
+      '<div class="service-price">' + s.price + '</div>' +
+      '<div class="service-check">' +
+        '<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      '</div>';
+    list.appendChild(item);
+  });
 }
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function goToStep(n) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + n).classList.add('active');
+  if (n === 2) updateStep2UI();
+  if (n === 3) loadTimeSlots();
+  if (n === 4) updateStep4UI();
+}
+
+function selectService(el) {
+  document.querySelectorAll('.service-item').forEach(i => i.classList.remove('selected'));
+  el.classList.add('selected');
+  state.service = parseInt(el.dataset.service);
+  document.getElementById('btn-step1').disabled = false;
+}
+
+function updateStep2UI() {
+  if (state.service !== null) {
+    const s = SERVICES[state.service];
+    const el = document.getElementById('s2-banner');
+    if (el) {
+      document.getElementById('s2-icon').textContent = s.emoji;
+      document.getElementById('s2-service-name').textContent = s.name + (s.price ? ' — ' + s.price : '');
+      el.style.display = 'flex';
+    }
+  }
+}
+
+function renderCalendar() {
+  const y = state.calYear, m = state.calMonth;
+  const label = document.getElementById('cal-month-label');
+  if (label) label.textContent = RU_MONTHS[m] + ' ' + y;
+  const firstDay = new Date(y, m, 1);
+  let startDow = firstDay.getDay();
+  startDow = startDow === 0 ? 6 : startDow - 1;
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const container = document.getElementById('cal-days');
+  if (!container) return;
+  container.innerHTML = '';
+  for (let i = 0; i < startDow; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'cal-day empty';
+    container.appendChild(empty);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cell = document.createElement('div');
+    cell.className = 'cal-day';
+    cell.textContent = d;
+    const cellDate = new Date(y, m, d);
+    const isToday = cellDate.toDateString() === today.toDateString();
+    const isPast = cellDate < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const isSunday = cellDate.getDay() === 0;
+    if (isPast || isSunday) { cell.classList.add('past'); }
+    else {
+      if (isToday) cell.classList.add('today');
+      if (state.date && state.date.getDate() === d && state.date.getMonth() === m && state.date.getFullYear() === y) {
+        cell.classList.add('selected');
+      }
+      cell.addEventListener('click', () => selectDate(y, m, d));
+    }
+    container.appendChild(cell);
+  }
+}
+
+function changeMonth(delta) {
+  state.calMonth += delta;
+  if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
+  if (state.calMonth < 0)  { state.calMonth = 11; state.calYear--; }
+  renderCalendar();
+}
+
+function selectDate(y, m, d) {
+  state.date = new Date(y, m, d);
+  state.time = null;
+  renderCalendar();
+  const dow = state.date.getDay();
+  const dowName = RU_DAYS[dow === 0 ? 6 : dow - 1];
+  const display = dowName + ', ' + d + ' ' + RU_MONTHS_GEN[m];
+  const el = document.getElementById('selected-date-display');
+  if (el) { el.textContent = display; el.style.display = 'block'; }
+  document.getElementById('btn-step2').disabled = false;
+}
+
+async function loadTimeSlots() {
+  if (!state.date) return;
+  const d = state.date;
+  const dow = d.getDay();
+  const dowName = RU_DAYS[dow === 0 ? 6 : dow - 1];
+  const dateEl = document.getElementById('s3-date-name');
+  if (dateEl) dateEl.textContent = dowName + ', ' + d.getDate() + ' ' + RU_MONTHS_GEN[d.getMonth()];
+
+  const dateStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const grid = document.getElementById('time-slots-grid');
+  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:rgba(245,240,235,0.4);padding:20px">Загрузка...</div>';
+
+  try {
+    const r = await fetch(API + '/api/v1/book/' + slug + '/slots?date=' + dateStr);
+    const data = await r.json();
+    const slots = data.slots || [];
+    grid.innerHTML = '';
+    if (slots.length === 0) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:rgba(245,240,235,0.4);padding:20px">Нет свободного времени</div>';
+      return;
+    }
+    slots.forEach(slot => {
+      const btn = document.createElement('div');
+      btn.className = 'time-slot';
+      btn.textContent = slot;
+      if (state.time === slot) btn.classList.add('selected');
+      btn.addEventListener('click', () => selectTime(slot));
+      grid.appendChild(btn);
+    });
+  } catch(e) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:rgba(245,240,235,0.4);padding:20px">Ошибка загрузки</div>';
+  }
+}
+
+function selectTime(slot) {
+  state.time = slot;
+  document.querySelectorAll('.time-slot').forEach(b => {
+    b.classList.toggle('selected', b.textContent === slot);
+  });
+  document.getElementById('btn-step3').disabled = false;
+}
+
+function updateStep4UI() {
+  if (state.service === null || !state.date || !state.time) return;
+  const s = SERVICES[state.service];
+  const d = state.date;
+  const dateStr = d.getDate() + ' ' + RU_MONTHS_GEN[d.getMonth()];
+  const tagsEl = document.getElementById('booking-tags');
+  if (tagsEl) tagsEl.innerHTML =
+    '<span class="booking-tag">' + s.emoji + ' ' + escHtml(s.name) + '</span>' +
+    '<span class="booking-tag">📅 ' + dateStr + '</span>' +
+    '<span class="booking-tag">🕐 ' + state.time + '</span>' +
+    (s.price ? '<span class="booking-tag">💰 ' + s.price + '</span>' : '');
+  validateStep4();
+}
+
+function formatPhone(el) {
+  let v = el.value.replace(/\D/g, '');
+  if (v.startsWith('8')) v = '7' + v.slice(1);
+  if (!v.startsWith('7') && v.length > 0) v = '7' + v;
+  v = v.slice(0, 11);
+  let out = '';
+  if (v.length > 0) out = '+' + v[0];
+  if (v.length > 1) out += ' (' + v.slice(1, 4);
+  if (v.length >= 4) out += ') ' + v.slice(4, 7);
+  if (v.length >= 7) out += '-' + v.slice(7, 9);
+  if (v.length >= 9) out += '-' + v.slice(9, 11);
+  el.value = out;
+}
+
+function formatBday(el) {
+  let v = el.value.replace(/\D/g, '').slice(0, 8);
+  if (v.length >= 3) v = v.slice(0,2) + '.' + v.slice(2);
+  if (v.length >= 6) v = v.slice(0,5) + '.' + v.slice(5);
+  el.value = v;
+}
+
+function validateStep4() {
+  const name = (document.getElementById('inp-name').value || '').trim();
+  const phone = (document.getElementById('inp-phone').value || '').replace(/\D/g,'');
+  const ok = name.length >= 2 && phone.length === 11;
+  document.getElementById('btn-step4').disabled = !ok;
+}
+
+async function submitBooking() {
+  const s = SERVICES[state.service];
+  const d = state.date;
+  const name = document.getElementById('inp-name').value.trim();
+  const phone = document.getElementById('inp-phone').value.replace(/\D/g,'');
+  const phoneFormatted = '+' + phone;
+  const bdayRaw = (document.getElementById('inp-bday').value || '').replace(/\D/g,'');
+  let birthday = '';
+  if (bdayRaw.length >= 4) {
+    const dd = bdayRaw.slice(0,2), mm = bdayRaw.slice(2,4);
+    birthday = mm + '-' + dd;
+  }
+  const dateStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+
+  const btn = document.getElementById('btn-step4');
+  btn.disabled = true;
+  btn.textContent = 'Отправляем...';
+
+  try {
+    const r = await fetch(API + '/api/v1/book/' + slug, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_name: name,
+        client_phone: phoneFormatted,
+        service_id: s.id,
+        procedure: s.name,
+        date: dateStr,
+        time: state.time,
+        birthday: birthday,
+      }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      btn.disabled = false;
+      btn.textContent = 'Записаться ✦';
+      alert(err.detail || 'Ошибка записи. Попробуйте другое время.');
+      return;
+    }
+    document.getElementById('suc-service').textContent = escHtml(s.name);
+    document.getElementById('suc-date').textContent = d.getDate() + ' ' + RU_MONTHS_GEN[d.getMonth()] + ' ' + d.getFullYear();
+    document.getElementById('suc-time').textContent = state.time;
+    if (document.getElementById('suc-price')) document.getElementById('suc-price').textContent = s.price;
+    if (document.getElementById('suc-master')) document.getElementById('suc-master').textContent = escHtml(masterName);
+    document.getElementById('success-sub').innerHTML = escHtml(masterName) + ' подтвердит запись<br>в ближайшее время';
+    goToStep(5);
+    spawnConfetti();
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Записаться ✦';
+    alert('Ошибка соединения');
+  }
+}
+
+function spawnConfetti() {
+  const container = document.getElementById('confetti');
+  if (!container) return;
+  container.innerHTML = '';
+  const colors = ['#FF6B9D','#E8B4B8','#C9A96E','#FFE4F0','#FFF0D0'];
+  for (let i = 0; i < 60; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.cssText = [
+      'left:' + Math.random()*100 + '%',
+      'background:' + colors[Math.floor(Math.random()*colors.length)],
+      'width:' + (Math.random()*8+4) + 'px',
+      'height:' + (Math.random()*8+4) + 'px',
+      'border-radius:' + (Math.random() > 0.5 ? '50%' : '2px'),
+      'animation-duration:' + (Math.random()*2+2) + 's',
+      'animation-delay:' + Math.random()*1.5 + 's',
+    ].join(';');
+    container.appendChild(piece);
+  }
+  setTimeout(() => container.innerHTML = '', 5000);
+}
+
+function resetBooking() {
+  state = { service: null, date: null, time: null, calYear: today.getFullYear(), calMonth: today.getMonth() };
+  document.querySelectorAll('.service-item').forEach(i => i.classList.remove('selected'));
+  ['btn-step1','btn-step2','btn-step3','btn-step4'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = true;
+  });
+  const banner = document.getElementById('s2-banner');
+  if (banner) banner.style.display = 'none';
+  const dd = document.getElementById('selected-date-display');
+  if (dd) dd.style.display = 'none';
+  const nm = document.getElementById('inp-name');
+  const ph = document.getElementById('inp-phone');
+  const bd = document.getElementById('inp-bday');
+  if (nm) nm.value = '';
+  if (ph) ph.value = '';
+  if (bd) bd.value = '';
+  renderCalendar();
+  goToStep(1);
 }
 
 init();
