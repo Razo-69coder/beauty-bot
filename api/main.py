@@ -31,6 +31,8 @@ from database import (
     get_master_by_email, create_master_with_email,
     # Blocked days
     get_blocked_days, add_blocked_day, remove_blocked_day,
+    update_appointment_status_db,
+    import_clients_batch,
     DB_PATH,
 )
 import aiosqlite
@@ -40,6 +42,8 @@ from models import (
     PublicBooking, RequestCode, VerifyCode, MasterSettings, PaymentUpdate,
     DashboardAppointmentCreate, EmailRegisterRequest, EmailLoginRequest,
     _V1AppointmentCreate,
+    ClientCreateV1, ClientUpdateV1,
+    ClientImportItem, ClientImportRequest,
 )
 
 # Admin endpoints
@@ -431,7 +435,7 @@ async def dashboard_create_client(
     body: ClientCreate,
     master_id: int = Depends(get_jwt_master_id),
 ):
-    client_id = await add_client(master_id, body.name, body.phone, body.notes)
+    client_id = await add_client(master_id, body.name, body.phone, body.notes, body.source, body.allergies)
     return {"id": client_id}
 
 
@@ -499,7 +503,7 @@ async def clients_list(
 
 @app.post("/api/clients", status_code=201)
 async def create_client(body: ClientCreate, master_id: int = Depends(get_master_id)):
-    client_id = await add_client(master_id, body.name, body.phone, body.notes)
+    client_id = await add_client(master_id, body.name, body.phone, body.notes, body.source, body.allergies)
     return {"id": client_id}
 
 
@@ -516,7 +520,7 @@ async def client_detail(client_id: int, master_id: int = Depends(get_master_id))
 async def edit_client(
     client_id: int, body: ClientUpdate, master_id: int = Depends(get_master_id),
 ):
-    ok = await update_client(client_id, master_id, body.name, body.phone, body.notes)
+    ok = await update_client(client_id, master_id, body.name, body.phone, body.notes, body.source, body.allergies)
     if not ok:
         raise HTTPException(status_code=404, detail="Клиент не найден")
     return {"ok": True}
@@ -559,6 +563,18 @@ async def create_appointment_v1(
         body.client_id, master_id, body.procedure,
         body.appointment_date, body.price, body.notes, "", body.time,
     )
+    return {"ok": True}
+
+
+@app.patch("/api/v1/appointments/{appointment_id}/status")
+async def update_appointment_status(
+    appointment_id: int, body: dict, master_id: int = Depends(get_jwt_master_id),
+):
+    status = body.get("status")
+    valid = {"pending", "confirmed", "completed", "cancelled", "no_show"}
+    if status not in valid:
+        raise HTTPException(400, f"Недопустимый статус. Допустимые: {', '.join(sorted(valid))}")
+    await update_appointment_status_db(master_id, appointment_id, status)
     return {"ok": True}
 
 
@@ -652,6 +668,79 @@ async def export_excel(master_id: int = Depends(get_master_id)):
         )
     except ImportError:
         raise HTTPException(status_code=500, detail="Установи openpyxl: pip install openpyxl")
+
+
+# ─── V1 Клиенты (iOS) ──────────────────────────────────────────────────
+
+@app.get("/api/v1/clients")
+async def v1_clients_list(
+    page: int = 0,
+    search: str = "",
+    master_id: int = Depends(get_jwt_master_id),
+):
+    if search:
+        results = await search_clients(master_id, search)
+        return {"clients": results, "total": len(results), "page": 0}
+    clients, total = await get_clients_page(master_id, page, 100)
+    return {"clients": clients, "total": total, "page": page}
+
+
+@app.post("/api/v1/clients", status_code=201)
+async def v1_create_client(
+    body: ClientCreateV1,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    client_id = await add_client(master_id, body.name, body.phone, body.notes, body.source, body.allergies)
+    return {"id": client_id}
+
+
+@app.get("/api/v1/clients/{client_id}")
+async def v1_client_detail(
+    client_id: int,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    client = await get_client(client_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Клиент не найден")
+    if client.get("master_id") != master_id and client.get("master_id") != master_id:
+        async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute("SELECT master_id FROM clients WHERE id=?", (client_id,)) as c:
+                row = await c.fetchone()
+                if not row or row[0] != master_id:
+                    raise HTTPException(403, "Нет доступа к этому клиенту")
+    history = await get_client_history(client_id)
+    return {**client, "history": history}
+
+
+@app.put("/api/v1/clients/{client_id}")
+async def v1_update_client(
+    client_id: int, body: ClientUpdateV1,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    ok = await update_client(client_id, master_id, body.name, body.phone, body.notes, body.source, body.allergies)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Клиент не найден")
+    return {"ok": True}
+
+
+@app.delete("/api/v1/clients/{client_id}")
+async def v1_delete_client(
+    client_id: int,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    ok = await delete_client(client_id, master_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Клиент не найден")
+    return {"ok": True}
+
+
+@app.post("/api/v1/clients/import", status_code=201)
+async def v1_import_clients(
+    body: ClientImportRequest,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    result = await import_clients_batch(master_id, body.clients)
+    return result
 
 
 # ─── Нерабочие дни ───────────────────────────────────────────────────

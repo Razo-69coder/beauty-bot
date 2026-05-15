@@ -7,12 +7,16 @@ class ClientCreate(BaseModel):
     name: str
     phone: str
     notes: str = ""
+    source: str = ""
+    allergies: str = ""
 
 
 class ClientUpdate(BaseModel):
     name: str
     phone: str
     notes: str = ""
+    source: str = ""
+    allergies: str = ""
 
 
 class AppointmentCreate(BaseModel):
@@ -96,3 +100,29 @@ class _V1AppointmentCreate(BaseModel):
     time: str = ""
     price: int = 0
     notes: str = ""
+
+
+class ClientImportItem(BaseModel):
+    name: str
+    phone: str
+    notes: str = ""
+
+
+class ClientImportRequest(BaseModel):
+    clients: list[ClientImportItem]
+
+
+class ClientCreateV1(BaseModel):
+    name: str
+    phone: str
+    notes: str = ""
+    source: str = ""
+    allergies: str = ""
+
+
+class ClientUpdateV1(BaseModel):
+    name: str
+    phone: str
+    notes: str = ""
+    source: str = ""
+    allergies: str = ""

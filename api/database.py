@@ -88,6 +88,8 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN booking_link TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN is_active INTEGER DEFAULT 1",
             "ALTER TABLE masters ADD COLUMN specialization TEXT DEFAULT ''",
+            "ALTER TABLE clients ADD COLUMN source TEXT DEFAULT ''",
+            "ALTER TABLE clients ADD COLUMN allergies TEXT DEFAULT ''",
         ]:
             try:
                 await db.execute(migration)
@@ -165,12 +167,12 @@ async def search_clients(master_id: int, query: str) -> list:
 async def get_client(client_id: int) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
-            "SELECT id, name, phone, notes, telegram_id FROM clients WHERE id=?", (client_id,)
+            "SELECT id, name, phone, notes, telegram_id, source, allergies FROM clients WHERE id=?", (client_id,)
         ) as cursor:
             row = await cursor.fetchone()
             if not row:
                 return None
-            return {"id": row[0], "name": row[1], "phone": row[2], "notes": row[3], "telegram_id": row[4]}
+            return {"id": row[0], "name": row[1], "phone": row[2], "notes": row[3], "telegram_id": row[4], "source": row[5] or "", "allergies": row[6] or ""}
 
 
 async def get_client_by_phone(master_telegram_id: int, phone: str) -> dict | None:
@@ -193,22 +195,22 @@ async def get_client_by_phone(master_telegram_id: int, phone: str) -> dict | Non
             return {"id": row[0], "name": row[1], "phone": row[2], "notes": row[3], "telegram_id": row[4]}
 
 
-async def add_client(master_id: int, name: str, phone: str, notes: str = "") -> int:
+async def add_client(master_id: int, name: str, phone: str, notes: str = "", source: str = "", allergies: str = "") -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
-            "INSERT INTO clients (master_id, name, phone, notes) VALUES (?, ?, ?, ?)",
-            (master_id, name, phone, notes)
+            "INSERT INTO clients (master_id, name, phone, notes, source, allergies) VALUES (?, ?, ?, ?, ?, ?)",
+            (master_id, name, phone, notes, source, allergies)
         )
         await db.commit()
         async with db.execute("SELECT last_insert_rowid()") as cursor:
             return (await cursor.fetchone())[0]
 
 
-async def update_client(client_id: int, master_id: int, name: str, phone: str, notes: str) -> bool:
+async def update_client(client_id: int, master_id: int, name: str, phone: str, notes: str, source: str = "", allergies: str = "") -> bool:
     async with aiosqlite.connect(DB_PATH) as db:
         result = await db.execute(
-            "UPDATE clients SET name=?, phone=?, notes=? WHERE id=? AND master_id=?",
-            (name, phone, notes, client_id, master_id)
+            "UPDATE clients SET name=?, phone=?, notes=?, source=?, allergies=? WHERE id=? AND master_id=?",
+            (name, phone, notes, source, allergies, client_id, master_id)
         )
         await db.commit()
         return result.rowcount > 0
@@ -709,3 +711,27 @@ async def remove_blocked_day(master_id: int, date_str: str) -> bool:
         )
         await db.commit()
         return result.rowcount > 0
+
+
+async def import_clients_batch(master_id: int, clients: list) -> dict:
+    imported = 0
+    skipped = 0
+    async with aiosqlite.connect(DB_PATH) as db:
+        for c in clients:
+            if not c.phone.strip():
+                skipped += 1
+                continue
+            async with db.execute(
+                "SELECT id FROM clients WHERE master_id=? AND phone=?", (master_id, c.phone.strip())
+            ) as cur:
+                existing = await cur.fetchone()
+            if existing:
+                skipped += 1
+                continue
+            await db.execute(
+                "INSERT INTO clients (master_id, name, phone, notes) VALUES (?, ?, ?, ?)",
+                (master_id, c.name, c.phone.strip(), c.notes)
+            )
+            imported += 1
+        await db.commit()
+    return {"imported": imported, "skipped": skipped}
