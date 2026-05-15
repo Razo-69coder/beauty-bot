@@ -328,6 +328,9 @@ class ClientUpdate(BaseModel):
     phone: str | None = None
     notes: str | None = None
     username: str | None = None
+    birthday: str | None = None
+    source: str | None = None
+    allergies: str | None = None
 
 class AppointmentCreate(BaseModel):
     client_id: int
@@ -830,6 +833,9 @@ class _V1ClientCreate(BaseModel):
     name: str
     phone: str
     notes: str = ""
+    birthday: str = ""
+    source: str = ""
+    allergies: str = ""
 
 class _V1AppointmentCreate(BaseModel):
     client_id: int
@@ -1044,7 +1050,8 @@ async def v1_update_client(client_id: int, body: _V1ClientCreate, master_id: int
     client = await get_client(client_id)
     if not client or client.get("master_id") != master_id:
         raise HTTPException(404, "Клиент не найден")
-    await update_client(client_id, master_id, body.name, body.phone, body.notes)
+    await update_client(client_id, master_id, body.name, body.phone, body.notes,
+                        birthday=body.birthday or None, source=body.source or None, allergies=body.allergies or None)
     return {"ok": True}
 
 
@@ -1427,7 +1434,10 @@ async def dash_update_client(client_id: int, body: ClientUpdate, master_id: int 
     await update_client(client_id, master_id,
         body.name or client.get("name", ""),
         body.phone or client.get("phone", ""),
-        body.notes or client.get("notes", ""))
+        body.notes or client.get("notes", ""),
+        birthday=body.birthday or client.get("birthday"),
+        source=body.source or client.get("source"),
+        allergies=body.allergies or client.get("allergies"))
     if body.username is not None:
         await update_client_username(client_id, master_id, body.username)
     return {"ok": True}

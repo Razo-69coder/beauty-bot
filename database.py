@@ -454,12 +454,15 @@ async def assign_client_telegram(client_id: int, telegram_id: int) -> None:
         )
 
 
-async def update_client(client_id: int, master_id: int, name: str, phone: str, notes: str, username: str = "") -> bool:
+async def update_client(client_id: int, master_id: int, name: str, phone: str, notes: str,
+                        username: str = "", birthday: str | None = None,
+                        source: str | None = None, allergies: str | None = None) -> bool:
     pool = await get_pool()
     async with pool.acquire() as conn:
         result = await conn.execute(
-            "UPDATE clients SET name=$1, phone=$2, notes=$3, username=$4 WHERE id=$5 AND master_id=$6",
-            name, phone, notes, username, client_id, master_id
+            "UPDATE clients SET name=$1, phone=$2, notes=$3, username=$4, "
+            "birthday=$5, source=$6, allergies=$7 WHERE id=$8 AND master_id=$9",
+            name, phone, notes, username, birthday, source, allergies, client_id, master_id
         )
     return result != "UPDATE 0"
 
