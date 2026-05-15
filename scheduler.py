@@ -102,7 +102,7 @@ async def send_correction_reminders(bot: Bot):
         try:
             await bot.send_message(
                 client_tg_id,
-                f"💅 *Привет, {client_name}!*\n\n"
+                f"💅 *Привет, {client_name.split()[0]}!*\n\n"
                 f"Прошло 3 недели после визита — самое время на коррекцию!\n\n"
                 f"Запишитесь к мастеру {master_name} заранее 🗓",
                 parse_mode="Markdown"
@@ -127,7 +127,7 @@ async def send_review_requests(bot: Bot):
         try:
             await bot.send_message(
                 appt['client_telegram_id'],
-                f"💅 *{appt['client_name']}, как прошёл визит?*\n\n"
+                f"💅 *{appt['client_name'].split()[0]}, как прошёл визит?*\n\n"
                 f"Оцените процедуру «{appt['procedure']}»:",
                 reply_markup=review_rating_keyboard(appt['id']),
                 parse_mode="Markdown",
@@ -149,7 +149,7 @@ async def send_review_requests(bot: Bot):
             try:
                 await bot.send_message(
                     client_tg_id,
-                    f"💅 *{client_name}, как прошёл визит?*\n\n"
+                    f"💅 *{client_name.split()[0]}, как прошёл визит?*\n\n"
                     f"Оцените процедуру «{procedure}» у мастера {master_name}:",
                     reply_markup=review_rating_keyboard(appt_id),
                     parse_mode="Markdown",
@@ -218,7 +218,7 @@ async def send_birthday_greetings(bot: Bot):
         try:
             await bot.send_message(
                 telegram_id,
-                f"🎂 *С днём рождения, {name}!*\n\n"
+                f"🎂 *С днём рождения, {name.split()[0]}!*\n\n"
                 f"Мастер {master_name} поздравляет вас с праздником! 🎉\n\n"
                 f"🎁 Скидка *{discount_percent}%* на следующий визит ждёт вас!\n"
                 f"Запишитесь и напомните мастеру о скидке 💅",
@@ -251,7 +251,7 @@ async def send_loyalty_notifications(bot: Bot):
         try:
             await bot.send_message(
                 telegram_id,
-                f"🏆 *{name}, вы у нас уже {visit_count} раз!*\n\n"
+                f"🏆 *{name.split()[0]}, вы у нас уже {visit_count} раз!*\n\n"
                 f"Вы заработали скидку *{discount_percent}%* на следующий визит 🎉\n\n"
                 f"Запишитесь и скажите мастеру {master_name} что вы постоянный клиент 💅",
                 parse_mode="Markdown"
