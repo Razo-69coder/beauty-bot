@@ -845,6 +845,14 @@ class _V1AppointmentCreate(BaseModel):
     price: int = 0
     notes: str = ""
 
+class _V1AppointmentUpdate(BaseModel):
+    procedure: str = ""
+    appointment_date: str = ""
+    time: str = ""
+    price: int = 0
+    service_id: int = 0
+    status: str = "confirmed"
+
 class _V1ServiceCreate(BaseModel):
     name: str
     price_default: int = 0
@@ -1200,6 +1208,20 @@ async def v1_create_appointment(body: _V1AppointmentCreate, master_id: int = Dep
     except Exception:
         pass  # Don't fail if bot message fails
     
+    return {"ok": True}
+
+
+@app.put("/api/v1/appointments/{appt_id}")
+async def v1_update_appointment(appt_id: int, body: _V1AppointmentUpdate, master_id: int = Depends(get_jwt_master_id)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        appt = await conn.fetchrow("SELECT id, master_id FROM appointments WHERE id=$1", appt_id)
+        if not appt or appt["master_id"] != master_id:
+            raise HTTPException(404, "Запись не найдена")
+        await conn.execute(
+            "UPDATE appointments SET procedure=$1, appointment_date=$2, time=$3, price=$4, status=$5 WHERE id=$6",
+            body.procedure, body.appointment_date, body.time, body.price, body.status, appt_id
+        )
     return {"ok": True}
 
 
