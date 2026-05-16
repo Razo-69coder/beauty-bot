@@ -726,10 +726,22 @@ async def v1_update_client(
     client_id: int, body: ClientUpdateV1,
     master_id: int = Depends(get_jwt_master_id),
 ):
-    ok = await update_client(client_id, master_id, body.name, body.phone, body.notes, body.source, body.allergies)
-    if not ok:
-        raise HTTPException(status_code=404, detail="Клиент не найден")
-    return {"ok": True}
+    import traceback
+    try:
+        ok = await update_client(client_id, master_id, body.name, body.phone, body.notes, body.source, body.allergies)
+        if not ok:
+            raise HTTPException(status_code=404, detail="Клиент не найден")
+        return {"ok": True}
+    except Exception as e:
+        err_str = str(e)
+        if "UNIQUE constraint failed" in err_str and "phone" in err_str:
+            raise HTTPException(
+                status_code=400,
+                detail="Этот номер телефона уже закреплён за другим клиентом"
+            )
+        print("Ошибка при обновлении клиента:")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
 
 @app.delete("/api/v1/clients/{client_id}")
