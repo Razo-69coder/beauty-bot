@@ -158,6 +158,7 @@ async def init_db():
             "ALTER TABLE clients ADD COLUMN IF NOT EXISTS birthday TEXT",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1",
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS service_id INTEGER",
         ]:
             try:
                 await conn.execute(sql)
@@ -1245,6 +1246,15 @@ async def set_payment_reminder_enabled(telegram_id: int, enabled: bool) -> None:
         )
 
 
+async def link_client_telegram(phone: str, telegram_id: int) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE clients SET telegram_id = $1 WHERE phone = $2",
+            telegram_id, phone
+        )
+
+
 async def get_appointments_pending_deposit_24h(target_date: str) -> list:
     """Записи завтра с невнесённой предоплатой, у мастеров с включённым напоминанием."""
     pool = await get_pool()
@@ -1395,3 +1405,19 @@ async def remove_blocked_day(master_id: int, date: str) -> None:
             "DELETE FROM blocked_days WHERE master_id=$1 AND date=$2",
             master_id, date
         )
+
+
+async def update_appointment(
+    appt_id: int, master_id: int, procedure: str,
+    appointment_date: str, time: str, price: int,
+    service_id: int, status: str,
+) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE appointments
+            SET procedure=$1, appointment_date=$2, time=$3, price=$4,
+                service_id=$5, status=$6,
+                reminder_24h_sent=0, reminder_2h_sent=0
+            WHERE id=$7 AND master_id=$8
+        """, procedure, appointment_date, time, price, service_id, status, appt_id, master_id)
