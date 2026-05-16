@@ -975,10 +975,8 @@ async def v1_master_stats(master_id: int = Depends(get_jwt_master_id)):
 
 
 @app.get("/api/v1/masters/me/stats/earnings-by-day")
-async def v1_earnings_by_day(period: str = "month", master_id: int = Depends(get_jwt_master_id)):
+async def v1_earnings_by_day(days: int = 30, master_id: int = Depends(get_jwt_master_id)):
     from datetime import date, timedelta
-    days_map = {"week": 7, "month": 30, "year": 365}
-    days = days_map.get(period, 30)
     today = date.today()
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -990,7 +988,7 @@ async def v1_earnings_by_day(period: str = "month", master_id: int = Depends(get
                 master_id, d
             )
             amount = int(row[0]) if row and row[0] else 0
-            result.append({"date": d[8:], "total": amount})
+            result.append({"date": d, "total": amount})
     return {"days": result}
 
 
