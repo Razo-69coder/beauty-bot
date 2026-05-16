@@ -36,7 +36,7 @@ from database import (
     DB_PATH,
 )
 import aiosqlite
-from api.database import get_client_by_phone
+from api.database import get_client_by_phone, get_yearly_stats, get_reminder_template, upsert_reminder_template, get_all_reminder_templates
 from models import (
     ClientCreate, ClientUpdate, AppointmentCreate, ReminderUpdate,
     PublicBooking, RequestCode, VerifyCode, MasterSettings, PaymentUpdate,
@@ -610,6 +610,14 @@ async def stats(master_id: int = Depends(get_master_id)):
     return await get_statistics(master_id)
 
 
+@app.get("/api/v1/masters/me/stats/yearly")
+async def yearly_stats(
+    year: int,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    return await get_yearly_stats(master_id, year)
+
+
 # ─── Настройки (Mini App) ────────────────────────────────────────────
 
 @app.put("/api/settings/reminder")
@@ -765,4 +773,23 @@ async def add_blocked_day_endpoint(
 @app.delete("/api/v1/schedule/blocked-days/{date_str}")
 async def remove_blocked_day_endpoint(date_str: str, master_id: int = Depends(get_jwt_master_id)):
     await remove_blocked_day(master_id, date_str)
+    return {"ok": True}
+
+
+# ─── Шаблоны напоминаний ──────────────────────────────────────────────
+
+@app.get("/api/v1/reminders/templates")
+async def get_templates(master_id: int = Depends(get_jwt_master_id)):
+    templates = await get_all_reminder_templates(master_id)
+    return {"templates": templates}
+
+
+@app.put("/api/v1/reminders/templates/{template_type}")
+async def update_template(
+    template_type: str,
+    body: dict,
+    master_id: int = Depends(get_jwt_master_id),
+):
+    template = body.get("template", "")
+    await upsert_reminder_template(master_id, template_type, template)
     return {"ok": True}

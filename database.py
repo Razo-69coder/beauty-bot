@@ -1421,3 +1421,12 @@ async def update_appointment(
                 reminder_24h_sent=0, reminder_2h_sent=0
             WHERE id=$7 AND master_id=$8
         """, procedure, appointment_date, time, price, service_id, status, appt_id, master_id)
+
+
+async def get_master_id_by_tg(telegram_id: int) -> int | None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id FROM masters WHERE telegram_id=$1", telegram_id
+        )
+    return row['id'] if row else None

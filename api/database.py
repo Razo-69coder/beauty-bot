@@ -69,6 +69,15 @@ async def init_db():
                 UNIQUE(master_id, date)
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS reminder_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                master_id INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                template TEXT NOT NULL DEFAULT '',
+                UNIQUE(master_id, type)
+            )
+        """)
         # Миграции для существующих баз
         for migration in [
             "ALTER TABLE masters ADD COLUMN reminder_days INTEGER DEFAULT 40",
@@ -311,6 +320,31 @@ async def get_statistics(master_id: int) -> dict:
         "total_earnings": total_earnings,
         "month_earnings": month_earnings,
         "top_procedures": top_procedures,
+    }
+
+
+async def get_yearly_stats(master_id: int, year: int) -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT COUNT(*), COALESCE(SUM(price), 0) FROM appointments "
+            "WHERE master_id=? AND strftime('%Y', appointment_date) = ?",
+            (master_id, str(year))
+        ) as c:
+            row = await c.fetchone()
+            total_appointments, total_revenue = row
+
+        async with db.execute(
+            "SELECT procedure, COUNT(*) as cnt FROM appointments "
+            "WHERE master_id=? AND strftime('%Y', appointment_date) = ? "
+            "GROUP BY procedure ORDER BY cnt DESC LIMIT 5",
+            (master_id, str(year))
+        ) as c:
+            top_services = [{"procedure": r[0], "count": r[1]} for r in await c.fetchall()]
+
+    return {
+        "total_revenue": total_revenue,
+        "total_appointments": total_appointments,
+        "top_services": top_services,
     }
 
 
@@ -735,3 +769,33 @@ async def import_clients_batch(master_id: int, clients: list) -> dict:
             imported += 1
         await db.commit()
     return {"imported": imported, "skipped": skipped}
+
+
+async def get_reminder_template(master_id: int, template_type: str) -> str | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT template FROM reminder_templates WHERE master_id=? AND type=?",
+            (master_id, template_type)
+        ) as c:
+            row = await c.fetchone()
+    return row[0] if row else None
+
+
+async def upsert_reminder_template(master_id: int, template_type: str, template: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO reminder_templates (master_id, type, template) VALUES (?, ?, ?) "
+            "ON CONFLICT(master_id, type) DO UPDATE SET template=excluded.template",
+            (master_id, template_type, template)
+        )
+        await db.commit()
+
+
+async def get_all_reminder_templates(master_id: int) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT type, template FROM reminder_templates WHERE master_id=?",
+            (master_id,)
+        ) as c:
+            rows = await c.fetchall()
+    return [{"type": r[0], "template": r[1]} for r in rows]

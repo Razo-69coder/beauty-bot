@@ -52,13 +52,26 @@ async def send_client_reminders_24h(bot: Bot):
 
     for appt_id, client_tg_id, client_name, master_tg_id, date, time, procedure in appointments:
         date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
-        try:
-            await bot.send_message(
-                client_tg_id,
+        # Check custom template
+        from database import get_master_id_by_tg
+        from api.database import get_reminder_template
+        master_id = await get_master_id_by_tg(master_tg_id) if master_tg_id else None
+        custom_template = await get_reminder_template(master_id, "24h") if master_id else None
+        if custom_template:
+            message_text = custom_template.format(
+                date=date_fmt, time=time, procedure=procedure, name=client_name
+            )
+        else:
+            message_text = (
                 f"🔔 *Напоминание о записи*\n\n"
                 f"Завтра, *{date_fmt}* в *{time}*\n"
                 f"📋 {procedure}\n\n"
-                f"Ждём вас!",
+                f"Ждём вас!"
+            )
+        try:
+            await bot.send_message(
+                client_tg_id,
+                message_text,
                 parse_mode="Markdown"
             )
             await mark_reminder_sent(appt_id, "24h")
@@ -79,13 +92,26 @@ async def send_client_reminders_2h(bot: Bot):
 
     for appt_id, client_tg_id, client_name, master_tg_id, date, time, procedure in appointments:
         date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
-        try:
-            await bot.send_message(
-                client_tg_id,
+        # Check custom template
+        from database import get_master_id_by_tg
+        from api.database import get_reminder_template
+        master_id = await get_master_id_by_tg(master_tg_id) if master_tg_id else None
+        custom_template = await get_reminder_template(master_id, "2h") if master_id else None
+        if custom_template:
+            message_text = custom_template.format(
+                date=date_fmt, time=time, procedure=procedure, name=client_name
+            )
+        else:
+            message_text = (
                 f"⏰ *Через 2 часа ваша запись!*\n\n"
                 f"📅 {date_fmt} в *{time}*\n"
                 f"📋 {procedure}\n\n"
-                f"Не забудьте!",
+                f"Не забудьте!"
+            )
+        try:
+            await bot.send_message(
+                client_tg_id,
+                message_text,
                 parse_mode="Markdown"
             )
             await mark_reminder_sent(appt_id, "2h")

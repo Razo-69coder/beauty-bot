@@ -126,3 +126,7 @@ class ClientUpdateV1(BaseModel):
     notes: str = ""
     source: str = ""
     allergies: str = ""
+
+
+class ReminderTemplateUpdate(BaseModel):
+    template: str
