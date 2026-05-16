@@ -10,7 +10,9 @@ from database import (
     get_appointments_for_review, mark_review_sent,
     get_appointments_pending_deposit_24h, get_appointments_pending_deposit_2h,
     get_appointments_for_review_request,
+    get_master_id_by_tg,
 )
+from api.database import get_reminder_template_with_enabled
 
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
@@ -124,15 +126,20 @@ async def send_correction_reminders(bot: Bot):
     three_weeks_ago = (now_msk() - timedelta(days=21)).strftime("%Y-%m-%d")
     appointments = await get_appointments_for_correction_reminder(three_weeks_ago)
 
-    for appt_id, client_tg_id, client_name, master_name, procedure in appointments:
-        try:
-            await bot.send_message(
-                client_tg_id,
+    for appt_id, client_tg_id, client_name, master_name, procedure, master_id in appointments:
+        custom_template, enabled = await get_reminder_template_with_enabled(master_id, "correction")
+        if not enabled:
+            continue
+        if custom_template:
+            message_text = custom_template.format(name=client_name.split()[0], master_name=master_name, procedure=procedure)
+        else:
+            message_text = (
                 f"💅 *Привет, {client_name.split()[0]}!*\n\n"
                 f"Прошло 3 недели после визита — самое время на коррекцию!\n\n"
-                f"Запишитесь к мастеру {master_name} заранее 🗓",
-                parse_mode="Markdown"
+                f"Запишитесь к мастеру {master_name} заранее 🗓"
             )
+        try:
+            await bot.send_message(client_tg_id, message_text, parse_mode="Markdown")
             await mark_correction_reminder_sent(appt_id)
         except Exception:
             pass
@@ -149,12 +156,18 @@ async def send_review_requests(bot: Bot):
     appointments = await get_appointments_for_review_request(now.isoformat())
     
     for appt in appointments:
+        custom_template, enabled = await get_reminder_template_with_enabled(appt['master_id'], "review")
+        if not enabled:
+            continue
+        if custom_template:
+            message_text = custom_template.format(name=appt['client_name'].split()[0], procedure=appt['procedure'])
+        else:
+            message_text = f"💅 *{appt['client_name'].split()[0]}, как прошёл визит?*\n\nОцените процедуру «{appt['procedure']}»:"
         from keyboards import review_rating_keyboard
         try:
             await bot.send_message(
                 appt['client_telegram_id'],
-                f"💅 *{appt['client_name'].split()[0]}, как прошёл визит?*\n\n"
-                f"Оцените процедуру «{appt['procedure']}»:",
+                message_text,
                 reply_markup=review_rating_keyboard(appt['id']),
                 parse_mode="Markdown",
             )
@@ -171,12 +184,18 @@ async def send_review_requests(bot: Bot):
         appointments = await get_appointments_for_review(target_date, time_from, time_to)
 
         for appt_id, client_tg_id, client_id, master_id, client_name, master_name, procedure in appointments:
+            custom_template, enabled = await get_reminder_template_with_enabled(master_id, "review")
+            if not enabled:
+                continue
+            if custom_template:
+                message_text = custom_template.format(name=client_name.split()[0], procedure=procedure, master_name=master_name)
+            else:
+                message_text = f"💅 *{client_name.split()[0]}, как прошёл визит?*\n\nОцените процедуру «{procedure}» у мастера {master_name}:"
             from keyboards import review_rating_keyboard
             try:
                 await bot.send_message(
                     client_tg_id,
-                    f"💅 *{client_name.split()[0]}, как прошёл визит?*\n\n"
-                    f"Оцените процедуру «{procedure}» у мастера {master_name}:",
+                    message_text,
                     reply_markup=review_rating_keyboard(appt_id),
                     parse_mode="Markdown",
                 )
@@ -191,6 +210,12 @@ async def send_payment_reminders_24h(bot: Bot):
     appointments = await get_appointments_pending_deposit_24h(tomorrow)
 
     for appt_id, client_tg_id, client_name, master_tg_id, date, time, deposit_pct, payment_card, payment_phone, payment_banks in appointments:
+        # Check custom template
+        master_id = await get_master_id_by_tg(master_tg_id) if master_tg_id else None
+        custom_template, enabled = await get_reminder_template_with_enabled(master_id, "payment_24h") if master_id else (None, False)
+        if not enabled:
+            continue
+
         date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
         time_str = f" в *{time}*" if time else ""
 
@@ -205,13 +230,23 @@ async def send_payment_reminders_24h(bot: Bot):
         if rekv_parts:
             rekv_block = "\n\nРеквизиты для оплаты:\n" + "\n".join(rekv_parts)
 
-        try:
-            await bot.send_message(
-                client_tg_id,
+        if custom_template:
+            message_text = custom_template.format(
+                date=date_fmt, time=time, name=client_name,
+                deposit_pct=deposit_pct, rekv_block=rekv_block,
+                procedure=""
+            )
+        else:
+            message_text = (
                 f"⚠️ *Напоминание об оплате*\n\n"
                 f"Завтра, *{date_fmt}*{time_str} у вас запись.\n\n"
                 f"Для подтверждения необходима предоплата *{deposit_pct}%*.{rekv_block}\n\n"
-                f"Пожалуйста, внесите оплату — мастер ждёт подтверждения 💳",
+                f"Пожалуйста, внесите оплату — мастер ждёт подтверждения 💳"
+            )
+        try:
+            await bot.send_message(
+                client_tg_id,
+                message_text,
                 parse_mode="Markdown"
             )
         except Exception:
@@ -223,6 +258,12 @@ async def send_payment_reminders_2h(bot: Bot):
     appointments = await get_appointments_pending_deposit_2h()
     
     for appt_id, client_tg_id, client_name, master_tg_id, date, time, deposit_pct, payment_card, payment_phone, payment_banks in appointments:
+        # Check custom template
+        master_id = await get_master_id_by_tg(master_tg_id) if master_tg_id else None
+        custom_template, enabled = await get_reminder_template_with_enabled(master_id, "payment_2h") if master_id else (None, False)
+        if not enabled:
+            continue
+
         date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
         time_str = f" в *{time}*" if time else ""
 
@@ -237,13 +278,23 @@ async def send_payment_reminders_2h(bot: Bot):
         if rekv_parts:
             rekv_block = "\n\nРеквизиты для оплаты:\n" + "\n".join(rekv_parts)
 
-        try:
-            await bot.send_message(
-                client_tg_id,
+        if custom_template:
+            message_text = custom_template.format(
+                date=date_fmt, time=time, name=client_name,
+                deposit_pct=deposit_pct, rekv_block=rekv_block,
+                procedure=""
+            )
+        else:
+            message_text = (
                 f"💳 *Напоминание об оплате*\n\n"
                 f"Вы записаны на *{date_fmt}*{time_str}.\n\n"
                 f"Для подтверждения записи внесите предоплату *{deposit_pct}%*.{rekv_block}\n\n"
-                f"После оплаты мастер подтвердит вашу запись ✅",
+                f"После оплаты мастер подтвердит вашу запись ✅"
+            )
+        try:
+            await bot.send_message(
+                client_tg_id,
+                message_text,
                 parse_mode="Markdown"
             )
         except Exception:

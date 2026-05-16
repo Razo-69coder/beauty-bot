@@ -130,3 +130,4 @@ class ClientUpdateV1(BaseModel):
 
 class ReminderTemplateUpdate(BaseModel):
     template: str
+    enabled: bool = True

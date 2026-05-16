@@ -99,6 +99,7 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN specialization TEXT DEFAULT ''",
             "ALTER TABLE clients ADD COLUMN source TEXT DEFAULT ''",
             "ALTER TABLE clients ADD COLUMN allergies TEXT DEFAULT ''",
+            "ALTER TABLE reminder_templates ADD COLUMN enabled INTEGER DEFAULT 1",
         ]:
             try:
                 await db.execute(migration)
@@ -781,12 +782,24 @@ async def get_reminder_template(master_id: int, template_type: str) -> str | Non
     return row[0] if row else None
 
 
-async def upsert_reminder_template(master_id: int, template_type: str, template: str):
+async def get_reminder_template_with_enabled(master_id: int, template_type: str) -> tuple[str | None, bool]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT template, enabled FROM reminder_templates WHERE master_id=? AND type=?",
+            (master_id, template_type)
+        ) as c:
+            row = await c.fetchone()
+    if row:
+        return row[0], bool(row[1]) if row[1] is not None else True
+    return None, True
+
+
+async def upsert_reminder_template(master_id: int, template_type: str, template: str, enabled: bool = True):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
-            "INSERT INTO reminder_templates (master_id, type, template) VALUES (?, ?, ?) "
-            "ON CONFLICT(master_id, type) DO UPDATE SET template=excluded.template",
-            (master_id, template_type, template)
+            "INSERT INTO reminder_templates (master_id, type, template, enabled) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(master_id, type) DO UPDATE SET template=excluded.template, enabled=excluded.enabled",
+            (master_id, template_type, template, 1 if enabled else 0)
         )
         await db.commit()
 
@@ -794,8 +807,8 @@ async def upsert_reminder_template(master_id: int, template_type: str, template:
 async def get_all_reminder_templates(master_id: int) -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
-            "SELECT type, template FROM reminder_templates WHERE master_id=?",
+            "SELECT type, template, enabled FROM reminder_templates WHERE master_id=?",
             (master_id,)
         ) as c:
             rows = await c.fetchall()
-    return [{"type": r[0], "template": r[1]} for r in rows]
+    return [{"type": r[0], "template": r[1], "enabled": bool(r[2]) if r[2] is not None else True} for r in rows]

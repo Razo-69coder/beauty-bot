@@ -690,7 +690,7 @@ async def get_appointments_for_correction_reminder(three_weeks_ago: str) -> list
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
-            SELECT a.id, c.telegram_id, c.name, m.name, a.procedure
+            SELECT a.id, c.telegram_id, c.name, m.name, a.procedure, m.id
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
             JOIN masters m ON m.id = a.master_id
@@ -699,7 +699,7 @@ async def get_appointments_for_correction_reminder(three_weeks_ago: str) -> list
               AND a.correction_reminder_sent = 0
               AND c.telegram_id IS NOT NULL
         """, three_weeks_ago)
-    return [(r[0], r[1], r[2], r[3], r[4]) for r in rows]
+    return [(r[0], r[1], r[2], r[3], r[4], r[5]) for r in rows]
 
 
 async def mark_correction_reminder_sent(appointment_id: int):

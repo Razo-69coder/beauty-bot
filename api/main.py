@@ -36,7 +36,7 @@ from database import (
     DB_PATH,
 )
 import aiosqlite
-from api.database import get_client_by_phone, get_yearly_stats, get_reminder_template, upsert_reminder_template, get_all_reminder_templates
+from api.database import get_client_by_phone, get_yearly_stats, get_reminder_template, get_reminder_template_with_enabled, upsert_reminder_template, get_all_reminder_templates
 from models import (
     ClientCreate, ClientUpdate, AppointmentCreate, ReminderUpdate,
     PublicBooking, RequestCode, VerifyCode, MasterSettings, PaymentUpdate,
@@ -44,6 +44,7 @@ from models import (
     _V1AppointmentCreate,
     ClientCreateV1, ClientUpdateV1,
     ClientImportItem, ClientImportRequest,
+    ReminderTemplateUpdate,
 )
 
 # Admin endpoints
@@ -787,9 +788,8 @@ async def get_templates(master_id: int = Depends(get_jwt_master_id)):
 @app.put("/api/v1/reminders/templates/{template_type}")
 async def update_template(
     template_type: str,
-    body: dict,
+    body: ReminderTemplateUpdate,
     master_id: int = Depends(get_jwt_master_id),
 ):
-    template = body.get("template", "")
-    await upsert_reminder_template(master_id, template_type, template)
+    await upsert_reminder_template(master_id, template_type, body.template, body.enabled)
     return {"ok": True}
