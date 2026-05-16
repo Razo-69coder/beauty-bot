@@ -302,6 +302,56 @@
   .service-check svg { display: none; }
   .service-item.selected .service-check svg { display: block; }
 
+  /* ── Services bottom panel ── */
+  .services-panel {
+    margin: 16px 16px 0;
+    padding: 14px 18px;
+    border-radius: 18px;
+    border: 1px solid rgba(201,169,110,0.3);
+    background: linear-gradient(135deg, rgba(201,169,110,0.1), rgba(255,107,157,0.06));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .services-panel-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .services-panel-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .services-panel-sum {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--gold);
+  }
+  .services-panel-btn {
+    padding: 12px 28px;
+    border: none;
+    border-radius: 30px;
+    background: linear-gradient(135deg, var(--pink), var(--rose));
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+  }
+  .services-panel-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+  .services-panel-btn:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px var(--glow-pink);
+  }
+
   /* ── Calendar ── */
   .calendar-wrap {
     margin: 0 16px;
@@ -798,8 +848,12 @@
 
       <div class="services-list" id="services-list"></div>
 
-      <div class="cta-wrap" style="margin-top:20px">
-        <button class="btn-cta" id="btn-step1" onclick="goToStep(2)" disabled>Выбрать дату →</button>
+      <div class="services-panel" id="services-panel">
+        <div class="services-panel-info">
+          <div class="services-panel-label" id="services-count">Выбрано: 0</div>
+          <div class="services-panel-sum" id="services-total">0 ₽</div>
+        </div>
+        <button class="services-panel-btn" id="btn-services-next" onclick="goToStep(2)" disabled>Далее →</button>
       </div>
     </div>
 
@@ -965,9 +1019,9 @@
         </div>
       </div>
 
-      <a href="https://t.me/Beauty6699_bot" target="_blank" class="btn-telegram">
+      <a href="https://t.me/Beauty6699_bot" target="_blank" class="btn-telegram" id="telegram-link">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M17.5 3L2.5 8.5L8 10.5L10 17L12.5 12L17.5 3Z" fill="white"/><path d="M8 10.5L11.5 9" stroke="#1B7BC4" stroke-width="1" stroke-linecap="round"/></svg>
-        Написать в Telegram
+        🔔 Получить напоминания в Telegram
       </a>
 
       <button class="btn-cta" style="background:var(--surface);background-image:none;animation:none;box-shadow:none;border:1px solid var(--border);color:var(--muted);font-weight:500" onclick="resetBooking()">
@@ -986,7 +1040,7 @@ const RU_MONTHS = ['Январь','Февраль','Март','Апрель','М
 const RU_MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 const RU_DAYS = ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
 
-let state = { service: null, date: null, time: null, calYear: null, calMonth: null };
+let state = { services: [], date: null, time: null, calYear: null, calMonth: null };
 let SERVICES = [];
 let masterName = '';
 
@@ -1005,6 +1059,7 @@ async function init() {
       id: s.id,
       name: s.name,
       price: s.price_default ? s.price_default + ' ₽' : '',
+      priceNum: s.price_default || 0,
       emoji: getEmoji(s.name),
     }));
     document.querySelectorAll('.master-name').forEach(el => el.textContent = masterName);
@@ -1040,7 +1095,7 @@ function renderServices() {
     const item = document.createElement('div');
     item.className = 'service-item';
     item.dataset.service = i;
-    item.onclick = () => selectService(item);
+    item.onclick = () => toggleService(i);
     item.innerHTML =
       '<div class="service-emoji">' + s.emoji + '</div>' +
       '<div class="service-info">' +
@@ -1066,16 +1121,32 @@ function goToStep(n) {
   if (n === 4) updateStep4UI();
 }
 
-function selectService(el) {
-  document.querySelectorAll('.service-item').forEach(i => i.classList.remove('selected'));
-  el.classList.add('selected');
-  state.service = parseInt(el.dataset.service);
-  document.getElementById('btn-step1').disabled = false;
+function toggleService(i) {
+  const idx = state.services.indexOf(i);
+  if (idx >= 0) {
+    state.services.splice(idx, 1);
+  } else {
+    state.services.push(i);
+  }
+  document.querySelectorAll('.service-item').forEach((el, j) => {
+    el.classList.toggle('selected', state.services.includes(j));
+  });
+  updateServicesPanel();
+}
+
+function updateServicesPanel() {
+  const selected = state.services.map(i => SERVICES[i]);
+  const total = selected.reduce((sum, s) => sum + s.priceNum, 0);
+  const count = selected.length;
+  document.getElementById('services-count').textContent =
+    'Выбрано: ' + count + ' ' + (count === 1 ? 'услуга' : (count >= 2 && count <= 4 ? 'услуги' : 'услуг'));
+  document.getElementById('services-total').textContent = total > 0 ? total + ' ₽' : '0 ₽';
+  document.getElementById('btn-services-next').disabled = count === 0;
 }
 
 function updateStep2UI() {
-  if (state.service !== null) {
-    const s = SERVICES[state.service];
+  if (state.services.length > 0) {
+    const s = SERVICES[state.services[0]];
     const el = document.getElementById('s2-banner');
     if (el) {
       document.getElementById('s2-icon').textContent = s.emoji;
@@ -1183,8 +1254,8 @@ function selectTime(slot) {
 }
 
 function updateStep4UI() {
-  if (state.service === null || !state.date || !state.time) return;
-  const s = SERVICES[state.service];
+  if (state.services.length === 0 || !state.date || !state.time) return;
+  const s = SERVICES[state.services[0]];
   const d = state.date;
   const dateStr = d.getDate() + ' ' + RU_MONTHS_GEN[d.getMonth()];
   const tagsEl = document.getElementById('booking-tags');
@@ -1225,7 +1296,10 @@ function validateStep4() {
 }
 
 async function submitBooking() {
-  const s = SERVICES[state.service];
+  const selected = state.services.map(i => SERVICES[i]);
+  const procedure = selected.map(s => s.name).join(' + ');
+  const totalPrice = selected.reduce((sum, s) => sum + s.priceNum, 0);
+  const firstService = selected[0];
   const d = state.date;
   const name = document.getElementById('inp-name').value.trim();
   const phone = document.getElementById('inp-phone').value.replace(/\D/g,'');
@@ -1249,8 +1323,9 @@ async function submitBooking() {
       body: JSON.stringify({
         client_name: name,
         client_phone: phoneFormatted,
-        service_id: s.id,
-        procedure: s.name,
+        service_id: firstService.id,
+        procedure: procedure,
+        price: totalPrice,
         date: dateStr,
         time: state.time,
         birthday: birthday,
@@ -1263,12 +1338,14 @@ async function submitBooking() {
       alert(err.detail || 'Ошибка записи. Попробуйте другое время.');
       return;
     }
-    document.getElementById('suc-service').textContent = escHtml(s.name);
+    document.getElementById('suc-service').textContent = escHtml(procedure);
     document.getElementById('suc-date').textContent = d.getDate() + ' ' + RU_MONTHS_GEN[d.getMonth()] + ' ' + d.getFullYear();
     document.getElementById('suc-time').textContent = state.time;
-    if (document.getElementById('suc-price')) document.getElementById('suc-price').textContent = s.price;
+    if (document.getElementById('suc-price')) document.getElementById('suc-price').textContent = totalPrice > 0 ? totalPrice + ' ₽' : '';
     if (document.getElementById('suc-master')) document.getElementById('suc-master').textContent = escHtml(masterName);
     document.getElementById('success-sub').innerHTML = escHtml(masterName) + ' подтвердит запись<br>в ближайшее время';
+    const linkEl = document.getElementById('telegram-link');
+    if (linkEl) linkEl.href = 'https://t.me/Beauty6699_bot?start=link_' + phone;
     goToStep(5);
     spawnConfetti();
   } catch(e) {
@@ -1301,9 +1378,10 @@ function spawnConfetti() {
 }
 
 function resetBooking() {
-  state = { service: null, date: null, time: null, calYear: today.getFullYear(), calMonth: today.getMonth() };
+  state = { services: [], date: null, time: null, calYear: today.getFullYear(), calMonth: today.getMonth() };
   document.querySelectorAll('.service-item').forEach(i => i.classList.remove('selected'));
-  ['btn-step1','btn-step2','btn-step3','btn-step4'].forEach(id => {
+  updateServicesPanel();
+  ['btn-step2','btn-step3','btn-step4'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = true;
   });
