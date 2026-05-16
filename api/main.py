@@ -728,7 +728,7 @@ async def v1_update_client(
 ):
     import traceback
     try:
-        ok = await update_client(client_id, master_id, body.name, body.phone, body.notes, body.source, body.allergies)
+        ok = await update_client(client_id, master_id, body.name, body.phone, body.notes, source=body.source, allergies=body.allergies, birthday=body.birthday)
         if not ok:
             raise HTTPException(status_code=404, detail="Клиент не найден")
         return {"ok": True}

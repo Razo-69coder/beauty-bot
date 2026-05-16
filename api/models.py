@@ -126,6 +126,7 @@ class ClientUpdateV1(BaseModel):
     notes: str = ""
     source: str = ""
     allergies: str = ""
+    birthday: Optional[str] = None
 
 
 class ReminderTemplateUpdate(BaseModel):
