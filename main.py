@@ -978,17 +978,67 @@ async def v1_master_stats(master_id: int = Depends(get_jwt_master_id)):
 async def v1_earnings_by_day(days: int = 30, master_id: int = Depends(get_jwt_master_id)):
     from datetime import date, timedelta
     today = date.today()
+    cutoff = (today - timedelta(days=days - 1)).isoformat()
     pool = await get_pool()
     async with pool.acquire() as conn:
-        result = []
-        for i in range(days - 1, -1, -1):
-            d = (today - timedelta(days=i)).isoformat()
-            row = await conn.fetchrow(
-                "SELECT COALESCE(SUM(price), 0) FROM appointments WHERE master_id=$1 AND appointment_date=$2 AND status != 'cancelled'",
-                master_id, d
-            )
-            amount = int(row[0]) if row and row[0] else 0
-            result.append({"date": d, "total": amount})
+        rows = await conn.fetch(
+            "SELECT appointment_date, COALESCE(SUM(price), 0)::int AS total, COUNT(*)::int AS count "
+            "FROM appointments "
+            "WHERE master_id=$1 AND appointment_date >= $2 AND status != 'cancelled' "
+            "GROUP BY appointment_date",
+            master_id, cutoff
+        )
+    by_date = {r["appointment_date"]: {"total": r["total"], "count": r["count"]} for r in rows}
+    result = []
+    for i in range(days - 1, -1, -1):
+        d = (today - timedelta(days=i)).isoformat()
+        e = by_date.get(d, {"total": 0, "count": 0})
+        result.append({"date": d, "total": e["total"], "count": e["count"]})
+    return {"days": result}
+
+
+@app.get("/api/v1/masters/me/stats/yearly")
+async def v1_yearly_stats(year: int, master_id: int = Depends(get_jwt_master_id)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT COUNT(*)::int, COALESCE(SUM(price), 0)::int FROM appointments "
+            "WHERE master_id=$1 AND appointment_date LIKE $2 AND status != 'cancelled'",
+            master_id, f"{year}-%"
+        )
+        top_rows = await conn.fetch(
+            "SELECT procedure, COUNT(*)::int AS cnt FROM appointments "
+            "WHERE master_id=$1 AND appointment_date LIKE $2 AND status != 'cancelled' "
+            "GROUP BY procedure ORDER BY cnt DESC LIMIT 5",
+            master_id, f"{year}-%"
+        )
+    total_appointments, total_revenue = int(row[0]), int(row[1])
+    top_services = [{"procedure": r["procedure"], "count": r["cnt"]} for r in top_rows]
+    return {"total_revenue": total_revenue, "total_appointments": total_appointments, "top_services": top_services}
+
+
+@app.get("/api/v1/masters/me/stats/earnings-by-range")
+async def v1_earnings_by_range(start: str, end: str, master_id: int = Depends(get_jwt_master_id)):
+    from datetime import date as date_type, timedelta
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT appointment_date, COALESCE(SUM(price), 0)::int AS total, COUNT(*)::int AS count "
+            "FROM appointments "
+            "WHERE master_id=$1 AND appointment_date >= $2 AND appointment_date <= $3 AND status != 'cancelled' "
+            "GROUP BY appointment_date",
+            master_id, start, end
+        )
+    by_date = {r["appointment_date"]: {"total": r["total"], "count": r["count"]} for r in rows}
+    start_d = date_type.fromisoformat(start)
+    end_d = date_type.fromisoformat(end)
+    result = []
+    d = start_d
+    while d <= end_d:
+        ds = d.isoformat()
+        e = by_date.get(ds, {"total": 0, "count": 0})
+        result.append({"date": ds, "total": e["total"], "count": e["count"]})
+        d += timedelta(days=1)
     return {"days": result}
 
 
