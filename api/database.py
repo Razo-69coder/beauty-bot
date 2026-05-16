@@ -216,12 +216,18 @@ async def add_client(master_id: int, name: str, phone: str, notes: str = "", sou
             return (await cursor.fetchone())[0]
 
 
-async def update_client(client_id: int, master_id: int, name: str, phone: str, notes: str, source: str = "", allergies: str = "") -> bool:
+async def update_client(client_id: int, master_id: int, name: str, phone: str, notes: str, source: str = "", allergies: str = "", birthday: str | None = None) -> bool:
     async with aiosqlite.connect(DB_PATH) as db:
-        result = await db.execute(
-            "UPDATE clients SET name=?, phone=?, notes=?, source=?, allergies=? WHERE id=? AND master_id=?",
-            (name, phone, notes, source, allergies, client_id, master_id)
-        )
+        if birthday is not None:
+            result = await db.execute(
+                "UPDATE clients SET name=?, phone=?, notes=?, source=?, allergies=?, birthday=? WHERE id=? AND master_id=?",
+                (name, phone, notes, source, allergies, birthday, client_id, master_id)
+            )
+        else:
+            result = await db.execute(
+                "UPDATE clients SET name=?, phone=?, notes=?, source=?, allergies=? WHERE id=? AND master_id=?",
+                (name, phone, notes, source, allergies, client_id, master_id)
+            )
         await db.commit()
         return result.rowcount > 0
 
