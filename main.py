@@ -758,12 +758,16 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
     price = 0
     if body.service_id:
         svcs = await get_services(master["id"])
+        service_duration = 0
         for s in svcs:
             if s[0] == body.service_id:
                 if not procedure:
                     procedure = s[1]
                 price = s[2] or 0
+                service_duration = s[3] if len(s) > 3 else 0
                 break
+    else:
+        service_duration = 0
     if not procedure:
         procedure = "Запись"
     pool = await get_pool()
@@ -784,6 +788,7 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
         time=body.time,
         price=price,
         status="pending",
+        duration_min=service_duration,
     )
     
     # Task 2: Notify master when web booking arrives
@@ -849,6 +854,7 @@ class _V1AppointmentCreate(BaseModel):
     time: str
     price: int = 0
     notes: str = ""
+    duration_min: int = 0
 
 class _V1AppointmentUpdate(BaseModel):
     procedure: str = ""
@@ -1195,6 +1201,7 @@ async def v1_create_appointment(body: _V1AppointmentCreate, master_id: int = Dep
         client_id=body.client_id, master_id=master_id,
         procedure=body.procedure, appointment_date=body.appointment_date,
         price=body.price, notes=body.notes, time=body.time,
+        duration_min=body.duration_min,
     )
     
     # Task 1: Send booking confirmation to client

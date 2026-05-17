@@ -180,6 +180,9 @@ async def init_db():
                 expires_at TIMESTAMPTZ NOT NULL
             )
         """)
+        await conn.execute(
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS duration_min INTEGER DEFAULT 0"
+        )
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS custom_slots (
                 id SERIAL PRIMARY KEY,
@@ -528,15 +531,16 @@ async def add_appointment(
     client_id: int, master_id: int, procedure: str,
     appointment_date: str, price: int = 0,
     notes: str = "", photo_id: str = "",
-    time: str = "", status: str = "confirmed"
+    time: str = "", status: str = "confirmed",
+    duration_min: int = 0
 ) -> int:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""
             INSERT INTO appointments
-            (client_id, master_id, procedure, appointment_date, price, notes, photo_id, time, status)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id
-        """, client_id, master_id, procedure, appointment_date, price, notes, photo_id, time, status)
+            (client_id, master_id, procedure, appointment_date, price, notes, photo_id, time, status, duration_min)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id
+        """, client_id, master_id, procedure, appointment_date, price, notes, photo_id, time, status, duration_min)
     return row['id']
 
 
@@ -618,22 +622,44 @@ async def get_busy_slots(master_id: int, date: str) -> list[str]:
     return [r['time'] for r in rows if r['time']]
 
 
+def _time_to_minutes(t: str) -> int:
+    h, m = map(int, t.split(':'))
+    return h * 60 + m
+
+
+async def _get_busy_intervals(master_id: int, date: str, default_duration: int) -> list[tuple[int, int]]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT time, COALESCE(NULLIF(duration_min, 0), $3) as dur "
+            "FROM appointments WHERE master_id=$1 AND appointment_date=$2 AND status != 'cancelled'",
+            master_id, date, default_duration
+        )
+    intervals = []
+    for r in rows:
+        if not r['time']:
+            continue
+        start = _time_to_minutes(r['time'])
+        intervals.append((start, start + r['dur']))
+    return intervals
+
+
 async def get_available_slots(
     master_id: int, date: str,
     work_start: int, work_end: int, slot_duration: int
 ) -> list[str]:
-    busy = await get_busy_slots(master_id, date)
+    intervals = await _get_busy_intervals(master_id, date, slot_duration)
     slots = []
-    total_minutes = work_start * 60
-    end_minutes = work_end * 60
+    t = work_start * 60
+    end = work_end * 60
 
-    while total_minutes + slot_duration <= end_minutes:
-        h = total_minutes // 60
-        m = total_minutes % 60
+    while t + slot_duration <= end:
+        h, m = t // 60, t % 60
         time_str = f"{h:02d}:{m:02d}"
-        if time_str not in busy:
+        overlaps = any(t < b_end and t + slot_duration > b_start for b_start, b_end in intervals)
+        if not overlaps:
             slots.append(time_str)
-        total_minutes += slot_duration
+        t += slot_duration
 
     return slots
 
