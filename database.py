@@ -198,6 +198,16 @@ async def init_db():
                 UNIQUE(master_id, date, time)
             )
         """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS reminder_templates (
+                id SERIAL PRIMARY KEY,
+                master_id INTEGER REFERENCES masters(id) ON DELETE CASCADE,
+                type TEXT NOT NULL,
+                template TEXT NOT NULL DEFAULT '',
+                enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                UNIQUE(master_id, type)
+            )
+        """)
 
 
 # ── Мастера ───────────────────────────────────────────────────────────
@@ -1507,6 +1517,50 @@ async def remove_blocked_day(master_id: int, date: str) -> None:
             "DELETE FROM blocked_days WHERE master_id=$1 AND date=$2",
             master_id, date
         )
+
+
+# ── Шаблоны напоминаний (v1 API) ─────────────────────────────────────
+
+_DEFAULT_TEMPLATES = {
+    "24h": "🔔 Напоминание о записи\n\nЗавтра, {date} в {time}\n📋 {procedure}\n\nЖдём вас!",
+    "2h": "⏰ Через 2 часа запись!\n\n📅 {date} в {time}\n📋 {procedure}\n\nНе забудьте!",
+    "birthday": "🎂 С днём рождения, {name}!\n\nСкидка ждёт вас 💅",
+    "return": "💅 {name}, давно не виделись!\n\nЗапишитесь на удобное время 🗓",
+    "correction": "💅 Привет, {name}!\n\nПора на коррекцию!",
+    "review": "💅 {name}, как прошёл визит?\n\nОцените процедуру «{procedure}»:",
+    "payment_24h": "⚠️ Напоминание об оплате\n\nЗавтра запись.\n\nНужна предоплата {deposit_pct}%.",
+    "payment_2h": "💳 Напоминание об оплате\n\nВы записаны на {date}.\n\nВнесите предоплату {deposit_pct}%.",
+}
+
+_ALL_TYPES = list(_DEFAULT_TEMPLATES.keys())
+
+
+async def get_reminder_templates_v1(master_id: int) -> list[dict]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT type, template, enabled FROM reminder_templates WHERE master_id=$1",
+            master_id
+        )
+    saved = {r['type']: r for r in rows}
+    result = []
+    for t in _ALL_TYPES:
+        if t in saved:
+            result.append({"type": t, "template": saved[t]['template'], "enabled": saved[t]['enabled']})
+        else:
+            result.append({"type": t, "template": _DEFAULT_TEMPLATES[t], "enabled": True})
+    return result
+
+
+async def upsert_reminder_template(master_id: int, type_: str, template: str, enabled: bool) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO reminder_templates (master_id, type, template, enabled)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (master_id, type) DO UPDATE
+            SET template = EXCLUDED.template, enabled = EXCLUDED.enabled
+        """, master_id, type_, template, enabled)
 
 
 async def update_appointment(

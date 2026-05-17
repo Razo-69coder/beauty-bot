@@ -47,6 +47,7 @@ from database import (
     get_pool,
     get_custom_slots_for_date, get_custom_slots_available,
     get_custom_slots_for_month, add_custom_slot, remove_custom_slot,
+    get_reminder_templates_v1, upsert_reminder_template,
 )
 
 from scheduler import setup_scheduler
@@ -888,6 +889,27 @@ async def v1_subscription_status(master_id: int = Depends(get_jwt_master_id_any)
         row = await conn.fetchrow("SELECT is_active FROM masters WHERE id=$1", master_id)
     is_active = bool(row["is_active"]) if row and row["is_active"] is not None else False
     return {"is_active": is_active}
+
+
+@app.get("/api/v1/reminders/templates")
+async def v1_get_reminder_templates(master_id: int = Depends(get_jwt_master_id)):
+    templates = await get_reminder_templates_v1(master_id)
+    return {"templates": templates}
+
+
+class _ReminderTemplateUpdate(BaseModel):
+    template: str
+    enabled: bool = True
+
+
+@app.put("/api/v1/reminders/templates/{type_}")
+async def v1_update_reminder_template(
+    type_: str,
+    body: _ReminderTemplateUpdate,
+    master_id: int = Depends(get_jwt_master_id)
+):
+    await upsert_reminder_template(master_id, type_, body.template, body.enabled)
+    return {"ok": True}
 
 
 @app.get("/api/v1/masters/me")
