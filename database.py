@@ -180,6 +180,15 @@ async def init_db():
                 expires_at TIMESTAMPTZ NOT NULL
             )
         """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS custom_slots (
+                id SERIAL PRIMARY KEY,
+                master_id INTEGER REFERENCES masters(id) ON DELETE CASCADE,
+                date TEXT NOT NULL,
+                time TEXT NOT NULL,
+                UNIQUE(master_id, date, time)
+            )
+        """)
 
 
 # ── Мастера ───────────────────────────────────────────────────────────
@@ -627,6 +636,57 @@ async def get_available_slots(
         total_minutes += slot_duration
 
     return slots
+
+
+# ── Кастомные слоты ───────────────────────────────────────────────────
+
+async def get_custom_slots_for_date(master_id: int, date: str) -> list[str]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT time FROM custom_slots WHERE master_id=$1 AND date=$2 ORDER BY time",
+            master_id, date
+        )
+    return [r['time'] for r in rows]
+
+
+async def get_custom_slots_available(master_id: int, date: str) -> list[str]:
+    all_slots = await get_custom_slots_for_date(master_id, date)
+    if not all_slots:
+        return []
+    busy = await get_busy_slots(master_id, date)
+    return [t for t in all_slots if t not in busy]
+
+
+async def get_custom_slots_for_month(master_id: int, month: str) -> dict:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT date, time FROM custom_slots WHERE master_id=$1 AND date LIKE $2 ORDER BY date, time",
+            master_id, f"{month}-%"
+        )
+    result: dict[str, list[str]] = {}
+    for r in rows:
+        result.setdefault(r['date'], []).append(r['time'])
+    return result
+
+
+async def add_custom_slot(master_id: int, date: str, time: str):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO custom_slots(master_id, date, time) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",
+            master_id, date, time
+        )
+
+
+async def remove_custom_slot(master_id: int, date: str, time: str):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "DELETE FROM custom_slots WHERE master_id=$1 AND date=$2 AND time=$3",
+            master_id, date, time
+        )
 
 
 async def get_master_schedule(master_id: int, date: str) -> list:

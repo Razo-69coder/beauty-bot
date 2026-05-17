@@ -45,6 +45,8 @@ from database import (
     get_expenses, add_expense, delete_expense,
     get_blocked_days, add_blocked_day, remove_blocked_day,
     get_pool,
+    get_custom_slots_for_date, get_custom_slots_available,
+    get_custom_slots_for_month, add_custom_slot, remove_custom_slot,
 )
 
 from scheduler import setup_scheduler
@@ -728,6 +730,9 @@ async def v1_public_slots(link: str, date: str):
     blocked = await get_blocked_days(master["id"])
     if date in blocked:
         return {"slots": []}
+    custom = await get_custom_slots_for_date(master["id"], date)
+    if custom:
+        return {"slots": await get_custom_slots_available(master["id"], date)}
     slots = await get_available_slots(
         master["id"], date,
         master["work_start"], master["work_end"], master["slot_duration"]
@@ -1264,6 +1269,9 @@ async def v1_schedule(date: str, master_id: int = Depends(get_jwt_master_id)):
 
 @app.get("/api/v1/slots")
 async def v1_slots(date: str, master_id: int = Depends(get_jwt_master_id)):
+    custom = await get_custom_slots_available(master_id, date)
+    if custom is not None and await get_custom_slots_for_date(master_id, date):
+        return {"slots": custom}
     master = await get_master_info(master_id)
     if not master:
         raise HTTPException(404, "Мастер не найден")
@@ -1272,6 +1280,26 @@ async def v1_slots(date: str, master_id: int = Depends(get_jwt_master_id)):
         master["work_start"], master["work_end"], master["slot_duration"]
     )
     return {"slots": slots}
+
+
+class _CustomSlotBody(BaseModel):
+    date: str
+    time: str
+
+@app.get("/api/v1/schedule/custom-slots")
+async def v1_get_custom_slots(month: str, master_id: int = Depends(get_jwt_master_id)):
+    slots = await get_custom_slots_for_month(master_id, month)
+    return {"slots": slots}
+
+@app.post("/api/v1/schedule/custom-slots", status_code=201)
+async def v1_add_custom_slot(body: _CustomSlotBody, master_id: int = Depends(get_jwt_master_id)):
+    await add_custom_slot(master_id, body.date, body.time)
+    return {"ok": True}
+
+@app.delete("/api/v1/schedule/custom-slots")
+async def v1_remove_custom_slot(body: _CustomSlotBody, master_id: int = Depends(get_jwt_master_id)):
+    await remove_custom_slot(master_id, body.date, body.time)
+    return {"ok": True}
 
 
 # --- v1 services ---
