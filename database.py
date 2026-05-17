@@ -183,6 +183,12 @@ async def init_db():
         await conn.execute(
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS duration_min INTEGER DEFAULT 0"
         )
+        await conn.execute(
+            "ALTER TABLE services ADD COLUMN IF NOT EXISTS duration_min INTEGER DEFAULT 60"
+        )
+        await conn.execute(
+            "ALTER TABLE services ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Основные'"
+        )
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS custom_slots (
                 id SERIAL PRIMARY KEY,
@@ -1208,12 +1214,12 @@ async def get_payment_reminder_enabled(telegram_id: int) -> bool:
 
 # ── Услуги мастера ────────────────────────────────────────────────────
 
-async def add_service(master_id: int, name: str, price_default: int = 0) -> int:
+async def add_service(master_id: int, name: str, price_default: int = 0, duration_min: int = 60, category: str = "Основные") -> int:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "INSERT INTO services (master_id, name, price_default) VALUES ($1,$2,$3) RETURNING id",
-            master_id, name, price_default
+            "INSERT INTO services (master_id, name, price_default, duration_min, category) VALUES ($1,$2,$3,$4,$5) RETURNING id",
+            master_id, name, price_default, duration_min, category
         )
     return row['id']
 
@@ -1222,10 +1228,20 @@ async def get_services(master_id: int) -> list:
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT id, name, price_default FROM services WHERE master_id=$1 ORDER BY created_at",
+            "SELECT id, name, price_default, duration_min, category FROM services WHERE master_id=$1 ORDER BY created_at",
             master_id
         )
-    return [(r['id'], r['name'], r['price_default']) for r in rows]
+    return [(r['id'], r['name'], r['price_default'], r['duration_min'], r['category']) for r in rows]
+
+
+async def update_service(service_id: int, master_id: int, name: str, price_default: int, duration_min: int, category: str) -> bool:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE services SET name=$1, price_default=$2, duration_min=$3, category=$4 WHERE id=$5 AND master_id=$6",
+            name, price_default, duration_min, category, service_id, master_id
+        )
+    return result != "UPDATE 0"
 
 
 async def get_service(service_id: int, master_id: int) -> dict | None:

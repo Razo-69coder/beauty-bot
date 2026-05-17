@@ -37,7 +37,7 @@ from database import (
     create_login_code, verify_login_code, verify_login_code_by_code,
     get_master_full, update_master_full_settings, update_master_loyalty_settings, update_master_payment, update_master_timezone,
     search_clients,
-    get_services, add_service, delete_service,
+    get_services, add_service, delete_service, update_service,
     get_earnings_by_service, get_earnings_by_client, get_earnings_by_day, get_earnings_by_period,
     get_appointment_with_client, update_appointment_service_done,
     get_master_by_booking_link, update_booking_link, get_master_booking_link, is_booking_linkTaken,
@@ -1315,15 +1315,23 @@ async def v1_remove_custom_slot(body: _CustomSlotBody, master_id: int = Depends(
 async def v1_services(master_id: int = Depends(get_jwt_master_id)):
     rows = await get_services(master_id)
     return {"services": [
-        {"id": r[0], "name": r[1], "price_default": r[2], "duration_min": 60, "category": "Основные"}
+        {"id": r[0], "name": r[1], "price_default": r[2], "duration_min": r[3], "category": r[4]}
         for r in rows
     ]}
 
 
 @app.post("/api/v1/services", status_code=201)
 async def v1_create_service(body: _V1ServiceCreate, master_id: int = Depends(get_jwt_master_id)):
-    svc_id = await add_service(master_id, body.name, body.price_default)
-    return {"id": svc_id}
+    svc_id = await add_service(master_id, body.name, body.price_default, body.duration_min, body.category)
+    return {"id": svc_id, "name": body.name, "price_default": body.price_default, "duration_min": body.duration_min, "category": body.category}
+
+
+@app.put("/api/v1/services/{svc_id}")
+async def v1_update_service(svc_id: int, body: _V1ServiceCreate, master_id: int = Depends(get_jwt_master_id)):
+    ok = await update_service(svc_id, master_id, body.name, body.price_default, body.duration_min, body.category)
+    if not ok:
+        raise HTTPException(404, "Услуга не найдена")
+    return {"ok": True}
 
 
 @app.delete("/api/v1/services/{svc_id}")
