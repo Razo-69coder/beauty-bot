@@ -159,6 +159,8 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT ''",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1",
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS service_id INTEGER",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS loyalty_discount_type TEXT DEFAULT 'percent'",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS loyalty_discount_rub INTEGER DEFAULT 0",
         ]:
             try:
                 await conn.execute(sql)
@@ -939,7 +941,9 @@ async def get_master_full(master_id: int) -> dict | None:
             "COALESCE(payment_card,'') as payment_card, COALESCE(payment_phone,'') as payment_phone, COALESCE(payment_banks,'') as payment_banks, "
             "COALESCE(timezone,'Europe/Moscow') as timezone, "
             "loyalty_threshold, birthday_discount_enabled, birthday_discount_percent, "
-            "loyalty_discount_enabled, loyalty_discount_percent "
+            "loyalty_discount_enabled, loyalty_discount_percent, "
+            "COALESCE(loyalty_discount_type,'percent') as loyalty_discount_type, "
+            "COALESCE(loyalty_discount_rub,0) as loyalty_discount_rub "
             "FROM masters WHERE id=$1",
             master_id
         )
@@ -959,6 +963,8 @@ async def get_master_full(master_id: int) -> dict | None:
         "birthday_discount_percent": row['birthday_discount_percent'] or 10,
         "loyalty_discount_enabled": row['loyalty_discount_enabled'] or False,
         "loyalty_discount_percent": row['loyalty_discount_percent'] or 10,
+        "loyalty_discount_type": row['loyalty_discount_type'] or "percent",
+        "loyalty_discount_rub": row['loyalty_discount_rub'] or 0,
     }
 
 
@@ -991,15 +997,19 @@ async def update_master_timezone(master_id: int, timezone: str):
 
 async def update_master_loyalty_settings(master_id: int, loyalty_enabled: bool, loyalty_threshold: int,
                                           loyalty_discount_percent: int, birthday_enabled: bool,
-                                          birthday_discount_percent: int):
+                                          birthday_discount_percent: int,
+                                          loyalty_discount_type: str = "percent",
+                                          loyalty_discount_rub: int = 0):
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute(
             "UPDATE masters SET loyalty_discount_enabled=$1, loyalty_threshold=$2, "
-            "loyalty_discount_percent=$3, birthday_discount_enabled=$4, birthday_discount_percent=$5 "
+            "loyalty_discount_percent=$3, birthday_discount_enabled=$4, birthday_discount_percent=$5, "
+            "loyalty_discount_type=$7, loyalty_discount_rub=$8 "
             "WHERE id=$6",
             loyalty_enabled, loyalty_threshold, loyalty_discount_percent,
-            birthday_enabled, birthday_discount_percent, master_id
+            birthday_enabled, birthday_discount_percent, master_id,
+            loyalty_discount_type, loyalty_discount_rub
         )
 
 

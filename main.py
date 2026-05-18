@@ -320,6 +320,8 @@ class LoyaltySettingsRequest(BaseModel):
     loyalty_discount_percent: int = 10
     birthday_enabled: bool = False
     birthday_discount_percent: int = 10
+    loyalty_discount_type: str = "percent"
+    loyalty_discount_rub: int = 0
 
 
 class FeedbackBody(BaseModel):
@@ -930,7 +932,9 @@ async def v1_master_me(master_id: int = Depends(get_jwt_master_id)):
             "COALESCE(birthday_discount_enabled,false) as birthday_discount_enabled, "
             "COALESCE(birthday_discount_percent,10) as birthday_discount_percent, "
             "COALESCE(loyalty_discount_enabled,false) as loyalty_discount_enabled, "
-            "COALESCE(loyalty_discount_percent,10) as loyalty_discount_percent "
+            "COALESCE(loyalty_discount_percent,10) as loyalty_discount_percent, "
+            "COALESCE(loyalty_discount_type,'percent') as loyalty_discount_type, "
+            "COALESCE(loyalty_discount_rub,0) as loyalty_discount_rub "
             "FROM masters WHERE id=$1", master_id
         )
     if not row:
@@ -951,6 +955,8 @@ async def v1_master_me(master_id: int = Depends(get_jwt_master_id)):
         "birthday_discount_percent": row['birthday_discount_percent'] or 10,
         "loyalty_discount_enabled": bool(row['loyalty_discount_enabled']) if row['loyalty_discount_enabled'] is not None else False,
         "loyalty_discount_percent": row['loyalty_discount_percent'] or 10,
+        "loyalty_discount_type": row['loyalty_discount_type'] or "percent",
+        "loyalty_discount_rub": row['loyalty_discount_rub'] or 0,
     }
 
 
@@ -1005,7 +1011,8 @@ async def v1_feedback(body: FeedbackBody, master_id: int = Depends(get_jwt_maste
 async def v1_update_loyalty_settings(body: LoyaltySettingsRequest, master_id: int = Depends(get_jwt_master_id)):
     await update_master_loyalty_settings(
         master_id, body.loyalty_enabled, body.loyalty_threshold,
-        body.loyalty_discount_percent, body.birthday_enabled, body.birthday_discount_percent
+        body.loyalty_discount_percent, body.birthday_enabled, body.birthday_discount_percent,
+        body.loyalty_discount_type, body.loyalty_discount_rub
     )
     return {"ok": True}
 
