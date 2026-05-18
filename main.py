@@ -21,6 +21,12 @@ ADMIN_TG_ID = 550421233  # Telegram ID администратора
 ADMIN_SECRET = os.getenv("ADMIN_PASSWORD", "")
 from aiogram.fsm.storage.memory import MemoryStorage
 
+APNS_KEY_ID = os.getenv("APNS_KEY_ID", "")
+APNS_TEAM_ID = os.getenv("APNS_TEAM_ID", "")
+APNS_PRIVATE_KEY = os.getenv("APNS_PRIVATE_KEY", "").replace("\\n", "\n")
+APNS_BUNDLE_ID = os.getenv("APNS_BUNDLE_ID", "")
+APNS_USE_SANDBOX = os.getenv("APNS_USE_SANDBOX", "true").lower() == "true"
+
 from config import BOT_TOKEN, WEBHOOK_URL, WEBHOOK_SECRET
 import jwt
 import httpx
@@ -48,11 +54,50 @@ from database import (
     get_custom_slots_for_date, get_custom_slots_available,
     get_custom_slots_for_month, add_custom_slot, remove_custom_slot,
     get_reminder_templates_v1, upsert_reminder_template,
+    save_device_token,
+    get_device_tokens_for_master,
 )
 
 from scheduler import setup_scheduler
 from handlers import start, clients, appointments, settings, stats, services
 from handlers import booking, schedule, subscriptions, templates, reviews, deposit, fallback
+
+
+import time as _time
+
+async def send_push(device_token: str, title: str, body_text: str) -> bool:
+    if not all([APNS_KEY_ID, APNS_TEAM_ID, APNS_PRIVATE_KEY, APNS_BUNDLE_ID]):
+        return False
+    try:
+        import jwt as _jwt
+        token = _jwt.encode(
+            {"iss": APNS_TEAM_ID, "iat": int(_time.time())},
+            APNS_PRIVATE_KEY,
+            algorithm="ES256",
+            headers={"kid": APNS_KEY_ID}
+        )
+        host = "api.sandbox.push.apple.com" if APNS_USE_SANDBOX else "api.push.apple.com"
+        url = f"https://{host}/3/device/{device_token}"
+        headers = {
+            "authorization": f"bearer {token}",
+            "apns-topic": APNS_BUNDLE_ID,
+            "apns-push-type": "alert",
+            "apns-priority": "10",
+        }
+        payload = {"aps": {"alert": {"title": title, "body": body_text}, "sound": "default"}}
+        async with httpx.AsyncClient(http2=True) as client:
+            resp = await client.post(url, json=payload, headers=headers, timeout=10)
+            print(f"[APNs] {device_token[:16]}... status={resp.status_code}")
+            return resp.status_code == 200
+    except Exception as e:
+        print(f"[APNs] error: {e}")
+        return False
+
+
+async def push_to_master(master_id: int, title: str, body_text: str):
+    tokens = await get_device_tokens_for_master(master_id)
+    for token in tokens:
+        await send_push(token, title, body_text)
 
 
 # ── Dispatcher ────────────────────────────────────────────────────────
@@ -807,8 +852,13 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
                 f"💅 {procedure}",
                 parse_mode="Markdown"
             )
+        await push_to_master(
+            master["id"],
+            "Новая запись!",
+            f"{body.client_name} — {date_fmt} в {body.time}"
+        )
     except Exception:
-        pass  # Don't fail if bot message fails
+        pass  # Don't fail if bot message or push fails
     
     return {"ok": True, "appointment_id": appt_id, "client_id": client_id, "bot_username": config.BOT_USERNAME}
 
@@ -1866,6 +1916,15 @@ async def admin_toggle_active(master_id: int):
         new_state = 0 if row["is_active"] else 1
         await conn.execute("UPDATE masters SET is_active=$1 WHERE id=$2", new_state, master_id)
     return {"ok": True, "is_active": bool(new_state)}
+
+
+@app.post("/api/v1/device/token")
+async def register_device_token_beauty(
+    token: str = Form(...),
+    master_id: int = Depends(get_jwt_master_id),
+):
+    await save_device_token(master_id, token)
+    return {"ok": True}
 
 
 @app.get("/admin/")

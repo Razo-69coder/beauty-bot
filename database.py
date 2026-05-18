@@ -192,6 +192,14 @@ async def init_db():
             "ALTER TABLE services ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Основные'"
         )
         await conn.execute("""
+            CREATE TABLE IF NOT EXISTS device_tokens (
+                id SERIAL PRIMARY KEY,
+                master_id INTEGER REFERENCES masters(id) ON DELETE CASCADE,
+                token TEXT NOT NULL UNIQUE,
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS custom_slots (
                 id SERIAL PRIMARY KEY,
                 master_id INTEGER REFERENCES masters(id) ON DELETE CASCADE,
@@ -1596,3 +1604,22 @@ async def get_master_id_by_tg(telegram_id: int) -> int | None:
             "SELECT id FROM masters WHERE telegram_id=$1", telegram_id
         )
     return row['id'] if row else None
+
+
+async def save_device_token(master_id: int, token: str):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO device_tokens (master_id, token, updated_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (token) DO UPDATE SET master_id=$1, updated_at=NOW()
+        """, master_id, token)
+
+
+async def get_device_tokens_for_master(master_id: int) -> list:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT token FROM device_tokens WHERE master_id=$1", master_id
+        )
+        return [r["token"] for r in rows]
