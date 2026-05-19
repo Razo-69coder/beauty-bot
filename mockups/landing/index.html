@@ -859,15 +859,40 @@ footer{border-top:1px solid rgba(255,255,255,.05);padding:44px 20px;text-align:c
   <div class="pricing-grid">
 
     <div class="p-card">
-      <div class="p-tier">МЕСЯЦ</div>
-      <div class="p-amount">590<small> ₽</small></div>
-      <div class="p-period">оплата ежемесячно</div>
+      <div class="p-tier">СТАРТ</div>
+      <div class="p-amount">0<small> ₽</small></div>
+      <div class="p-period">навсегда бесплатно</div>
       <div class="p-hr"></div>
       <ul class="p-list">
-        <li>Все функции без ограничений</li>
+        <li>До 10 клиентов</li>
+        <li>Ручные записи в календаре</li>
+        <li style="color:rgba(255,255,255,.25);">❌ Авто-напоминания клиентам</li>
+        <li style="color:rgba(255,255,255,.25);">❌ Онлайн-запись по ссылке</li>
+        <li style="color:rgba(255,255,255,.25);">❌ Статистика и аналитика</li>
+        <li style="color:rgba(255,255,255,.25);">❌ Поддержка</li>
+      </ul>
+      <form class="waitlist-form" onsubmit="handleWaitlist(event)">
+        <input type="email" placeholder="Твой email" class="waitlist-input" required>
+        <button type="submit" class="btn-glow">Начать бесплатно</button>
+      </form>
+    </div>
+
+    <div class="p-card featured">
+      <div class="p-hot">ХИТ</div>
+      <div class="p-tier">ПРО</div>
+      <div class="p-amount">790<small> ₽</small></div>
+      <div class="p-period">в месяц</div>
+      <div style="font-size:12px;color:var(--pink);font-weight:700;margin-bottom:8px;line-height:1.7;">
+        6 месяцев — 3 990 ₽ (665 ₽/мес, −15%)<br>
+        Год — 6 900 ₽ (575 ₽/мес, −27%)<br>
+        2 года — 11 900 ₽ (496 ₽/мес, −37%)
+      </div>
+      <span class="saving-badge">Популярный выбор</span>
+      <div class="p-hr"></div>
+      <ul class="p-list">
+        <li>Безлимит клиентов</li>
+        <li>Авто-напоминания через Telegram</li>
         <li>Онлайн-запись по ссылке</li>
-        <li>Авто-напоминания клиентам</li>
-        <li>Карточки клиентов</li>
         <li>Статистика и аналитика</li>
         <li>Поддержка в Telegram</li>
       </ul>
@@ -877,35 +902,16 @@ footer{border-top:1px solid rgba(255,255,255,.05);padding:44px 20px;text-align:c
       </form>
     </div>
 
-    <div class="p-card featured">
-      <div class="p-hot">ХИТ</div>
-      <div class="p-tier">6 МЕСЯЦЕВ</div>
-      <div class="p-amount">450<small> ₽</small></div>
-      <div class="p-period">итого 2 700 ₽ · экономия 840 ₽</div>
-      <span class="saving-badge">Экономия 840 ₽</span>
-      <div class="p-hr"></div>
-      <ul class="p-list">
-        <li>Всё из тарифа Месяц</li>
-        <li>Приоритетная поддержка</li>
-        <li>Ранний доступ к новым функциям</li>
-      </ul>
-      <form class="waitlist-form" onsubmit="handleWaitlist(event)">
-        <input type="email" placeholder="Твой email" class="waitlist-input" required>
-        <button type="submit" class="btn-glow">🍎 Получить первой</button>
-      </form>
-    </div>
-
     <div class="p-card">
-      <div class="p-tier">ГОД</div>
-      <div class="p-amount">350<small> ₽</small></div>
-      <div class="p-period">итого 4 200 ₽ · экономия 2 880 ₽</div>
-      <span class="saving-badge">Экономия 2 880 ₽</span>
+      <div class="p-tier">БИЗНЕС</div>
+      <div class="p-amount">1 290<small> ₽</small></div>
+      <div class="p-period">в месяц</div>
       <div class="p-hr"></div>
       <ul class="p-list">
-        <li>Всё из тарифа Месяц</li>
-        <li>Максимальная экономия</li>
-        <li>Приоритетная поддержка</li>
-        <li>Ранний доступ к функциям</li>
+        <li>Всё из тарифа Про</li>
+        <li>Личная настройка от разработчика (30 мин)</li>
+        <li>Приоритетная поддержка (ответ в течение часа)</li>
+        <li>Ранний доступ к новым функциям</li>
       </ul>
       <form class="waitlist-form" onsubmit="handleWaitlist(event)">
         <input type="email" placeholder="Твой email" class="waitlist-input" required>
@@ -1060,8 +1066,17 @@ footer{border-top:1px solid rgba(255,255,255,.05);padding:44px 20px;text-align:c
         <path d="M2 8l10 7 10-7" stroke="url(#sg3)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </a>
+    <!-- Instagram -->
+    <a href="https://www.instagram.com/solvo.beauty" class="social-link" aria-label="Instagram">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="sg4" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#FF69B4"/><stop offset="1" stop-color="#9370DB"/></linearGradient></defs>
+        <rect x="2" y="2" width="20" height="20" rx="5" stroke="url(#sg4)" stroke-width="1.5"/>
+        <circle cx="12" cy="12" r="4.5" stroke="url(#sg4)" stroke-width="1.5"/>
+        <circle cx="18" cy="6" r="1.2" fill="url(#sg4)"/>
+      </svg>
+    </a>
   </div>
-  <p class="footer-contacts">📧 <a href="mailto:beautybook@rambler.ru">beautybook@rambler.ru</a></p>
+  <p class="footer-contacts">📧 <a href="mailto:beautybook@rambler.ru">beautybook@rambler.ru</a> · <a href="https://www.instagram.com/solvo.beauty">@solvo.beauty</a></p>
   <div class="footer-tags">
     <span class="ftag">#solvabeauty</span>
     <span class="ftag">#маникюр</span>
