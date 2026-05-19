@@ -19,6 +19,11 @@ from slowapi.errors import RateLimitExceeded
 class AdminLoginBody(BaseModel):
     password: str
 
+
+class PaymentNotifyRequest(BaseModel):
+    email: str
+    plan: str
+
 from auth import validate_init_data
 from database import (
     init_db,
@@ -407,6 +412,16 @@ async def login(request: Request, body: EmailLoginRequest):
         "deposit_percent": master.get("deposit_percent", 30),
         "theme": master.get("theme", "pink"),
     }}
+
+
+# ─── Уведомление об оплате ────────────────────────────────────────────
+
+
+@app.post("/api/v1/payment/notify")
+async def payment_notify(body: PaymentNotifyRequest):
+    text = f"💰 Новая оплата!\nEmail: {body.email}\nТариф: {body.plan}\n\nАктивировать: https://beauty-bot-44ou.onrender.com/admin"
+    await send_telegram(text)
+    return {"ok": True}
 
 
 # ─── Дашборд (JWT авторизация) ────────────────────────────────────────
