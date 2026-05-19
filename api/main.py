@@ -3,13 +3,17 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
+import bcrypt
 import jwt
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, Header, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from dotenv import load_dotenv
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 
 class AdminLoginBody(BaseModel):
@@ -65,6 +69,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Beauty Book API", lifespan=lifespan)
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Init admin endpoints
 init_admin(app, verify_admin_token, create_admin_token, ADMIN_SECRET, _jwt_secret)
 
@@ -81,7 +89,10 @@ PAGE_SIZE = 10
 # ─── JWT утилиты ─────────────────────────────────────────────────────
 
 def _jwt_secret() -> str:
-    return BOT_TOKEN or "beauty_book_secret_fallback"
+    secret = os.getenv("JWT_SECRET") or BOT_TOKEN
+    if not secret:
+        raise RuntimeError("JWT_SECRET или BOT_TOKEN должен быть задан")
+    return secret
 
 
 def create_jwt(telegram_id: int, master_id: int) -> str:
@@ -96,7 +107,7 @@ def create_jwt(telegram_id: int, master_id: int) -> str:
 def generate_jwt(master_id: int) -> str:
     payload = {
         "mid": master_id,
-        "exp": datetime.utcnow() + timedelta(days=365),
+        "exp": datetime.utcnow() + timedelta(days=90),
     }
     return jwt.encode(payload, _jwt_secret(), algorithm="HS256")
 
@@ -157,8 +168,16 @@ def _get_jwt_payload(authorization: str = Header(None)) -> dict:
 
 
 async def require_admin(authorization: str = Header(None)) -> int:
-    """Возвращает master_id — для тестов пропускаем всех."""
-    return 1  # Тестовый master_id
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Требуется авторизация")
+    try:
+        token = authorization.replace("Bearer ", "")
+        data = jwt.decode(token, _jwt_secret(), algorithms=["HS256"])
+        if data.get("role") != "admin":
+            raise HTTPException(403, "Нет доступа")
+        return data.get("mid", 1)
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "Неверный токен администратора")
 
 
 # ─── Telegram утилита (отправка сообщения боту) ───────────────────────
@@ -342,10 +361,9 @@ async def admin_master_data(master_id: int, authorization: str = Header(None)):
 
 
 @app.post("/api/v1/auth/register")
-async def register(body: EmailRegisterRequest):
-    import hashlib
-    
-    password_hash = hashlib.sha256(body.password.encode()).hexdigest()
+@limiter.limit("5/minute")
+async def register(request: Request, body: EmailRegisterRequest):
+    password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
     
     existing = await get_master_by_email(body.email)
     if existing:
@@ -371,13 +389,10 @@ async def register(body: EmailRegisterRequest):
 
 
 @app.post("/api/v1/auth/login")
-async def login(body: EmailLoginRequest):
-    import hashlib
-    
-    password_hash = hashlib.sha256(body.password.encode()).hexdigest()
-    
+@limiter.limit("10/minute")
+async def login(request: Request, body: EmailLoginRequest):
     master = await get_master_by_email(body.email)
-    if not master or master.get("password_hash") != password_hash:
+    if not master or not bcrypt.checkpw(body.password.encode(), master.get("password_hash", "").encode()):
         raise HTTPException(401, "Неверный email или пароль")
     
     token = generate_jwt(master["id"])
