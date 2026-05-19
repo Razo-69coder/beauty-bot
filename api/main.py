@@ -24,6 +24,11 @@ class PaymentNotifyRequest(BaseModel):
     email: str
     plan: str
 
+
+class BroadcastRequest(BaseModel):
+    message: str
+    admin_key: str
+
 from auth import validate_init_data
 from database import (
     init_db,
@@ -422,6 +427,32 @@ async def payment_notify(body: PaymentNotifyRequest):
     text = f"💰 Новая оплата!\nEmail: {body.email}\nТариф: {body.plan}\n\nАктивировать: https://beauty-bot-44ou.onrender.com/admin"
     await send_telegram(text)
     return {"ok": True}
+
+
+# ─── Broadcast (админ-рассылка) ─────────────────────────────────────────
+
+
+@app.post("/api/admin/broadcast")
+async def broadcast_to_all_masters(body: BroadcastRequest):
+    if body.admin_key != os.getenv("ADMIN_PASSWORD", "changeme"):
+        raise HTTPException(403, "Нет доступа")
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT telegram_id FROM masters WHERE telegram_id IS NOT NULL AND telegram_id != 0"
+        ) as cursor:
+            rows = await cursor.fetchall()
+
+    sent = 0
+    for row in rows:
+        tg_id = row[0]
+        try:
+            await send_tg_message(tg_id, body.message)
+            sent += 1
+        except Exception:
+            pass
+
+    return {"ok": True, "sent": sent}
 
 
 # ─── Дашборд (JWT авторизация) ────────────────────────────────────────
