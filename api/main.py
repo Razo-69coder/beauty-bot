@@ -29,6 +29,10 @@ class BroadcastRequest(BaseModel):
     message: str
     admin_key: str
 
+
+class WaitlistRequest(BaseModel):
+    email: str
+
 from auth import validate_init_data
 from database import (
     init_db,
@@ -453,6 +457,16 @@ async def broadcast_to_all_masters(body: BroadcastRequest):
             pass
 
     return {"ok": True, "sent": sent}
+
+
+# ─── Waitlist ────────────────────────────────────────────────────────────
+
+
+@app.post("/api/v1/waitlist")
+async def waitlist(body: WaitlistRequest):
+    text = f"📧 Новый email в вейтлист:\n{body.email}"
+    await send_telegram(text)
+    return {"ok": True}
 
 
 # ─── Дашборд (JWT авторизация) ────────────────────────────────────────
