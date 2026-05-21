@@ -214,8 +214,12 @@ async def health():
 async def webhook(request: Request):
     if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
         raise HTTPException(status_code=401)
-    update = Update.model_validate(await request.json())
-    await dp.feed_update(bot=bot, update=update)
+    try:
+        update = Update.model_validate(await request.json())
+        await dp.feed_update(bot=bot, update=update)
+    except Exception as e:
+        import traceback
+        print(f"[WEBHOOK ERROR] {e}\n{traceback.format_exc()}")
     return {"ok": True}
 
 
