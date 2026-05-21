@@ -25,18 +25,20 @@ async def cmd_start(message: Message, state: FSMContext):
     args = message.text.split(maxsplit=1)
     param = args[1] if len(args) > 1 else ''
 
-    if param.startswith('PHONE_') and '_NAME_' in param:
-        parts = param.split('_NAME_', 1)
-        phone_part = parts[0].replace('PHONE_', '', 1)
-        client_name = urllib.parse.unquote(parts[1].strip()) if len(parts) > 1 else ''
-        phone = '+' + phone_part if not phone_part.startswith('+') else phone_part
+    if param.startswith('PHONE_'):
+        # формат: PHONE_{digits} или PHONE_{digits}_NAME_{name} (backward compat)
+        phone_part = param[6:]  # убираем 'PHONE_'
+        if '_NAME_' in phone_part:
+            phone_part = phone_part.split('_NAME_', 1)[0]
+        phone_digits = phone_part.replace('+', '').strip()
+        phone = '+' + phone_digits
 
         pool = await get_pool()
         async with pool.acquire() as conn:
             client = await conn.fetchrow(
                 "SELECT id, name FROM clients WHERE phone = $1 LIMIT 1", phone
             )
-            name = client['name'] if client else client_name
+            name = client['name'] if client else message.from_user.first_name or 'Клиент'
             if client:
                 await conn.execute(
                     "UPDATE clients SET telegram_id = $1 WHERE phone = $2",
