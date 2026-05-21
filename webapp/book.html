@@ -1345,7 +1345,7 @@ async function submitBooking() {
     if (document.getElementById('suc-master')) document.getElementById('suc-master').textContent = escHtml(masterName);
     document.getElementById('success-sub').innerHTML = escHtml(masterName) + ' подтвердит запись<br>в ближайшее время';
     const linkEl = document.getElementById('telegram-link');
-    if (linkEl) linkEl.href = 'https://t.me/Beauty6699_bot?start=link_' + phone;
+    if (linkEl) linkEl.href = 'https://t.me/Beauty6699_bot?start=PHONE_' + phone + '_NAME_' + encodeURIComponent(name);
     goToStep(5);
     spawnConfetti();
   } catch(e) {

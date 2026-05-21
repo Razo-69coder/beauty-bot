@@ -1,3 +1,5 @@
+import urllib.parse
+
 from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.filters import CommandStart, Command
@@ -23,7 +25,35 @@ async def cmd_start(message: Message, state: FSMContext):
     args = message.text.split(maxsplit=1)
     param = args[1] if len(args) > 1 else ''
 
-    if param.startswith('phone'):
+    if param.startswith('PHONE_') and '_NAME_' in param:
+        parts = param.split('_NAME_', 1)
+        phone_part = parts[0].replace('PHONE_', '', 1)
+        client_name = urllib.parse.unquote(parts[1].strip()) if len(parts) > 1 else ''
+        phone = '+' + phone_part if not phone_part.startswith('+') else phone_part
+
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            client = await conn.fetchrow(
+                "SELECT id, name FROM clients WHERE phone = $1 LIMIT 1", phone
+            )
+            name = client['name'] if client else client_name
+            if client:
+                await conn.execute(
+                    "UPDATE clients SET telegram_id = $1 WHERE phone = $2",
+                    message.from_user.id, phone
+                )
+
+            await message.answer(
+                f"Отлично, {name}! Теперь вы будете получать:\n"
+                f"🔔 — Напоминания о записи за 24 и 2 часа до визита\n"
+                f"🎂 — Поздравление и подарок в день рождения\n"
+                f"🏆 — Уведомление о накопленной скидке за постоянство\n\n"
+                f"До встречи! 👋"
+            )
+        return
+
+    # backward compat: старый формат link_{phone}
+    if param.startswith('link_'):
         phone_digits = param[5:]
         phone = '+' + phone_digits if not phone_digits.startswith('+') else phone_digits
         pool = await get_pool()
@@ -31,15 +61,20 @@ async def cmd_start(message: Message, state: FSMContext):
             client = await conn.fetchrow(
                 "SELECT id, name FROM clients WHERE phone = $1 LIMIT 1", phone
             )
+            name = client['name'] if client else 'Клиент'
             if client:
                 await conn.execute(
                     "UPDATE clients SET telegram_id = $1 WHERE phone = $2",
                     message.from_user.id, phone
                 )
-                await message.answer(
-                    f"✅ Отлично, {client['name']}! Теперь вы будете получать напоминания о записях. До встречи! 💅"
-                )
-                return
+            await message.answer(
+                f"Отлично, {name}! Теперь вы будете получать:\n"
+                f"🔔 — Напоминания о записи за 24 и 2 часа до визита\n"
+                f"🎂 — Поздравление и подарок в день рождения\n"
+                f"🏆 — Уведомление о накопленной скидке за постоянство\n\n"
+                f"До встречи! 👋"
+            )
+        return
 
     elif param.startswith('master_'):
         token = param[7:]
