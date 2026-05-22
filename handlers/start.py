@@ -88,6 +88,10 @@ async def cmd_start(message: Message, state: FSMContext):
             )
             if row:
                 await conn.execute(
+                    "UPDATE masters SET telegram_id=NULL WHERE telegram_id=$1 AND id!=$2",
+                    message.from_user.id, row['master_id']
+                )
+                await conn.execute(
                     "UPDATE masters SET telegram_id=$1 WHERE id=$2",
                     message.from_user.id, row['master_id']
                 )
