@@ -845,8 +845,8 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
     
     # Task 2: Notify master when web booking arrives
     try:
+        date_fmt = _dt.strptime(body.date, "%Y-%m-%d").strftime("%d.%m.%Y")
         if master.get("telegram_id"):
-            date_fmt = _dt.strptime(body.date, "%Y-%m-%d").strftime("%d.%m.%Y")
             await bot.send_message(
                 master["telegram_id"],
                 f"🔔 *Новая запись через ссылку!*\n\n"
@@ -861,8 +861,8 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
             "Новая запись!",
             f"{body.client_name} — {date_fmt} в {body.time}"
         )
-    except Exception:
-        pass  # Don't fail if bot message or push fails
+    except Exception as e:
+        print(f"[NOTIFY] booking notification error: {e}")
     
     return {"ok": True, "appointment_id": appt_id, "client_id": client_id, "bot_username": config.BOT_USERNAME}
 
