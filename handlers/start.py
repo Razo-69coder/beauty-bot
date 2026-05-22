@@ -87,17 +87,18 @@ async def cmd_start(message: Message, state: FSMContext):
                 token
             )
             if row:
-                await conn.execute(
-                    "UPDATE masters SET telegram_id=NULL WHERE telegram_id=$1 AND id!=$2",
-                    message.from_user.id, row['master_id']
-                )
-                await conn.execute(
-                    "UPDATE masters SET telegram_id=$1 WHERE id=$2",
-                    message.from_user.id, row['master_id']
-                )
-                await conn.execute(
-                    "DELETE FROM telegram_link_tokens WHERE token=$1", token
-                )
+                async with conn.transaction():
+                    await conn.execute(
+                        "UPDATE masters SET telegram_id=NULL WHERE telegram_id=$1 AND id!=$2",
+                        message.from_user.id, row['master_id']
+                    )
+                    await conn.execute(
+                        "UPDATE masters SET telegram_id=$1 WHERE id=$2",
+                        message.from_user.id, row['master_id']
+                    )
+                    await conn.execute(
+                        "DELETE FROM telegram_link_tokens WHERE token=$1", token
+                    )
                 await message.answer("✅ Telegram успешно привязан! Теперь вы будете получать уведомления.")
             else:
                 await message.answer("❌ Ссылка недействительна или устарела. Создайте новую в приложении.")

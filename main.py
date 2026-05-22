@@ -134,6 +134,7 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE clients ADD COLUMN IF NOT EXISTS username VARCHAR(50) DEFAULT ''",
                 "ALTER TABLE masters ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) DEFAULT 'Europe/Moscow'",
                 "ALTER TABLE clients ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) DEFAULT 'Europe/Moscow'",
+                "ALTER TABLE masters ALTER COLUMN telegram_id DROP NOT NULL",
             ]:
                 try:
                     await conn.execute(sql)
