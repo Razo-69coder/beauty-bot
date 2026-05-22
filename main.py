@@ -1333,6 +1333,18 @@ async def v1_cancel_appointment(appt_id: int, master_id: int = Depends(get_jwt_m
     return {"ok": True}
 
 
+@app.patch("/api/v1/appointments/{appt_id}/status")
+async def v1_update_status(appt_id: int, body: StatusUpdate, master_id: int = Depends(get_jwt_master_id)):
+    appt = await get_appointment_with_client(appt_id)
+    if not appt or appt["master_id"] != master_id:
+        raise HTTPException(404, "Запись не найдена")
+    valid = ("confirmed", "cancelled", "pending", "completed", "no_show")
+    if body.status not in valid:
+        raise HTTPException(400, "Неверный статус")
+    await update_appointment_status(appt_id, body.status)
+    return {"ok": True}
+
+
 @app.post("/api/v1/appointments/{appt_id}/done")
 async def v1_mark_done(appt_id: int, master_id: int = Depends(get_jwt_master_id)):
     appt = await get_appointment_with_client(appt_id)
