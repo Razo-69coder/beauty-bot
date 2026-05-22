@@ -1343,6 +1343,32 @@ async def v1_update_status(appt_id: int, body: StatusUpdate, master_id: int = De
     if body.status not in valid:
         raise HTTPException(400, "Неверный статус")
     await update_appointment_status(appt_id, body.status)
+    try:
+        client_tg = appt.get("client_telegram_id")
+        date_str = str(appt.get("appointment_date", ""))
+        time_str = appt.get("time", "")
+        procedure = appt.get("procedure", "")
+        try:
+            date_fmt = _dt.strptime(date_str, "%Y-%m-%d").strftime("%d.%m.%Y")
+        except Exception:
+            date_fmt = date_str
+        if client_tg and body.status == "confirmed":
+            await bot.send_message(
+                client_tg,
+                f"✅ Ваша запись подтверждена!\n\n"
+                f"📅 {date_fmt} в {time_str}\n"
+                f"💅 {procedure}\n\n"
+                f"Ждём вас! До встречи 🌸"
+            )
+        elif client_tg and body.status == "cancelled":
+            await bot.send_message(
+                client_tg,
+                f"❌ К сожалению, ваша запись отменена.\n\n"
+                f"📅 {date_fmt} в {time_str}\n\n"
+                f"Для новой записи перейдите по ссылке мастера."
+            )
+    except Exception as e:
+        print(f"[NOTIFY] status change notification error: {e}")
     return {"ok": True}
 
 
