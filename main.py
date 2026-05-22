@@ -800,10 +800,14 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
     blocked = await get_blocked_days(master["id"])
     if body.date in blocked:
         raise HTTPException(409, "Этот день недоступен для записи")
-    slots = await get_available_slots(
-        master["id"], body.date,
-        master["work_start"], master["work_end"], master["slot_duration"]
-    )
+    custom = await get_custom_slots_for_date(master["id"], body.date)
+    if custom:
+        slots = await get_custom_slots_available(master["id"], body.date)
+    else:
+        slots = await get_available_slots(
+            master["id"], body.date,
+            master["work_start"], master["work_end"], master["slot_duration"]
+        )
     if body.time not in slots:
         raise HTTPException(409, "Этот слот уже занят")
     procedure = body.procedure
