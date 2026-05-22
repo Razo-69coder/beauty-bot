@@ -875,7 +875,7 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
 async def v1_telegram_link_token(master_id: int = Depends(get_jwt_master_id)):
     from datetime import datetime, timedelta
     token = secrets.token_urlsafe(16)
-    expires_at = datetime.utcnow() + timedelta(minutes=10)
+    expires_at = datetime.utcnow() + timedelta(hours=1)
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute(
