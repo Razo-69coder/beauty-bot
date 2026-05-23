@@ -19,3 +19,7 @@ PAGE_SIZE = 10
 
 # Username бота (заполняется автоматически при старте через bot.get_me())
 BOT_USERNAME = os.getenv("BOT_USERNAME", "")
+
+# ЮКасса
+YUKASSA_SHOP_ID = os.getenv("YUKASSA_SHOP_ID", "")
+YUKASSA_SECRET_KEY = os.getenv("YUKASSA_SECRET_KEY", "")

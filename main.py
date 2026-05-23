@@ -10,6 +10,7 @@ from urllib.parse import unquote
 
 import config
 from fastapi import FastAPI, Request, Header, HTTPException, Depends, Form
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -135,6 +136,7 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE masters ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) DEFAULT 'Europe/Moscow'",
                 "ALTER TABLE clients ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) DEFAULT 'Europe/Moscow'",
                 "ALTER TABLE masters ALTER COLUMN telegram_id DROP NOT NULL",
+                "ALTER TABLE masters ADD COLUMN IF NOT EXISTS trial_end_date TIMESTAMP",
             ]:
                 try:
                     await conn.execute(sql)
@@ -142,6 +144,9 @@ async def lifespan(app: FastAPI):
                     pass
     except Exception as e:
         print(f"[STARTUP] DB warning: {e}")
+    
+    os.environ.setdefault("YUKASSA_SHOP_ID", "")
+    os.environ.setdefault("YUKASSA_SECRET_KEY", "")
     
     setup_scheduler(bot)
 
@@ -1980,3 +1985,83 @@ async def serve_admin():
     from fastapi.responses import FileResponse
     html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp", "admin.html")
     return FileResponse(html_path)
+
+
+# ── Юридические страницы ──────────────────────────────────────────────
+
+@app.get("/oferta", response_class=HTMLResponse)
+async def oferta_page():
+    with open("webapp/oferta.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_page():
+    with open("webapp/privacy.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
+@app.get("/contacts", response_class=HTMLResponse)
+async def contacts_page():
+    with open("webapp/contacts.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
+@app.get("/payment/success", response_class=HTMLResponse)
+async def payment_success():
+    with open("webapp/payment_success.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
+# ── ЮКасса — платёжные эндпоинты ──────────────────────────────────────
+
+import yookassa
+from yookassa import Payment, Configuration
+import uuid
+
+Configuration.account_id = config.YUKASSA_SHOP_ID
+Configuration.secret_key = config.YUKASSA_SECRET_KEY
+
+
+@app.post("/api/v1/payment/create")
+async def create_payment(master_id: int = Depends(get_jwt_master_id_any)):
+    if not config.YUKASSA_SHOP_ID or not config.YUKASSA_SECRET_KEY:
+        raise HTTPException(503, "Платёжная система не настроена")
+    payment = Payment.create({
+        "amount": {"value": "490.00", "currency": "RUB"},
+        "confirmation": {
+            "type": "redirect",
+            "return_url": f"{WEBHOOK_URL.rstrip('/')}/payment/success",
+        },
+        "capture": True,
+        "description": f"Подписка Solvo Beauty — мастер #{master_id}",
+        "metadata": {"master_id": str(master_id)},
+    }, str(uuid.uuid4()))
+    return {
+        "payment_id": payment.id,
+        "confirmation_url": payment.confirmation.confirmation_url,
+    }
+
+
+@app.post("/api/v1/payment/webhook")
+async def payment_webhook(request: Request):
+    body = await request.json()
+    event = body.get("event")
+    obj = body.get("object", {})
+    if event == "payment.succeeded":
+        master_id = int(obj.get("metadata", {}).get("master_id", 0))
+        if master_id:
+            pool = await get_pool()
+            async with pool.acquire() as conn:
+                from datetime import timedelta, datetime
+                await conn.execute(
+                    "UPDATE masters SET is_active = 1, trial_end_date = $1 WHERE id = $2",
+                    datetime.utcnow() + timedelta(days=30),
+                    master_id,
+                )
+                name = await conn.fetchval("SELECT name FROM masters WHERE id=$1", master_id)
+            await send_telegram(
+                f"💳 Оплата подписки от мастера {name or '#' + str(master_id)}\n"
+                f"Подписка продлена на 30 дней."
+            )
+    return {"status": "ok"}

@@ -16,3 +16,4 @@ h2>=3,<5
 python-multipart==0.0.12
 bcrypt==4.2.1
 slowapi==0.1.9
+yookassa==3.3.0

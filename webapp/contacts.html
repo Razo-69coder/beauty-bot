@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Контакты — Solvo Beauty</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0D0D0D;
+    color: #F5F0EB;
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+  .page {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 48px 24px 64px;
+  }
+  .logo {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 24px;
+    font-weight: 600;
+    color: #FF6B9D;
+    margin-bottom: 40px;
+    letter-spacing: 1px;
+  }
+  h1 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 32px;
+    font-weight: 600;
+    color: #F5F0EB;
+    margin-bottom: 32px;
+    line-height: 1.3;
+  }
+  .info-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 24px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    gap: 16px;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-label {
+    color: rgba(245,240,235,0.45);
+    font-size: 13px;
+    font-weight: 500;
+    min-width: 120px;
+    flex-shrink: 0;
+  }
+  .info-value {
+    color: #F5F0EB;
+    font-size: 14px;
+    text-align: right;
+    word-break: break-word;
+  }
+  .nav-links {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.09);
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    font-size: 13px;
+  }
+  .nav-links a {
+    color: rgba(245,240,235,0.5);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: #FF6B9D; }
+  @media (max-width: 480px) {
+    .page { padding: 32px 16px 48px; }
+    h1 { font-size: 26px; }
+    .info-card { padding: 20px; }
+    .info-row { flex-direction: column; gap: 4px; }
+    .info-value { text-align: left; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="logo">Solvo Beauty</div>
+  <h1>Контакты и реквизиты</h1>
+
+  <div class="info-card">
+    <div class="info-row">
+      <span class="info-label">Статус</span>
+      <span class="info-value">Самозанятый (плательщик НПД)</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">ФИО</span>
+      <span class="info-value">[ФИО_ЗАГЛУШКА]</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">ИНН</span>
+      <span class="info-value">[ИНН_ЗАГЛУШКА]</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Email</span>
+      <span class="info-value">[EMAIL_ЗАГЛУШКА]</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Телефон</span>
+      <span class="info-value">[PHONE_ЗАГЛУШКА]</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Режим работы</span>
+      <span class="info-value">Приложение работает 24/7</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Способ оказания услуг</span>
+      <span class="info-value">Онлайн, через мобильное приложение Solvo Beauty (iOS)</span>
+    </div>
+  </div>
+
+  <div class="nav-links">
+    <a href="/book">Главная</a>
+    <a href="/oferta">Публичная оферта</a>
+    <a href="/privacy">Политика конфиденциальности</a>
+  </div>
+</div>
+</body>
+</html>

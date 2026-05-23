@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Оплата успешна — Solvo Beauty</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0D0D0D;
+    color: #F5F0EB;
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card {
+    max-width: 440px;
+    width: 100%;
+    margin: 24px;
+    padding: 48px 32px;
+    text-align: center;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 24px;
+  }
+  .checkmark {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #FF6B9D, #C9A96E);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 28px;
+    font-size: 40px;
+    color: #fff;
+    animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes pop {
+    0% { transform: scale(0); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .logo {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: #FF6B9D;
+    margin-bottom: 24px;
+    letter-spacing: 1px;
+  }
+  h1 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+    color: #F5F0EB;
+    margin-bottom: 12px;
+  }
+  p {
+    color: rgba(245,240,235,0.6);
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 32px;
+  }
+  .btn {
+    display: inline-block;
+    padding: 14px 32px;
+    background: linear-gradient(135deg, #FF6B9D, #C9A96E);
+    color: #fff;
+    text-decoration: none;
+    border-radius: 14px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(255,107,157,0.3);
+  }
+  .btn-secondary {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 12px 24px;
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(245,240,235,0.6);
+    text-decoration: none;
+    border-radius: 14px;
+    font-size: 13px;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .btn-secondary:hover {
+    color: #F5F0EB;
+    border-color: rgba(255,255,255,0.3);
+  }
+  @media (max-width: 480px) {
+    .card { padding: 32px 20px; }
+    h1 { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">Solvo Beauty</div>
+  <div class="checkmark">✓</div>
+  <h1>Оплата прошла успешно!</h1>
+  <p>Ваша подписка активирована.<br>Вернитесь в приложение Solvo Beauty.</p>
+  <a href="solvobeauty://subscription/success" class="btn">Открыть приложение</a>
+  <br>
+  <a href="/book" class="btn-secondary">Вернуться на главную</a>
+</div>
+</body>
+</html>
