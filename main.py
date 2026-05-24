@@ -2070,3 +2070,31 @@ async def payment_webhook(request: Request):
                 f"Подписка продлена на 30 дней."
             )
     return {"status": "ok"}
+
+
+# ── Waitlist ────────────────────────────────────────────────────────────
+
+class WaitlistRequest(BaseModel):
+    email: str
+
+
+@app.post("/api/v1/waitlist")
+async def join_waitlist(body: WaitlistRequest):
+    from database import add_to_waitlist
+    is_new = await add_to_waitlist(body.email)
+
+    if is_new:
+        await send_telegram(
+            f"🎉 Новая заявка на лендинге!\n📧 {body.email}"
+        )
+
+    return {"ok": True, "is_new": is_new}
+
+
+@app.get("/api/v1/waitlist/list")
+async def get_waitlist_list(secret: str = ""):
+    if secret != ADMIN_SECRET:
+        raise HTTPException(403, "Forbidden")
+    from database import get_waitlist
+    items = await get_waitlist()
+    return {"count": len(items), "emails": items}

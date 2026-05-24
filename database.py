@@ -218,6 +218,13 @@ async def init_db():
                 UNIQUE(master_id, type)
             )
         """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS waitlist (
+                id SERIAL PRIMARY KEY,
+                email TEXT UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
 
 
 # ── Мастера ───────────────────────────────────────────────────────────
@@ -1623,3 +1630,25 @@ async def get_device_tokens_for_master(master_id: int) -> list:
             "SELECT token FROM device_tokens WHERE master_id=$1", master_id
         )
         return [r["token"] for r in rows]
+
+
+# ── Waitlist ────────────────────────────────────────────────────────────
+
+async def add_to_waitlist(email: str) -> bool:
+    async with get_pool().acquire() as conn:
+        try:
+            result = await conn.execute(
+                "INSERT INTO waitlist (email) VALUES ($1) ON CONFLICT (email) DO NOTHING",
+                email
+            )
+            return "INSERT 0 1" in result
+        except Exception:
+            return False
+
+
+async def get_waitlist() -> list:
+    async with get_pool().acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT email, created_at FROM waitlist ORDER BY created_at DESC"
+        )
+        return [dict(r) for r in rows]
