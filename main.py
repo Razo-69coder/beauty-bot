@@ -174,9 +174,14 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 
 # ── Health checks (для keep-alive) ─────────────────────────────────────
-@app.get("/")
-async def root():
+@app.get("/health")
+async def health():
     return {"status": "ok", "message": "Beauty Book v5", "v": 5}
+
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    with open("webapp/index.html", "r", encoding="utf-8") as f:
+        return f.read()
 
 @app.get("/api/all-masters")
 async def get_all_v6():
