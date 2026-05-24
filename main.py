@@ -2080,15 +2080,29 @@ class WaitlistRequest(BaseModel):
 
 @app.post("/api/v1/waitlist")
 async def join_waitlist(body: WaitlistRequest):
-    from database import add_to_waitlist
-    is_new = await add_to_waitlist(body.email)
+    try:
+        async with get_pool().acquire() as conn:
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS waitlist (
+                    id SERIAL PRIMARY KEY,
+                    email TEXT UNIQUE NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            result = await conn.execute(
+                "INSERT INTO waitlist (email) VALUES ($1) ON CONFLICT (email) DO NOTHING",
+                body.email
+            )
+            is_new = "INSERT 0 1" in result
 
-    if is_new:
-        await send_telegram(
-            f"🎉 Новая заявка на лендинге!\n📧 {body.email}"
-        )
+        if is_new:
+            await send_telegram(
+                f"🎉 Новая заявка на лендинге!\n📧 {body.email}"
+            )
 
-    return {"ok": True, "is_new": is_new}
+        return {"ok": True, "is_new": is_new}
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @app.get("/api/v1/waitlist/list")
