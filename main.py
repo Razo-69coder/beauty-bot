@@ -717,7 +717,10 @@ async def register(body: EmailRegisterRequest):
     except Exception as e:
         raise HTTPException(500, f"DB error: {e}")
     
-    return {"token": token, "master": {
+    from database import get_master_trial_status
+    trial = await get_master_trial_status(master["id"])
+    
+    return {"token": token, "trial": trial, "master": {
         "id": master["id"], "name": master["name"], "email": master["email"],
         "phone": master.get("phone") or "",
         "work_start": master["work_start"], "work_end": master["work_end"],
@@ -738,7 +741,10 @@ async def login(body: EmailLoginRequest):
     
     token = _generate_jwt(master["id"])
     
-    return {"token": token, "master": {
+    from database import get_master_trial_status
+    trial = await get_master_trial_status(master["id"])
+    
+    return {"token": token, "trial": trial, "master": {
         "id": master["id"], "name": master["name"], "email": master["email"],
         "work_start": master["work_start"], "work_end": master["work_end"],
         "slot_duration": master["slot_duration"], "timezone": master["timezone"],
@@ -960,6 +966,15 @@ async def v1_subscription_status(master_id: int = Depends(get_jwt_master_id_any)
         row = await conn.fetchrow("SELECT is_active FROM masters WHERE id=$1", master_id)
     is_active = bool(row["is_active"]) if row and row["is_active"] is not None else False
     return {"is_active": is_active}
+
+
+@app.get("/api/v1/masters/me/trial")
+async def v1_trial_status(master_id: int = Depends(get_jwt_master_id_any)):
+    from database import get_master_trial_status
+    trial = await get_master_trial_status(master_id)
+    if not trial:
+        raise HTTPException(404, "Мастер не найден")
+    return trial
 
 
 @app.get("/api/v1/reminders/templates")
@@ -2021,10 +2036,10 @@ async def payment_success():
 # ── ЮКасса — платёжные эндпоинты ──────────────────────────────────────
 
 PLANS = {
-    "pro_1m":  {"price": "490.00", "days": 30,  "label": "1 месяц"},
-    "pro_6m":  {"price": "2 490.00", "days": 180, "label": "6 месяцев"},
-    "pro_1y":  {"price": "4 990.00", "days": 365, "label": "12 месяцев"},
-    "pro_2y":  {"price": "8 990.00", "days": 730, "label": "24 месяца"},
+    "pro_1m":  {"price": "690.00",  "days": 30,  "label": "1 месяц"},
+    "pro_6m":  {"price": "3490.00", "days": 180, "label": "6 месяцев"},
+    "pro_1y":  {"price": "5990.00", "days": 365, "label": "12 месяцев"},
+    "pro_2y":  {"price": "9990.00", "days": 730, "label": "24 месяца"},
 }
 
 
