@@ -2020,6 +2020,18 @@ async def payment_success():
 
 # ── ЮКасса — платёжные эндпоинты ──────────────────────────────────────
 
+PLANS = {
+    "pro_1m":  {"price": "490.00", "days": 30,  "label": "1 месяц"},
+    "pro_6m":  {"price": "2 490.00", "days": 180, "label": "6 месяцев"},
+    "pro_1y":  {"price": "4 990.00", "days": 365, "label": "12 месяцев"},
+    "pro_2y":  {"price": "8 990.00", "days": 730, "label": "24 месяца"},
+}
+
+
+class CreatePaymentRequest(BaseModel):
+    plan: str = "pro_1m"
+
+
 import yookassa
 from yookassa import Payment, Configuration
 import uuid
@@ -2029,18 +2041,19 @@ Configuration.secret_key = config.YUKASSA_SECRET_KEY
 
 
 @app.post("/api/v1/payment/create")
-async def create_payment(master_id: int = Depends(get_jwt_master_id_any)):
+async def create_payment(body: CreatePaymentRequest, master_id: int = Depends(get_jwt_master_id_any)):
     if not config.YUKASSA_SHOP_ID or not config.YUKASSA_SECRET_KEY:
         raise HTTPException(503, "Платёжная система не настроена")
+    plan = PLANS.get(body.plan, PLANS["pro_1m"])
     payment = Payment.create({
-        "amount": {"value": "490.00", "currency": "RUB"},
+        "amount": {"value": plan["price"], "currency": "RUB"},
         "confirmation": {
             "type": "redirect",
             "return_url": f"{WEBHOOK_URL.rstrip('/')}/payment/success",
         },
         "capture": True,
-        "description": f"Подписка Solvo Beauty — мастер #{master_id}",
-        "metadata": {"master_id": str(master_id)},
+        "description": f"Подписка Solvo Beauty — мастер #{master_id}, {plan['label']}",
+        "metadata": {"master_id": str(master_id), "plan": body.plan, "days": str(plan["days"])},
     }, str(uuid.uuid4()))
     return {
         "payment_id": payment.id,
@@ -2054,14 +2067,16 @@ async def payment_webhook(request: Request):
     event = body.get("event")
     obj = body.get("object", {})
     if event == "payment.succeeded":
-        master_id = int(obj.get("metadata", {}).get("master_id", 0))
+        meta = obj.get("metadata", {})
+        master_id = int(meta.get("master_id", 0))
+        days = int(meta.get("days", 30))
         if master_id:
             pool = await get_pool()
             async with pool.acquire() as conn:
                 from datetime import timedelta, datetime
                 await conn.execute(
                     "UPDATE masters SET is_active = 1, trial_end_date = $1 WHERE id = $2",
-                    datetime.utcnow() + timedelta(days=30),
+                    datetime.utcnow() + timedelta(days=days),
                     master_id,
                 )
                 name = await conn.fetchval("SELECT name FROM masters WHERE id=$1", master_id)
