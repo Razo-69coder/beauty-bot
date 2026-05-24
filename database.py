@@ -161,6 +161,7 @@ async def init_db():
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS service_id INTEGER",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS loyalty_discount_type TEXT DEFAULT 'percent'",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS loyalty_discount_rub INTEGER DEFAULT 0",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS paid_until TIMESTAMP",
         ]:
             try:
                 await conn.execute(sql)
@@ -302,12 +303,13 @@ async def get_master_by_email(email: str) -> dict | None:
 
 async def create_master_with_email(email: str, password_hash: str, name: str, phone: str = "") -> int:
     import time
+    from datetime import datetime, timedelta
     telegram_id = -int(time.time())
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "INSERT INTO masters (email, password_hash, name, telegram_id, is_active, phone) VALUES ($1, $2, $3, $4, 1, $5) RETURNING id",
-            email, password_hash, name, telegram_id, phone
+            "INSERT INTO masters (email, password_hash, name, telegram_id, is_active, phone, trial_end_date) VALUES ($1, $2, $3, $4, 1, $5, $6) RETURNING id",
+            email, password_hash, name, telegram_id, phone, datetime.utcnow() + timedelta(days=30)
         )
     return row['id'] if row else 0
 
@@ -1652,3 +1654,25 @@ async def get_waitlist() -> list:
             "SELECT email, created_at FROM waitlist ORDER BY created_at DESC"
         )
         return [dict(r) for r in rows]
+
+
+async def get_master_trial_status(master_id: int) -> dict | None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT trial_end_date, is_active, paid_until FROM masters WHERE id=$1",
+            master_id
+        )
+    if not row:
+        return None
+    trial_end = row["trial_end_date"]
+    paid_until = row["paid_until"]
+    now = datetime.utcnow()
+    is_trial = bool(trial_end and trial_end > now and row["is_active"] == 1 and paid_until is None)
+    days_left = (trial_end - now).days if trial_end and trial_end > now else 0
+    return {
+        "trial_end_date": trial_end.isoformat() if trial_end else None,
+        "days_left": max(0, days_left),
+        "is_trial": is_trial,
+        "is_active": bool(row["is_active"]),
+    }

@@ -2090,14 +2090,14 @@ async def payment_webhook(request: Request):
             async with pool.acquire() as conn:
                 from datetime import timedelta, datetime
                 await conn.execute(
-                    "UPDATE masters SET is_active = 1, trial_end_date = $1 WHERE id = $2",
+                    "UPDATE masters SET is_active = 1, trial_end_date = NULL, paid_until = $1 WHERE id = $2",
                     datetime.utcnow() + timedelta(days=days),
                     master_id,
                 )
                 name = await conn.fetchval("SELECT name FROM masters WHERE id=$1", master_id)
             await send_telegram(
                 f"💳 Оплата подписки от мастера {name or '#' + str(master_id)}\n"
-                f"Подписка продлена на 30 дней."
+                f"Подписка продлена на {days} дней."
             )
     return {"status": "ok"}
 

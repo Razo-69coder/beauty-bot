@@ -389,4 +389,49 @@ def setup_scheduler(bot: Bot):
     # Loyalty notifications at 20:00 MSK
     scheduler.add_job(send_loyalty_notifications, "cron", hour=20, minute=0, args=[bot])
 
+    # Trial deactivation at 00:05 UTC
+    scheduler.add_job(deactivate_expired_trials, "cron", hour=0, minute=5, args=[bot])
+
+    # Trial expiry reminder at 10:00 MSK
+    scheduler.add_job(send_trial_expiry_reminder, "cron", hour=10, minute=0, args=[bot])
+
     scheduler.start()
+
+
+async def deactivate_expired_trials(bot: Bot):
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT id, name FROM masters
+            WHERE trial_end_date < NOW()
+              AND is_active = 1
+              AND paid_until IS NULL
+        """)
+        for row in rows:
+            await conn.execute(
+                "UPDATE masters SET is_active = 0 WHERE id = $1", row["id"]
+            )
+            print(f"[TRIAL] Deactivated master #{row['id']} ({row['name']})")
+
+
+async def send_trial_expiry_reminder(bot: Bot):
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT id, telegram_id, name FROM masters
+            WHERE trial_end_date::date = (NOW() + INTERVAL '2 days')::date
+              AND is_active = 1
+        """)
+    for row in rows:
+        try:
+            await bot.send_message(
+                row["telegram_id"],
+                "⏰ Пробный период Solvo Beauty заканчивается через 2 дня.\n"
+                "Чтобы продолжить работу, оформите подписку в приложении.\n"
+                "Pro — всего 690 ₽/мес 💅"
+            )
+            print(f"[TRIAL] Sent expiry reminder to master #{row['id']}")
+        except Exception as e:
+            print(f"[TRIAL] Failed to send to #{row['id']}: {e}")
