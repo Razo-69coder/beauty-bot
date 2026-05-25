@@ -226,6 +226,18 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id SERIAL PRIMARY KEY,
+                master_id INTEGER REFERENCES masters(id) ON DELETE CASCADE,
+                type VARCHAR(50) NOT NULL,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                appointment_id INTEGER REFERENCES appointments(id) ON DELETE SET NULL,
+                is_read BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
 
 
 # ── Мастера ───────────────────────────────────────────────────────────
@@ -1654,6 +1666,77 @@ async def get_waitlist() -> list:
             "SELECT email, created_at FROM waitlist ORDER BY created_at DESC"
         )
         return [dict(r) for r in rows]
+
+
+# ── Уведомления ─────────────────────────────────────────────────────────
+
+async def create_notification(master_id: int, type: str, title: str, body: str, appointment_id: int = None) -> int:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO notifications (master_id, type, title, body, appointment_id) VALUES ($1,$2,$3,$4,$5) RETURNING id",
+            master_id, type, title, body, appointment_id
+        )
+    return row['id']
+
+
+async def get_notifications(master_id: int, limit: int = 50) -> list:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT n.id, n.type, n.title, n.body, n.appointment_id, n.is_read, n.created_at,
+                   a.procedure, a.appointment_date, a.time, a.status as appt_status,
+                   c.name as client_name, c.phone as client_phone
+            FROM notifications n
+            LEFT JOIN appointments a ON a.id = n.appointment_id
+            LEFT JOIN clients c ON c.id = a.client_id
+            WHERE n.master_id = $1
+            ORDER BY n.is_read ASC, n.created_at DESC
+            LIMIT $2
+        """, master_id, limit)
+    return [dict(r) for r in rows]
+
+
+async def get_unread_count(master_id: int) -> int:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT COUNT(*) as cnt FROM notifications WHERE master_id=$1 AND is_read=FALSE",
+            master_id
+        )
+    return row['cnt']
+
+
+async def mark_notification_read(notification_id: int, master_id: int):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE notifications SET is_read=TRUE WHERE id=$1 AND master_id=$2",
+            notification_id, master_id
+        )
+
+
+async def mark_all_notifications_read(master_id: int):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE notifications SET is_read=TRUE WHERE master_id=$1",
+            master_id
+        )
+
+
+async def broadcast_notification(title: str, body: str) -> int:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        master_ids = await conn.fetch("SELECT id FROM masters")
+        count = 0
+        for m in master_ids:
+            await conn.execute(
+                "INSERT INTO notifications (master_id, type, title, body) VALUES ($1,'broadcast',$2,$3)",
+                m['id'], title, body
+            )
+            count += 1
+    return count
 
 
 async def get_master_trial_status(master_id: int) -> dict | None:

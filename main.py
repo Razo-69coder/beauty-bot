@@ -57,6 +57,8 @@ from database import (
     get_reminder_templates_v1, upsert_reminder_template,
     save_device_token,
     get_device_tokens_for_master,
+    create_notification, get_notifications, get_unread_count,
+    mark_notification_read, mark_all_notifications_read, broadcast_notification,
 )
 
 from scheduler import setup_scheduler
@@ -927,9 +929,15 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
             "Новая запись!",
             f"{body.client_name} — {date_fmt} в {body.time}"
         )
+        await create_notification(
+            master["id"], "new_booking",
+            f"📅 Новая запись",
+            f"{body.client_name} · {date_fmt} в {body.time} · {procedure}",
+            appt_id
+        )
     except Exception as e:
         print(f"[NOTIFY] booking notification error: {e}")
-    
+
     return {"ok": True, "appointment_id": appt_id, "client_id": client_id, "bot_username": config.BOT_USERNAME}
 
 
@@ -1024,6 +1032,12 @@ async def my_cancel(slug: str, body: ClientLookupRequest, appointment_id: int):
                 parse_mode="Markdown"
             )
         await push_to_master(master["id"], "Отмена записи", f"{client['name']} отменил(а) запись на {date_fmt}")
+        await create_notification(
+            master["id"], "client_cancel",
+            f"❌ Клиент отменил запись",
+            f"{client['name']} · {date_fmt} в {appt['time']} · {appt['procedure']}",
+            appt["id"]
+        )
     except Exception as e:
         print(f"[NOTIFY] cancel notify error: {e}")
     return {"ok": True}
@@ -1099,9 +1113,70 @@ async def my_reschedule(slug: str, body: ClientRescheduleRequest):
                 ]]}
             )
         await push_to_master(master["id"], "Перенос записи", f"{client['name']} перенёс(ла) на {new_date_fmt} {body.new_time}")
+        await create_notification(
+            master["id"], "client_reschedule",
+            f"🔄 Клиент перенёс запись",
+            f"{client['name']} · с {old_date_fmt} {appt['time']} → {new_date_fmt} {body.new_time} · {appt['procedure']}",
+            new_appt_id
+        )
     except Exception as e:
         print(f"[NOTIFY] reschedule notify error: {e}")
     return {"ok": True, "new_appointment_id": new_appt_id}
+
+
+# ── Уведомления ──────────────────────────────────────────────────────
+
+@app.get("/api/v1/notifications")
+async def v1_get_notifications(master_id: int = Depends(get_jwt_master_id)):
+    items = await get_notifications(master_id)
+    return {"notifications": [
+        {
+            "id": r["id"], "type": r["type"], "title": r["title"], "body": r["body"],
+            "is_read": r["is_read"],
+            "created_at": str(r["created_at"]),
+            "appointment_id": r["appointment_id"],
+            "appointment": {
+                "procedure": r["procedure"],
+                "date": str(r["appointment_date"])[:10] if r["appointment_date"] else None,
+                "time": r["time"],
+                "status": r["appt_status"],
+                "client_name": r["client_name"],
+                "client_phone": r["client_phone"],
+            } if r["appointment_id"] else None
+        }
+        for r in items
+    ]}
+
+
+@app.get("/api/v1/notifications/unread-count")
+async def v1_unread_count(master_id: int = Depends(get_jwt_master_id)):
+    count = await get_unread_count(master_id)
+    return {"count": count}
+
+
+@app.post("/api/v1/notifications/{notif_id}/read")
+async def v1_mark_read(notif_id: int, master_id: int = Depends(get_jwt_master_id)):
+    await mark_notification_read(notif_id, master_id)
+    return {"ok": True}
+
+
+@app.post("/api/v1/notifications/read-all")
+async def v1_read_all(master_id: int = Depends(get_jwt_master_id)):
+    await mark_all_notifications_read(master_id)
+    return {"ok": True}
+
+
+class _BroadcastBody(BaseModel):
+    title: str
+    body: str
+    secret: str
+
+@app.post("/api/v1/admin/broadcast")
+async def v1_broadcast(body: _BroadcastBody):
+    if body.secret != (config.ADMIN_SECRET if hasattr(config, "ADMIN_SECRET") else ""):
+        raise HTTPException(403, "Forbidden")
+    count = await broadcast_notification(body.title, body.body)
+    return {"ok": True, "sent_to": count}
 
 
 @app.get("/api/v1/telegram-link-token")
