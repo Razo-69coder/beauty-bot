@@ -929,13 +929,16 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
                 f"💅 {procedure}",
                 parse_mode="Markdown"
             )
+    except Exception as e:
+        print(f"[NOTIFY] booking telegram error: {e}")
+    try:
         await push_to_master(
             master["id"],
             "Новая запись!",
             f"{body.client_name} — {date_fmt} в {body.time}"
         )
     except Exception as e:
-        print(f"[NOTIFY] booking telegram/push error: {e}")
+        print(f"[NOTIFY] booking push error: {e}")
     try:
         await create_notification(
             master["id"], "new_booking",
