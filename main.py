@@ -70,6 +70,7 @@ import time as _time
 
 async def send_push(device_token: str, title: str, body_text: str) -> bool:
     if not all([APNS_KEY_ID, APNS_TEAM_ID, APNS_PRIVATE_KEY, APNS_BUNDLE_ID]):
+        print(f"[APNs] SKIP — missing env vars: KEY_ID={bool(APNS_KEY_ID)} TEAM_ID={bool(APNS_TEAM_ID)} KEY={bool(APNS_PRIVATE_KEY)} BUNDLE={bool(APNS_BUNDLE_ID)}")
         return False
     try:
         import jwt as _jwt
@@ -90,7 +91,8 @@ async def send_push(device_token: str, title: str, body_text: str) -> bool:
         payload = {"aps": {"alert": {"title": title, "body": body_text}, "sound": "default"}}
         async with httpx.AsyncClient(http2=True) as client:
             resp = await client.post(url, json=payload, headers=headers, timeout=10)
-            print(f"[APNs] {device_token[:16]}... status={resp.status_code}")
+            body = resp.text
+            print(f"[APNs] status={resp.status_code} body={body!r} token={device_token[:16]}...")
             return resp.status_code == 200
     except Exception as e:
         print(f"[APNs] error: {e}")
@@ -2298,6 +2300,18 @@ async def register_device_token_beauty(
 ):
     await save_device_token(master_id, token)
     return {"ok": True}
+
+
+@app.post("/api/v1/debug/push-test")
+async def debug_push_test(master_id: int = Depends(get_jwt_master_id)):
+    tokens = await get_device_tokens_for_master(master_id)
+    if not tokens:
+        return {"ok": False, "error": "no_device_tokens", "master_id": master_id}
+    results = []
+    for t in tokens:
+        ok = await send_push(t, "Тест пуша", "Если видишь это — push работает ✅")
+        results.append({"token": t[:16] + "...", "sent": ok})
+    return {"ok": True, "master_id": master_id, "results": results}
 
 
 @app.get("/admin/")
