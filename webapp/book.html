@@ -257,9 +257,8 @@
     font-weight: 600;
     color: var(--fg);
     margin-bottom: 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
   }
   .service-meta {
     display: flex;
@@ -1043,6 +1042,7 @@ const RU_DAYS = ['Понедельник','Вторник','Среда','Чет�
 let state = { services: [], date: null, time: null, calYear: null, calMonth: null };
 let SERVICES = [];
 let masterName = '';
+let BLOCKED_DAYS = [];
 
 const today = new Date();
 
@@ -1055,6 +1055,7 @@ async function init() {
     if (!r.ok) { showError('Мастер не найден'); return; }
     const data = await r.json();
     masterName = data.master_name || 'Мастер';
+    BLOCKED_DAYS = data.blocked_days || [];
     SERVICES = (data.services || []).map(s => ({
       id: s.id,
       name: s.name,
@@ -1180,7 +1181,9 @@ function renderCalendar() {
     const isToday = cellDate.toDateString() === today.toDateString();
     const isPast = cellDate < new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const isSunday = cellDate.getDay() === 0;
-    if (isPast || isSunday) { cell.classList.add('past'); }
+    const dateIso = y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const isBlocked = BLOCKED_DAYS.includes(dateIso);
+    if (isPast || isSunday || isBlocked) { cell.classList.add('past'); }
     else {
       if (isToday) cell.classList.add('today');
       if (state.date && state.date.getDate() === d && state.date.getMonth() === m && state.date.getFullYear() === y) {
@@ -1255,15 +1258,16 @@ function selectTime(slot) {
 
 function updateStep4UI() {
   if (state.services.length === 0 || !state.date || !state.time) return;
-  const s = SERVICES[state.services[0]];
+  const selected = state.services.map(i => SERVICES[i]);
+  const totalPrice = selected.reduce((sum, s) => sum + s.priceNum, 0);
   const d = state.date;
   const dateStr = d.getDate() + ' ' + RU_MONTHS_GEN[d.getMonth()];
   const tagsEl = document.getElementById('booking-tags');
   if (tagsEl) tagsEl.innerHTML =
-    '<span class="booking-tag">' + s.emoji + ' ' + escHtml(s.name) + '</span>' +
+    selected.map(s => '<span class="booking-tag">' + s.emoji + ' ' + escHtml(s.name) + '</span>').join('') +
     '<span class="booking-tag">📅 ' + dateStr + '</span>' +
     '<span class="booking-tag">🕐 ' + state.time + '</span>' +
-    (s.price ? '<span class="booking-tag">💰 ' + s.price + '</span>' : '');
+    (totalPrice > 0 ? '<span class="booking-tag">💰 ' + totalPrice + ' ₽</span>' : '');
   validateStep4();
 }
 

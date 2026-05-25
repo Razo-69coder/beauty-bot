@@ -783,11 +783,13 @@ async def v1_public_master_info(link: str):
     if not master:
         raise HTTPException(404, "Мастер не найден")
     svcs = await get_services(master["id"])
+    blocked = await get_blocked_days(master["id"])
     return {
         "master_name": master["name"],
         "work_start": master["work_start"],
         "work_end": master["work_end"],
         "services": [{"id": s[0], "name": s[1], "price_default": s[2]} for s in svcs],
+        "blocked_days": blocked,
     }
 
 
