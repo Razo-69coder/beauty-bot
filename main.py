@@ -911,9 +911,8 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
         duration_min=service_duration,
     )
     
-    # Task 2: Notify master when web booking arrives
+    date_fmt = _dt.strptime(body.date, "%Y-%m-%d").strftime("%d.%m.%Y")
     try:
-        date_fmt = _dt.strptime(body.date, "%Y-%m-%d").strftime("%d.%m.%Y")
         if master.get("telegram_id"):
             await bot.send_message(
                 master["telegram_id"],
@@ -929,14 +928,17 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
             "Новая запись!",
             f"{body.client_name} — {date_fmt} в {body.time}"
         )
+    except Exception as e:
+        print(f"[NOTIFY] booking telegram/push error: {e}")
+    try:
         await create_notification(
             master["id"], "new_booking",
-            f"📅 Новая запись",
+            "📅 Новая запись",
             f"{body.client_name} · {date_fmt} в {body.time} · {procedure}",
             appt_id
         )
     except Exception as e:
-        print(f"[NOTIFY] booking notification error: {e}")
+        print(f"[NOTIFY] booking create_notification error: {e}")
 
     return {"ok": True, "appointment_id": appt_id, "client_id": client_id, "bot_username": config.BOT_USERNAME}
 
@@ -1032,14 +1034,17 @@ async def my_cancel(slug: str, body: ClientLookupRequest, appointment_id: int):
                 parse_mode="Markdown"
             )
         await push_to_master(master["id"], "Отмена записи", f"{client['name']} отменил(а) запись на {date_fmt}")
+    except Exception as e:
+        print(f"[NOTIFY] cancel telegram/push error: {e}")
+    try:
         await create_notification(
             master["id"], "client_cancel",
-            f"❌ Клиент отменил запись",
+            "❌ Клиент отменил запись",
             f"{client['name']} · {date_fmt} в {appt['time']} · {appt['procedure']}",
             appt["id"]
         )
     except Exception as e:
-        print(f"[NOTIFY] cancel notify error: {e}")
+        print(f"[NOTIFY] cancel create_notification error: {e}")
     return {"ok": True}
 
 
@@ -1113,14 +1118,17 @@ async def my_reschedule(slug: str, body: ClientRescheduleRequest):
                 ]]}
             )
         await push_to_master(master["id"], "Перенос записи", f"{client['name']} перенёс(ла) на {new_date_fmt} {body.new_time}")
+    except Exception as e:
+        print(f"[NOTIFY] reschedule telegram/push error: {e}")
+    try:
         await create_notification(
             master["id"], "client_reschedule",
-            f"🔄 Клиент перенёс запись",
+            "🔄 Клиент перенёс запись",
             f"{client['name']} · с {old_date_fmt} {appt['time']} → {new_date_fmt} {body.new_time} · {appt['procedure']}",
             new_appt_id
         )
     except Exception as e:
-        print(f"[NOTIFY] reschedule notify error: {e}")
+        print(f"[NOTIFY] reschedule create_notification error: {e}")
     return {"ok": True, "new_appointment_id": new_appt_id}
 
 
