@@ -1266,6 +1266,7 @@ def _fmt_appt(r) -> dict:
         "client_name": r.get('client_name') or "",
         "client_phone": r.get('client_phone') or "",
         "service_done_at": str(r['service_done_at']) if r.get('service_done_at') else None,
+        "duration": r.get('duration_min') or 0,
     }
 
 
@@ -1290,7 +1291,7 @@ async def v1_appointments(
             SELECT a.id, a.client_id, a.master_id, a.procedure,
                    a.appointment_date, a.time, a.price, a.notes, a.status,
                    a.deposit_status, a.deposit_amount, a.service_done_at,
-                   c.name as client_name, c.phone as client_phone
+                   a.duration_min, c.name as client_name, c.phone as client_phone
             FROM appointments a JOIN clients c ON c.id=a.client_id
             WHERE {where}
             ORDER BY a.appointment_date DESC, a.time
@@ -1307,7 +1308,7 @@ async def v1_appointment_detail(appt_id: int, master_id: int = Depends(get_jwt_m
             SELECT a.id, a.client_id, a.master_id, a.procedure,
                    a.appointment_date, a.time, a.price, a.notes, a.status,
                    a.deposit_status, a.deposit_amount, a.service_done_at,
-                   c.name as client_name, c.phone as client_phone
+                   a.duration_min, c.name as client_name, c.phone as client_phone
             FROM appointments a JOIN clients c ON c.id=a.client_id
             WHERE a.id=$1 AND a.master_id=$2
         """, appt_id, master_id)
@@ -1425,6 +1426,7 @@ async def v1_schedule(date: str, master_id: int = Depends(get_jwt_master_id)):
             SELECT a.id, a.client_id, a.master_id, a.procedure,
                    a.appointment_date, a.time, a.price, a.notes, a.status,
                    a.deposit_status, a.deposit_amount, a.service_done_at,
+                   a.duration_min,
                    c.name as client_name, c.phone as client_phone
             FROM appointments a JOIN clients c ON c.id=a.client_id
             WHERE a.master_id=$1 AND a.appointment_date=$2
