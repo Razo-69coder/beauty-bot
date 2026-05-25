@@ -1228,7 +1228,9 @@ async function loadTimeSlots() {
   grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:rgba(245,240,235,0.4);padding:20px">Загрузка...</div>';
 
   try {
-    const r = await fetch(API + '/api/v1/book/' + slug + '/slots?date=' + dateStr);
+    const totalDuration = state.services.map(i => SERVICES[i]).reduce((sum, s) => sum + s.durationNum, 0);
+    const durParam = totalDuration > 0 ? '&duration=' + totalDuration : '';
+    const r = await fetch(API + '/api/v1/book/' + slug + '/slots?date=' + dateStr + durParam);
     const data = await r.json();
     const slots = data.slots || [];
     grid.innerHTML = '';

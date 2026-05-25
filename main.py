@@ -795,8 +795,27 @@ async def v1_public_master_info(link: str):
     }
 
 
+def _time_str_to_min(t: str) -> int:
+    parts = t.split(":")
+    return int(parts[0]) * 60 + (int(parts[1]) if len(parts) > 1 else 0)
+
+
+async def _get_busy_min(master_id: int, date: str, default_dur: int) -> list[tuple[int, int]]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT time, COALESCE(NULLIF(duration_min,0),$3) as dur "
+            "FROM appointments WHERE master_id=$1 AND appointment_date=$2 AND status!='cancelled'",
+            master_id, date, default_dur
+        )
+    return [
+        (s := _time_str_to_min(r["time"]), s + r["dur"])
+        for r in rows if r["time"]
+    ]
+
+
 @app.get("/api/v1/book/{link}/slots")
-async def v1_public_slots(link: str, date: str):
+async def v1_public_slots(link: str, date: str, duration: int = 0):
     master = await get_master_by_booking_link(link)
     if not master:
         raise HTTPException(404, "Мастер не найден")
@@ -805,11 +824,23 @@ async def v1_public_slots(link: str, date: str):
         return {"slots": []}
     custom = await get_custom_slots_for_date(master["id"], date)
     if custom:
-        return {"slots": await get_custom_slots_available(master["id"], date)}
-    slots = await get_available_slots(
-        master["id"], date,
-        master["work_start"], master["work_end"], master["slot_duration"]
-    )
+        slots = await get_custom_slots_available(master["id"], date)
+    else:
+        slots = await get_available_slots(
+            master["id"], date,
+            master["work_start"], master["work_end"], master["slot_duration"]
+        )
+    total_dur = duration if duration > master["slot_duration"] else 0
+    if total_dur > 0:
+        busy = await _get_busy_min(master["id"], date, master["slot_duration"])
+        work_end_min = master["work_end"] * 60
+        def fits(slot: str) -> bool:
+            s = _time_str_to_min(slot)
+            e = s + total_dur
+            if e > work_end_min:
+                return False
+            return not any(s < b_end and e > b_start for b_start, b_end in busy)
+        slots = [s for s in slots if fits(s)]
     return {"slots": slots}
 
 
@@ -849,6 +880,12 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
         price = body.price
     if body.duration > 0:
         service_duration = body.duration
+    if service_duration > master["slot_duration"]:
+        busy = await _get_busy_min(master["id"], body.date, master["slot_duration"])
+        s_min = _time_str_to_min(body.time)
+        e_min = s_min + service_duration
+        if any(s_min < b_end and e_min > b_start for b_start, b_end in busy):
+            raise HTTPException(409, "Выбранное время пересекается с другой записью")
     if not procedure:
         procedure = "Запись"
     pool = await get_pool()
