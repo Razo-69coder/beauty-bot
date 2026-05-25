@@ -2080,6 +2080,34 @@ async def create_payment(body: CreatePaymentRequest, master_id: int = Depends(ge
     }
 
 
+class WebPaymentRequest(BaseModel):
+    email: str
+    password: str
+    plan: str = "pro_1m"
+
+
+@app.post("/api/v1/payment/create-web")
+async def create_payment_web(body: WebPaymentRequest):
+    password_hash = hashlib.sha256(body.password.encode()).hexdigest()
+    master = await get_master_by_email(body.email)
+    if not master or master.get("password_hash") != password_hash:
+        raise HTTPException(401, "Неверный email или пароль")
+    if not config.YUKASSA_SHOP_ID or not config.YUKASSA_SECRET_KEY:
+        raise HTTPException(503, "Платёжная система не настроена")
+    plan = PLANS.get(body.plan, PLANS["pro_1m"])
+    payment = Payment.create({
+        "amount": {"value": plan["price"], "currency": "RUB"},
+        "confirmation": {
+            "type": "redirect",
+            "return_url": "https://solvobeauty.vercel.app/pay.html?status=success",
+        },
+        "capture": True,
+        "description": f"Подписка Solvo Beauty — мастер #{master['id']}, {plan['label']}",
+        "metadata": {"master_id": str(master["id"]), "plan": body.plan, "days": str(plan["days"])},
+    }, str(uuid.uuid4()))
+    return {"confirmation_url": payment.confirmation.confirmation_url}
+
+
 @app.post("/api/v1/payment/webhook")
 async def payment_webhook(request: Request):
     body = await request.json()
