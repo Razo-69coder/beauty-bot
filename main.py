@@ -68,13 +68,12 @@ from handlers import booking, schedule, subscriptions, templates, reviews, depos
 
 import time as _time
 
-async def send_push(device_token: str, title: str, body_text: str) -> bool:
+async def send_push_detailed(device_token: str, title: str, body_text: str) -> dict:
     if not all([APNS_KEY_ID, APNS_TEAM_ID, APNS_PRIVATE_KEY, APNS_BUNDLE_ID]):
-        print(f"[APNs] SKIP — missing env vars: KEY_ID={bool(APNS_KEY_ID)} TEAM_ID={bool(APNS_TEAM_ID)} KEY={bool(APNS_PRIVATE_KEY)} BUNDLE={bool(APNS_BUNDLE_ID)}")
-        return False
+        return {"ok": False, "error": "missing_env_vars", "key_id": bool(APNS_KEY_ID), "team_id": bool(APNS_TEAM_ID), "private_key": bool(APNS_PRIVATE_KEY), "bundle_id": bool(APNS_BUNDLE_ID)}
     try:
         import jwt as _jwt
-        token = _jwt.encode(
+        jwt_token = _jwt.encode(
             {"iss": APNS_TEAM_ID, "iat": int(_time.time())},
             APNS_PRIVATE_KEY,
             algorithm="ES256",
@@ -83,7 +82,7 @@ async def send_push(device_token: str, title: str, body_text: str) -> bool:
         host = "api.sandbox.push.apple.com" if APNS_USE_SANDBOX else "api.push.apple.com"
         url = f"https://{host}/3/device/{device_token}"
         headers = {
-            "authorization": f"bearer {token}",
+            "authorization": f"bearer {jwt_token}",
             "apns-topic": APNS_BUNDLE_ID,
             "apns-push-type": "alert",
             "apns-priority": "10",
@@ -93,10 +92,15 @@ async def send_push(device_token: str, title: str, body_text: str) -> bool:
             resp = await client.post(url, json=payload, headers=headers, timeout=10)
             body = resp.text
             print(f"[APNs] status={resp.status_code} body={body!r} token={device_token[:16]}...")
-            return resp.status_code == 200
+            return {"ok": resp.status_code == 200, "status": resp.status_code, "apple_response": body, "host": host, "bundle_id": APNS_BUNDLE_ID, "key_id": APNS_KEY_ID}
     except Exception as e:
         print(f"[APNs] error: {e}")
-        return False
+        return {"ok": False, "error": str(e)}
+
+
+async def send_push(device_token: str, title: str, body_text: str) -> bool:
+    result = await send_push_detailed(device_token, title, body_text)
+    return result.get("ok", False)
 
 
 async def push_to_master(master_id: int, title: str, body_text: str):
@@ -2309,8 +2313,9 @@ async def debug_push_test(master_id: int = Depends(get_jwt_master_id)):
         return {"ok": False, "error": "no_device_tokens", "master_id": master_id}
     results = []
     for t in tokens:
-        ok = await send_push(t, "Тест пуша", "Если видишь это — push работает ✅")
-        results.append({"token": t[:16] + "...", "sent": ok})
+        detail = await send_push_detailed(t, "Тест пуша", "Если видишь это — push работает ✅")
+        detail["token"] = t[:16] + "..."
+        results.append(detail)
     return {"ok": True, "master_id": master_id, "results": results}
 
 
