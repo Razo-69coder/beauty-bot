@@ -933,6 +933,177 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
     return {"ok": True, "appointment_id": appt_id, "client_id": client_id, "bot_username": config.BOT_USERNAME}
 
 
+# ── Управление записью клиентом (отмена/перенос) ─────────────────────
+
+class ClientLookupRequest(BaseModel):
+    phone: str
+
+class ClientRescheduleRequest(BaseModel):
+    phone: str
+    appointment_id: int
+    new_date: str
+    new_time: str
+    duration: int = 0
+
+
+@app.post("/api/v1/my/{slug}/lookup")
+async def my_lookup(slug: str, body: ClientLookupRequest):
+    master = await get_master_by_booking_link(slug)
+    if not master:
+        raise HTTPException(404, "Мастер не найден")
+    phone = body.phone.strip()
+    if not phone.startswith("+"):
+        phone = "+" + phone.lstrip("+")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        client = await conn.fetchrow(
+            "SELECT id, name FROM clients WHERE master_id=$1 AND phone=$2",
+            master["id"], phone
+        )
+        if not client:
+            return {"appointments": [], "client_name": ""}
+        today = _dt.now().strftime("%Y-%m-%d")
+        rows = await conn.fetch(
+            """SELECT a.id, a.procedure, a.appointment_date, a.time,
+                      a.price, a.status, a.duration_min
+               FROM appointments a
+               WHERE a.master_id=$1 AND a.client_id=$2
+                 AND a.appointment_date >= $3 AND a.status != 'cancelled'
+               ORDER BY a.appointment_date, a.time""",
+            master["id"], client["id"], today
+        )
+    return {
+        "client_name": client["name"],
+        "appointments": [
+            {
+                "id": r["id"],
+                "procedure": r["procedure"],
+                "date": str(r["appointment_date"])[:10],
+                "time": r["time"],
+                "price": r["price"],
+                "status": r["status"],
+                "duration_min": r["duration_min"] or 0,
+            }
+            for r in rows
+        ]
+    }
+
+
+@app.post("/api/v1/my/{slug}/cancel")
+async def my_cancel(slug: str, body: ClientLookupRequest, appointment_id: int):
+    master = await get_master_by_booking_link(slug)
+    if not master:
+        raise HTTPException(404, "Мастер не найден")
+    phone = body.phone.strip()
+    if not phone.startswith("+"):
+        phone = "+" + phone.lstrip("+")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        client = await conn.fetchrow(
+            "SELECT id, name FROM clients WHERE master_id=$1 AND phone=$2",
+            master["id"], phone
+        )
+        if not client:
+            raise HTTPException(403, "Клиент не найден")
+        appt = await conn.fetchrow(
+            "SELECT id, procedure, appointment_date, time FROM appointments WHERE id=$1 AND master_id=$2 AND client_id=$3 AND status!='cancelled'",
+            appointment_id, master["id"], client["id"]
+        )
+        if not appt:
+            raise HTTPException(404, "Запись не найдена")
+        await conn.execute("UPDATE appointments SET status='cancelled' WHERE id=$1", appt["id"])
+    date_fmt = _dt.strptime(str(appt["appointment_date"])[:10], "%Y-%m-%d").strftime("%d.%m.%Y")
+    try:
+        if master.get("telegram_id"):
+            await bot.send_message(
+                master["telegram_id"],
+                f"❌ *Клиент отменил запись*\n\n"
+                f"👤 {client['name']}\n"
+                f"📅 {date_fmt} в {appt['time']}\n"
+                f"💅 {appt['procedure']}",
+                parse_mode="Markdown"
+            )
+        await push_to_master(master["id"], "Отмена записи", f"{client['name']} отменил(а) запись на {date_fmt}")
+    except Exception as e:
+        print(f"[NOTIFY] cancel notify error: {e}")
+    return {"ok": True}
+
+
+@app.post("/api/v1/my/{slug}/reschedule")
+async def my_reschedule(slug: str, body: ClientRescheduleRequest):
+    master = await get_master_by_booking_link(slug)
+    if not master:
+        raise HTTPException(404, "Мастер не найден")
+    phone = body.phone.strip()
+    if not phone.startswith("+"):
+        phone = "+" + phone.lstrip("+")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        client = await conn.fetchrow(
+            "SELECT id, name FROM clients WHERE master_id=$1 AND phone=$2",
+            master["id"], phone
+        )
+        if not client:
+            raise HTTPException(403, "Клиент не найден")
+        appt = await conn.fetchrow(
+            "SELECT id, procedure, appointment_date, time, price, duration_min FROM appointments WHERE id=$1 AND master_id=$2 AND client_id=$3 AND status!='cancelled'",
+            body.appointment_id, master["id"], client["id"]
+        )
+        if not appt:
+            raise HTTPException(404, "Запись не найдена")
+    # Проверяем что новый слот свободен
+    blocked = await get_blocked_days(master["id"])
+    if body.new_date in blocked:
+        raise HTTPException(409, "Этот день недоступен")
+    slots = await get_available_slots(
+        master["id"], body.new_date,
+        master["work_start"], master["work_end"], master["slot_duration"]
+    )
+    if body.new_time not in slots:
+        raise HTTPException(409, "Выбранное время уже занято")
+    total_dur = body.duration or appt["duration_min"] or master["slot_duration"]
+    if total_dur > master["slot_duration"]:
+        busy = await _get_busy_min(master["id"], body.new_date, master["slot_duration"])
+        s_min = _time_str_to_min(body.new_time)
+        if any(s_min < b_end and s_min + total_dur > b_start for b_start, b_end in busy):
+            raise HTTPException(409, "Выбранное время пересекается с другой записью")
+    # Отменяем старую, создаём новую
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE appointments SET status='cancelled' WHERE id=$1", appt["id"])
+    new_appt_id = await add_appointment(
+        client_id=client["id"],
+        master_id=master["id"],
+        procedure=appt["procedure"],
+        appointment_date=body.new_date,
+        time=body.new_time,
+        price=appt["price"],
+        status="pending",
+        duration_min=total_dur,
+    )
+    old_date_fmt = _dt.strptime(str(appt["appointment_date"])[:10], "%Y-%m-%d").strftime("%d.%m.%Y")
+    new_date_fmt = _dt.strptime(body.new_date, "%Y-%m-%d").strftime("%d.%m.%Y")
+    try:
+        if master.get("telegram_id"):
+            await bot.send_message(
+                master["telegram_id"],
+                f"🔄 *Клиент перенёс запись*\n\n"
+                f"👤 {client['name']}\n"
+                f"📅 С {old_date_fmt} {appt['time']} → на {new_date_fmt} {body.new_time}\n"
+                f"💅 {appt['procedure']}\n\n"
+                f"Подтвердите новое время:",
+                parse_mode="Markdown",
+                reply_markup={"inline_keyboard": [[
+                    {"text": "✅ Подтвердить", "callback_data": f"confirm_{new_appt_id}"},
+                    {"text": "❌ Отменить", "callback_data": f"cancel_{new_appt_id}"}
+                ]]}
+            )
+        await push_to_master(master["id"], "Перенос записи", f"{client['name']} перенёс(ла) на {new_date_fmt} {body.new_time}")
+    except Exception as e:
+        print(f"[NOTIFY] reschedule notify error: {e}")
+    return {"ok": True, "new_appointment_id": new_appt_id}
+
+
 @app.get("/api/v1/telegram-link-token")
 async def v1_telegram_link_token(master_id: int = Depends(get_jwt_master_id)):
     from datetime import datetime, timedelta
