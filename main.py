@@ -373,6 +373,7 @@ class PublicBookingRequest(BaseModel):
     time: str
     birthday: str = ""
     price: int = 0
+    duration: int = 0
 
 
 class LoyaltySettingsRequest(BaseModel):
@@ -789,7 +790,7 @@ async def v1_public_master_info(link: str):
         "master_name": master["name"],
         "work_start": master["work_start"],
         "work_end": master["work_end"],
-        "services": [{"id": s[0], "name": s[1], "price_default": s[2]} for s in svcs],
+        "services": [{"id": s[0], "name": s[1], "price_default": s[2], "duration_min": s[3] if len(s) > 3 else 0} for s in svcs],
         "blocked_days": blocked,
     }
 
@@ -841,10 +842,13 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
                     procedure = s[1]
                 if not body.price:
                     price = s[2] or 0
-                service_duration = s[3] if len(s) > 3 else 0
+                if not body.duration:
+                    service_duration = s[3] if len(s) > 3 else 0
                 break
     if body.price > 0:
         price = body.price
+    if body.duration > 0:
+        service_duration = body.duration
     if not procedure:
         procedure = "Запись"
     pool = await get_pool()

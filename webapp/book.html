@@ -1061,6 +1061,7 @@ async function init() {
       name: s.name,
       price: s.price_default ? s.price_default + ' ₽' : '',
       priceNum: s.price_default || 0,
+      durationNum: s.duration_min || 0,
       emoji: getEmoji(s.name),
     }));
     document.querySelectorAll('.master-name').forEach(el => el.textContent = masterName);
@@ -1303,6 +1304,7 @@ async function submitBooking() {
   const selected = state.services.map(i => SERVICES[i]);
   const procedure = selected.map(s => s.name).join(' + ');
   const totalPrice = selected.reduce((sum, s) => sum + s.priceNum, 0);
+  const totalDuration = selected.reduce((sum, s) => sum + s.durationNum, 0);
   const firstService = selected[0];
   const d = state.date;
   const name = document.getElementById('inp-name').value.trim();
@@ -1330,6 +1332,7 @@ async function submitBooking() {
         service_id: firstService.id,
         procedure: procedure,
         price: totalPrice,
+        duration: totalDuration,
         date: dateStr,
         time: state.time,
         birthday: birthday,
