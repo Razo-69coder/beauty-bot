@@ -238,6 +238,19 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        # Welcome-уведомление для всех мастеров (только один раз)
+        existing = await conn.fetchval(
+            "SELECT COUNT(*) FROM notifications WHERE type='broadcast'"
+        )
+        if existing == 0:
+            masters = await conn.fetch("SELECT id FROM masters")
+            for m in masters:
+                await conn.execute(
+                    """INSERT INTO notifications (master_id, type, title, body)
+                       VALUES ($1, 'broadcast', '✦ Добро пожаловать в Solvo Beauty!',
+                       'Здесь будут появляться новые записи, отмены и переносы от клиентов, а также важные обновления приложения. Нажимай на запись — прямо отсюда можно подтвердить или отменить.')""",
+                    m['id']
+                )
 
 
 # ── Мастера ───────────────────────────────────────────────────────────
