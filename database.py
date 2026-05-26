@@ -435,25 +435,37 @@ async def update_reminder_days_by_master(master_id: int, days: int):
 
 # ── Клиенты ───────────────────────────────────────────────────────────
 
+def _normalize_phone(phone: str) -> str:
+    """Возвращает только цифры с заменой 8→7 для РФ номеров."""
+    digits = ''.join(filter(str.isdigit, phone or ''))
+    if digits.startswith('8') and len(digits) == 11:
+        digits = '7' + digits[1:]
+    return digits
+
+
 async def add_client(master_id: int, name: str, phone: str, notes: str = "", birthday: str = "") -> int:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        # Нормализуем телефон — только цифры
-        digits = ''.join(filter(str.isdigit, phone or ''))
-        if digits.startswith('8') and len(digits) == 11:
-            digits = '7' + digits[1:]
+        digits = _normalize_phone(phone)
+        # Сохраняем в стандартном формате +7XXXXXXXXXX
+        normalized_phone = ('+' + digits) if digits else (phone or '')
 
-        # Проверяем дубль
+        # Проверяем дубль — нормализуем обе стороны (8→7)
         existing = await conn.fetchrow(
-            "SELECT id FROM clients WHERE master_id=$1 AND regexp_replace(phone, '[^0-9]', '', 'g') = $2",
+            """SELECT id FROM clients WHERE master_id=$1 AND (
+                 CASE WHEN regexp_replace(phone,'[^0-9]','','g') ~ '^8[0-9]{10}$'
+                      THEN '7' || substring(regexp_replace(phone,'[^0-9]','','g'), 2)
+                      ELSE regexp_replace(phone,'[^0-9]','','g')
+                 END
+               ) = $2""",
             master_id, digits
         )
         if existing:
-            return existing['id']  # возвращаем существующего клиента
+            return existing['id']
 
         row = await conn.fetchrow(
             "INSERT INTO clients (master_id, name, phone, notes, birthday) VALUES ($1,$2,$3,$4,$5) RETURNING id",
-            master_id, name, phone, notes, birthday if birthday else None
+            master_id, name, normalized_phone, notes, birthday if birthday else None
         )
     return row['id']
 
