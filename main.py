@@ -1,4 +1,5 @@
 import asyncio
+import bcrypt
 import hmac
 import hashlib
 import json
@@ -32,6 +33,9 @@ from config import BOT_TOKEN, WEBHOOK_URL, WEBHOOK_SECRET
 import jwt
 import httpx
 from datetime import datetime as _dt, timedelta as _td
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from database import (
     init_db, get_or_create_master, get_clients, get_client,
@@ -180,6 +184,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 
 # ── Health checks (для keep-alive) ─────────────────────────────────────
 @app.get("/health")
@@ -290,7 +298,7 @@ async def get_master_id(
 # ── JWT утилиты (определены здесь — до всех JWT-эндпоинтов) ──────────
 
 def _jwt_secret() -> str:
-    return BOT_TOKEN or "beauty_fallback_secret"
+    return config.JWT_SECRET or BOT_TOKEN or "beauty_fallback_secret"
 
 def _create_jwt(telegram_id: int, master_id: int) -> str:
     return jwt.encode(
@@ -306,7 +314,7 @@ def _decode_jwt(token: str) -> dict | None:
 
 def _generate_jwt(master_id: int) -> str:
     return jwt.encode(
-        {"mid": master_id, "exp": _dt.utcnow() + _td(days=365)},
+        {"mid": master_id, "exp": _dt.utcnow() + _td(days=30)},
         _jwt_secret(), algorithm="HS256"
     )
 
@@ -708,9 +716,10 @@ async def auth_verify_code(body: _VerifyCodeOnly):
 # ── API: Email/Password авторизация ───────────────────────────────
 
 @app.post("/api/v1/auth/register")
-async def register(body: EmailRegisterRequest):
+@limiter.limit("5/minute")
+async def register(request: Request, body: EmailRegisterRequest):
     try:
-        password_hash = hashlib.sha256(body.password.encode()).hexdigest()
+        password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
 
         existing = await get_master_by_email(body.email)
         if existing:
@@ -743,10 +752,17 @@ async def register(body: EmailRegisterRequest):
 
 
 @app.post("/api/v1/auth/login")
-async def login(body: EmailLoginRequest):
-    password_hash = hashlib.sha256(body.password.encode()).hexdigest()
+@limiter.limit("5/minute")
+async def login(request: Request, body: EmailLoginRequest):
     master = await get_master_by_email(body.email)
-    if not master or master.get("password_hash") != password_hash:
+    if not master:
+        raise HTTPException(401, "Неверный email или пароль")
+    stored = master.get("password_hash") or ""
+    try:
+        ok = bcrypt.checkpw(body.password.encode(), stored.encode())
+    except ValueError:
+        ok = stored == hashlib.sha256(body.password.encode()).hexdigest()
+    if not ok:
         raise HTTPException(401, "Неверный email или пароль")
     
     token = _generate_jwt(master["id"])
@@ -2403,9 +2419,15 @@ class WebPaymentRequest(BaseModel):
 
 @app.post("/api/v1/payment/create-web")
 async def create_payment_web(body: WebPaymentRequest):
-    password_hash = hashlib.sha256(body.password.encode()).hexdigest()
     master = await get_master_by_email(body.email)
-    if not master or master.get("password_hash") != password_hash:
+    if not master:
+        raise HTTPException(401, "Неверный email или пароль")
+    stored = master.get("password_hash") or ""
+    try:
+        ok = bcrypt.checkpw(body.password.encode(), stored.encode())
+    except ValueError:
+        ok = stored == hashlib.sha256(body.password.encode()).hexdigest()
+    if not ok:
         raise HTTPException(401, "Неверный email или пароль")
     if not config.YUKASSA_SHOP_ID or not config.YUKASSA_SECRET_KEY:
         raise HTTPException(503, "Платёжная система не настроена")
