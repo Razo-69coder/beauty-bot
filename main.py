@@ -1670,7 +1670,7 @@ async def v1_update_status(appt_id: int, body: StatusUpdate, master_id: int = De
         raise HTTPException(400, "Неверный статус")
     await update_appointment_status(appt_id, body.status)
     try:
-        client_tg = appt.get("client_telegram_id")
+        client_tg = appt.get("client_tg_id")
         date_str = str(appt.get("appointment_date", ""))
         time_str = appt.get("time", "")
         procedure = appt.get("procedure", "")
