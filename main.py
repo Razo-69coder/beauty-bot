@@ -1494,7 +1494,7 @@ async def v1_earnings_by_range(start: str, end: str, master_id: int = Depends(ge
 
 @app.get("/api/v1/clients")
 async def v1_clients(page: int = 0, search: str = "", master_id: int = Depends(get_jwt_master_id)):
-    page_size = 20
+    page_size = 200
     if search:
         rows = await search_clients(master_id, search)
         clients = [
