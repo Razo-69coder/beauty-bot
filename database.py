@@ -579,6 +579,48 @@ async def search_clients(master_id: int, query: str) -> list:
     return [c for c in all_clients if q in c[1].lower()]
 
 
+async def merge_duplicate_clients(master_id: int) -> dict:
+    """Находит дубликаты клиентов по нормализованному телефону,
+    переносит все appointments на первую карточку, удаляет дубли."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT id, name, phone,
+                   regexp_replace(COALESCE(phone,''),'[^0-9]','','g') as digits
+            FROM clients WHERE master_id=$1
+        """, master_id)
+    groups: dict[str, list[dict]] = {}
+    for r in rows:
+        d = r['digits']
+        if d.startswith('8') and len(d) == 11:
+            d = '7' + d[1:]
+        if len(d) < 3:
+            continue
+        groups.setdefault(d, []).append({"id": r['id'], "name": r['name'], "phone": r['phone']})
+
+    merged = 0
+    async with pool.acquire() as conn:
+        for digits, clients in groups.items():
+            if len(clients) < 2:
+                continue
+            clients.sort(key=lambda c: c['id'])
+            keep = clients[0]
+            for dup in clients[1:]:
+                await conn.execute(
+                    "UPDATE appointments SET client_id=$1 WHERE client_id=$2",
+                    keep['id'], dup['id']
+                )
+                await conn.execute(
+                    "UPDATE subscriptions SET client_id=$1 WHERE client_id=$2",
+                    keep['id'], dup['id']
+                )
+                await conn.execute(
+                    "DELETE FROM clients WHERE id=$1", dup['id']
+                )
+                merged += 1
+    return {"merged": merged}
+
+
 async def get_inactive_clients(master_id: int, days: int) -> list:
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -624,7 +666,6 @@ async def get_client_history(client_id: int) -> list:
             FROM appointments
             WHERE client_id=$1
             ORDER BY appointment_date DESC
-            LIMIT 10
         """, client_id)
     return [(r['procedure'], r['appointment_date'], r['price'], r['notes'], r['photo_id']) for r in rows]
 

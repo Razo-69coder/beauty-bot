@@ -47,7 +47,7 @@ from database import (
     get_master_schedule, update_appointment_status,
     create_login_code, verify_login_code, verify_login_code_by_code,
     get_master_full, update_master_full_settings, update_master_loyalty_settings, update_master_payment, update_master_timezone,
-    search_clients,
+    search_clients, merge_duplicate_clients,
     get_services, add_service, delete_service, update_service,
     get_earnings_by_service, get_earnings_by_client, get_earnings_by_day, get_earnings_by_period,
     get_appointment_with_client, update_appointment_service_done,
@@ -1534,6 +1534,11 @@ async def v1_client_detail(client_id: int, master_id: int = Depends(get_jwt_mast
         "telegram_id": client.get("telegram_id"), "history": history,
     }
 
+
+@app.post("/api/v1/clients/merge-duplicates")
+async def v1_merge_clients(master_id: int = Depends(get_jwt_master_id)):
+    result = await merge_duplicate_clients(master_id)
+    return result
 
 @app.post("/api/v1/clients", status_code=201)
 async def v1_create_client(body: _V1ClientCreate, master_id: int = Depends(get_jwt_master_id)):
