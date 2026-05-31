@@ -54,7 +54,7 @@ from database import (
     DB_PATH,
 )
 import aiosqlite
-from api.database import get_client_by_phone, get_yearly_stats, get_reminder_template, get_reminder_template_with_enabled, upsert_reminder_template, get_all_reminder_templates
+from api.database import get_client_by_phone, get_yearly_stats, get_reminder_template, get_reminder_template_with_enabled, upsert_reminder_template, get_all_reminder_templates, get_personal_notes, create_personal_note, delete_personal_note
 from models import (
     ClientCreate, ClientUpdate, AppointmentCreate, ReminderUpdate,
     PublicBooking, RequestCode, VerifyCode, MasterSettings, PaymentUpdate,
@@ -879,4 +879,32 @@ async def update_template(
     master_id: int = Depends(get_jwt_master_id),
 ):
     await upsert_reminder_template(master_id, template_type, body.template, body.enabled)
+    return {"ok": True}
+
+
+# ─── Личные заметки ────────────────────────────────────────────────────
+
+class PersonalNoteCreate(BaseModel):
+    date: str
+    time: str
+    text: str
+
+
+@app.get("/api/v1/notes")
+async def get_notes(date: str, master_id: int = Depends(get_jwt_master_id)):
+    notes = await get_personal_notes(master_id, date)
+    return {"notes": notes}
+
+
+@app.post("/api/v1/notes")
+async def add_note(body: PersonalNoteCreate, master_id: int = Depends(get_jwt_master_id)):
+    note_id = await create_personal_note(master_id, body.date, body.time, body.text)
+    return {"id": note_id, "ok": True}
+
+
+@app.delete("/api/v1/notes/{note_id}")
+async def remove_note(note_id: int, master_id: int = Depends(get_jwt_master_id)):
+    deleted = await delete_personal_note(master_id, note_id)
+    if not deleted:
+        raise HTTPException(404, "Заметка не найдена")
     return {"ok": True}

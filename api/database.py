@@ -78,6 +78,16 @@ async def init_db():
                 UNIQUE(master_id, type)
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS personal_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                master_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                time TEXT NOT NULL DEFAULT '09:00',
+                text TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         # Миграции для существующих баз
         for migration in [
             "ALTER TABLE masters ADD COLUMN reminder_days INTEGER DEFAULT 40",
@@ -808,6 +818,35 @@ async def upsert_reminder_template(master_id: int, template_type: str, template:
             (master_id, template_type, template, 1 if enabled else 0)
         )
         await db.commit()
+
+
+async def get_personal_notes(master_id: int, date_str: str) -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT id, date, time, text FROM personal_notes WHERE master_id=? AND date=? ORDER BY time",
+            (master_id, date_str)
+        ) as c:
+            rows = await c.fetchall()
+    return [{"id": r[0], "date": r[1], "time": r[2], "text": r[3]} for r in rows]
+
+
+async def create_personal_note(master_id: int, date_str: str, time_str: str, text: str) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "INSERT INTO personal_notes (master_id, date, time, text) VALUES (?, ?, ?, ?)",
+            (master_id, date_str, time_str, text)
+        )
+        await db.commit()
+        return cursor.lastrowid
+
+
+async def delete_personal_note(master_id: int, note_id: int) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        result = await db.execute(
+            "DELETE FROM personal_notes WHERE id=? AND master_id=?", (note_id, master_id)
+        )
+        await db.commit()
+        return result.rowcount > 0
 
 
 async def get_all_reminder_templates(master_id: int) -> list[dict]:
