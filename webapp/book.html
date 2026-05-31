@@ -791,6 +791,58 @@
     letter-spacing: 0.03em;
   }
 
+  /* ── Inline slots preview (step 2) ── */
+  .slots-preview-wrap {
+    margin: 12px 16px 0;
+    display: none;
+  }
+  .slots-preview-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    padding-inline-start: 2px;
+  }
+  .slots-preview-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .slot-chip {
+    padding: 9px 16px;
+    border-radius: 30px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .slot-chip:hover {
+    border-color: rgba(255,107,157,0.4);
+    background: rgba(255,107,157,0.07);
+  }
+  .slot-chip.selected {
+    background: rgba(255,107,157,0.15);
+    border-color: var(--pink);
+    color: var(--pink);
+    font-weight: 600;
+    box-shadow: 0 0 12px var(--glow-pink);
+  }
+  .slots-preview-empty {
+    font-size: 13px;
+    color: var(--muted);
+    padding: 4px 2px;
+  }
+  .slots-preview-loading {
+    font-size: 13px;
+    color: var(--muted);
+    padding: 4px 2px;
+  }
+
   /* ── Decorative gradient lines ── */
   .gradient-line {
     height: 1px;
@@ -899,13 +951,18 @@
 
       <div class="selected-date-display" id="selected-date-display" style="display:none"></div>
 
+      <div class="slots-preview-wrap" id="slots-preview-wrap">
+        <div class="slots-preview-label">Свободное время</div>
+        <div class="slots-preview-grid" id="slots-preview-grid"></div>
+      </div>
+
       <button class="btn-back" onclick="goToStep(1)">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 11L5 7L9 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Назад
       </button>
 
       <div class="cta-wrap">
-        <button class="btn-cta" id="btn-step2" onclick="goToStep(3)" disabled>Выбрать время →</button>
+        <button class="btn-cta" id="btn-step2" onclick="onStep2Next()" disabled>Выбрать время →</button>
       </div>
     </div>
 
@@ -1213,6 +1270,71 @@ function selectDate(y, m, d) {
   const el = document.getElementById('selected-date-display');
   if (el) { el.textContent = display; el.style.display = 'block'; }
   document.getElementById('btn-step2').disabled = false;
+  updateStep2Button();
+  loadSlotsPreview();
+}
+
+function updateStep2Button() {
+  const btn = document.getElementById('btn-step2');
+  if (!btn) return;
+  if (state.time) {
+    btn.textContent = 'Продолжить: ' + state.time + ' →';
+  } else {
+    btn.textContent = 'Выбрать время →';
+  }
+}
+
+function onStep2Next() {
+  if (state.time) {
+    goToStep(4);
+  } else {
+    goToStep(3);
+  }
+}
+
+async function loadSlotsPreview() {
+  if (!state.date) return;
+  const wrap = document.getElementById('slots-preview-wrap');
+  const grid = document.getElementById('slots-preview-grid');
+  if (!wrap || !grid) return;
+  wrap.style.display = 'block';
+  grid.innerHTML = '<span class="slots-preview-loading">Загрузка...</span>';
+
+  const d = state.date;
+  const dateStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  try {
+    const totalDuration = state.services.map(i => SERVICES[i]).reduce((sum, s) => sum + s.durationNum, 0);
+    const durParam = totalDuration > 0 ? '&duration=' + totalDuration : '';
+    const r = await fetch(API + '/api/v1/book/' + slug + '/slots?date=' + dateStr + durParam);
+    const data = await r.json();
+    const slots = data.slots || [];
+    grid.innerHTML = '';
+    if (slots.length === 0) {
+      grid.innerHTML = '<span class="slots-preview-empty">Нет свободного времени</span>';
+      return;
+    }
+    slots.forEach(slot => {
+      const chip = document.createElement('div');
+      chip.className = 'slot-chip' + (state.time === slot ? ' selected' : '');
+      chip.textContent = slot;
+      chip.addEventListener('click', () => selectTimeFromPreview(slot));
+      grid.appendChild(chip);
+    });
+  } catch(e) {
+    grid.innerHTML = '<span class="slots-preview-empty">Ошибка загрузки</span>';
+  }
+}
+
+function selectTimeFromPreview(slot) {
+  state.time = slot;
+  document.querySelectorAll('.slot-chip').forEach(c => {
+    c.classList.toggle('selected', c.textContent === slot);
+  });
+  document.querySelectorAll('.time-slot').forEach(b => {
+    b.classList.toggle('selected', b.textContent === slot);
+  });
+  document.getElementById('btn-step3').disabled = false;
+  updateStep2Button();
 }
 
 async function loadTimeSlots() {
