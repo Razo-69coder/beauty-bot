@@ -63,6 +63,7 @@ from database import (
     get_device_tokens_for_master,
     create_notification, get_notifications, get_unread_count,
     mark_notification_read, mark_all_notifications_read, broadcast_notification,
+    get_personal_notes, create_personal_note, delete_personal_note,
 )
 
 from scheduler import setup_scheduler
@@ -2516,3 +2517,31 @@ async def get_waitlist_list(secret: str = ""):
     from database import get_waitlist
     items = await get_waitlist()
     return {"count": len(items), "emails": items}
+
+
+# ── Личные заметки ────────────────────────────────────────────────────
+
+class PersonalNoteCreate(BaseModel):
+    date: str
+    time: str
+    text: str
+
+
+@app.get("/api/v1/notes")
+async def api_get_notes(date: str, master_id: int = Depends(get_jwt_master_id)):
+    notes = await get_personal_notes(master_id, date)
+    return {"notes": notes}
+
+
+@app.post("/api/v1/notes")
+async def api_create_note(body: PersonalNoteCreate, master_id: int = Depends(get_jwt_master_id)):
+    note_id = await create_personal_note(master_id, body.date, body.time, body.text)
+    return {"id": note_id, "ok": True}
+
+
+@app.delete("/api/v1/notes/{note_id}")
+async def api_delete_note(note_id: int, master_id: int = Depends(get_jwt_master_id)):
+    deleted = await delete_personal_note(master_id, note_id)
+    if not deleted:
+        raise HTTPException(404, "Заметка не найдена")
+    return {"ok": True}

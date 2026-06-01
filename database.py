@@ -238,6 +238,16 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS personal_notes (
+                id SERIAL PRIMARY KEY,
+                master_id INTEGER REFERENCES masters(id) ON DELETE CASCADE,
+                date TEXT NOT NULL,
+                time TEXT NOT NULL DEFAULT '09:00',
+                text TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         # Welcome-уведомление для всех мастеров (только один раз)
         existing = await conn.fetchval(
             "SELECT COUNT(*) FROM notifications WHERE type='broadcast'"
@@ -1825,3 +1835,35 @@ async def get_master_trial_status(master_id: int) -> dict | None:
         "is_trial": is_trial,
         "is_active": bool(row["is_active"]),
     }
+
+
+# ── Личные заметки ────────────────────────────────────────────────────
+
+async def get_personal_notes(master_id: int, date_str: str) -> list:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, date, time, text FROM personal_notes WHERE master_id=$1 AND date=$2 ORDER BY time",
+            master_id, date_str
+        )
+    return [{"id": r["id"], "date": r["date"], "time": r["time"], "text": r["text"]} for r in rows]
+
+
+async def create_personal_note(master_id: int, date_str: str, time_str: str, text: str) -> int:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO personal_notes (master_id, date, time, text) VALUES ($1, $2, $3, $4) RETURNING id",
+            master_id, date_str, time_str, text
+        )
+    return row["id"]
+
+
+async def delete_personal_note(master_id: int, note_id: int) -> bool:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            "DELETE FROM personal_notes WHERE id=$1 AND master_id=$2",
+            note_id, master_id
+        )
+    return result == "DELETE 1"
