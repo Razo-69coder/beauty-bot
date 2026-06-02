@@ -759,10 +759,14 @@ async def login(request: Request, body: EmailLoginRequest):
     if not master:
         raise HTTPException(401, "Неверный email или пароль")
     stored = master.get("password_hash") or ""
-    try:
-        ok = bcrypt.checkpw(body.password.encode(), stored.encode())
-    except ValueError:
-        ok = stored == hashlib.sha256(body.password.encode()).hexdigest()
+    # Быстрый путь для demo-аккаунта (Apple Review)
+    if body.email == "test@solvobeauty.com" and body.password == "TestSolvo123!":
+        ok = True
+    else:
+        try:
+            ok = bcrypt.checkpw(body.password.encode(), stored.encode())
+        except ValueError:
+            ok = stored == hashlib.sha256(body.password.encode()).hexdigest()
     if not ok:
         raise HTTPException(401, "Неверный email или пароль")
     
