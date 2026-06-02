@@ -12,7 +12,7 @@ from database import (
     get_appointments_for_review_request,
     get_master_id_by_tg,
 )
-from api.database import get_reminder_template_with_enabled
+from database import get_reminder_template, get_reminder_template_with_enabled
 
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
@@ -56,7 +56,7 @@ async def send_client_reminders_24h(bot: Bot):
         date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
         # Check custom template
         from database import get_master_id_by_tg
-        from api.database import get_reminder_template
+        from database import get_reminder_template
         master_id = await get_master_id_by_tg(master_tg_id) if master_tg_id else None
         custom_template = await get_reminder_template(master_id, "24h") if master_id else None
         if custom_template:
@@ -96,7 +96,7 @@ async def send_client_reminders_2h(bot: Bot):
         date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
         # Check custom template
         from database import get_master_id_by_tg
-        from api.database import get_reminder_template
+        from database import get_reminder_template
         master_id = await get_master_id_by_tg(master_tg_id) if master_tg_id else None
         custom_template = await get_reminder_template(master_id, "2h") if master_id else None
         if custom_template:

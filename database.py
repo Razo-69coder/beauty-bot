@@ -1650,6 +1650,30 @@ _DEFAULT_TEMPLATES = {
 _ALL_TYPES = list(_DEFAULT_TEMPLATES.keys())
 
 
+async def get_reminder_template(master_id: int, template_type: str) -> str | None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT template, enabled FROM reminder_templates WHERE master_id=$1 AND type=$2",
+            master_id, template_type
+        )
+    if row and row['enabled']:
+        return row['template'] or None
+    return None
+
+
+async def get_reminder_template_with_enabled(master_id: int, template_type: str) -> tuple:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT template, enabled FROM reminder_templates WHERE master_id=$1 AND type=$2",
+            master_id, template_type
+        )
+    if row:
+        return row['template'] or None, bool(row['enabled'])
+    return None, True
+
+
 async def get_reminder_templates_v1(master_id: int) -> list[dict]:
     pool = await get_pool()
     async with pool.acquire() as conn:
