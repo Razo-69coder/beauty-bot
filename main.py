@@ -2359,6 +2359,42 @@ async def admin_test_reminders(
         raise HTTPException(400, "reminder_type должен быть 24h или 2h")
 
 
+@app.get("/api/admin/check-appointments")
+async def admin_check_appointments(days: int = 7):
+    """Показывает ближайшие записи и есть ли у клиентов Telegram. Ничего не отправляет."""
+    from database import get_pool
+    from scheduler import now_msk
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT a.id, a.appointment_date, a.time, a.procedure,
+                   c.name as client_name, c.telegram_id,
+                   a.reminder_24h_sent, a.reminder_2h_sent
+            FROM appointments a
+            JOIN clients c ON c.id = a.client_id
+            WHERE a.appointment_date BETWEEN CURRENT_DATE AND CURRENT_DATE + $1
+              AND a.status != 'cancelled'
+            ORDER BY a.appointment_date, a.time
+        """, days)
+    result = []
+    for r in rows:
+        result.append({
+            "id": r["id"],
+            "date": str(r["appointment_date"]),
+            "time": r["time"],
+            "procedure": r["procedure"],
+            "client": r["client_name"],
+            "has_telegram": r["telegram_id"] is not None,
+            "reminder_24h_sent": bool(r["reminder_24h_sent"]),
+            "reminder_2h_sent": bool(r["reminder_2h_sent"]),
+        })
+    return {
+        "total": len(result),
+        "with_telegram": sum(1 for x in result if x["has_telegram"]),
+        "appointments": result
+    }
+
+
 @app.get("/admin/")
 @app.get("/admin")
 async def serve_admin():
