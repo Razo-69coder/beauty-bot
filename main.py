@@ -2340,6 +2340,25 @@ async def debug_push_test(master_id: int = Depends(get_jwt_master_id)):
     return {"ok": True, "master_id": master_id, "results": results}
 
 
+@app.post("/api/admin/test-reminders")
+async def admin_test_reminders(
+    reminder_type: str = "24h",
+    token: str = "",
+):
+    """Ручной запуск напоминаний для отладки. reminder_type: 24h | 2h"""
+    if token != ADMIN_SECRET:
+        raise HTTPException(403, "Forbidden")
+    from scheduler import send_client_reminders_24h, send_client_reminders_2h
+    if reminder_type == "24h":
+        await send_client_reminders_24h(bot)
+        return {"ok": True, "type": "24h", "message": "Запущено — смотри логи Render"}
+    elif reminder_type == "2h":
+        await send_client_reminders_2h(bot)
+        return {"ok": True, "type": "2h", "message": "Запущено — смотри логи Render"}
+    else:
+        raise HTTPException(400, "reminder_type должен быть 24h или 2h")
+
+
 @app.get("/admin/")
 @app.get("/admin")
 async def serve_admin():

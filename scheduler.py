@@ -26,6 +26,7 @@ def now_msk() -> datetime:
 
 async def send_inactive_reminders(bot: Bot):
     """Ежедневно в 10:00 — напоминает мастеру о давно не приходивших клиентах"""
+    print(f"[INACTIVE] Запуск в {now_msk().strftime('%Y-%m-%d %H:%M:%S')} MSK")
     masters = await get_all_masters()
     for master_id, telegram_id in masters:
         reminder_days = await get_reminder_days(telegram_id)
@@ -43,18 +44,20 @@ async def send_inactive_reminders(bot: Bot):
 
         try:
             await bot.send_message(telegram_id, text, parse_mode="Markdown")
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[INACTIVE] ❌ Ошибка отправки мастеру tg={telegram_id}: {e}")
 
 
 async def send_client_reminders_24h(bot: Bot):
     """Ежедневно в 18:00 — напоминает клиентам о записи завтра"""
     tomorrow = (now_msk() + timedelta(days=1)).strftime("%Y-%m-%d")
+    print(f"[REMINDER-24H] Запуск в {now_msk().strftime('%Y-%m-%d %H:%M:%S')} MSK, ищем записи на {tomorrow}")
     appointments = await get_appointments_for_reminder_24h(tomorrow)
+    print(f"[REMINDER-24H] Найдено записей: {len(appointments)}")
 
     for appt_id, client_tg_id, client_name, master_tg_id, date, time, procedure in appointments:
+        print(f"[REMINDER-24H] Обработка записи #{appt_id}: клиент {client_name} (tg={client_tg_id}), {date} {time}")
         date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
-        # Check custom template
         from database import get_master_id_by_tg
         from database import get_reminder_template
         master_id = await get_master_id_by_tg(master_tg_id) if master_tg_id else None
@@ -77,8 +80,9 @@ async def send_client_reminders_24h(bot: Bot):
                 parse_mode="Markdown"
             )
             await mark_reminder_sent(appt_id, "24h")
-        except Exception:
-            pass
+            print(f"[REMINDER-24H] ✅ Отправлено клиенту {client_name} (tg={client_tg_id}), запись #{appt_id}")
+        except Exception as e:
+            print(f"[REMINDER-24H] ❌ Ошибка отправки клиенту {client_name} (tg={client_tg_id}), запись #{appt_id}: {e}")
 
 
 async def send_client_reminders_2h(bot: Bot):
@@ -86,15 +90,16 @@ async def send_client_reminders_2h(bot: Bot):
     now = now_msk()
     target = now + timedelta(hours=2)
     target_date = target.strftime("%Y-%m-%d")
-    # Окно ±15 минут от целевого времени
     time_from = (target - timedelta(minutes=15)).strftime("%H:%M")
     time_to = (target + timedelta(minutes=15)).strftime("%H:%M")
+    print(f"[REMINDER-2H] Запуск {now.strftime('%H:%M:%S')} MSK, окно {time_from}-{time_to} на {target_date}")
 
     appointments = await get_appointments_for_reminder_2h(target_date, time_from, time_to)
+    if appointments:
+        print(f"[REMINDER-2H] Найдено записей: {len(appointments)}")
 
     for appt_id, client_tg_id, client_name, master_tg_id, date, time, procedure in appointments:
         date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
-        # Check custom template
         from database import get_master_id_by_tg
         from database import get_reminder_template
         master_id = await get_master_id_by_tg(master_tg_id) if master_tg_id else None
@@ -117,8 +122,9 @@ async def send_client_reminders_2h(bot: Bot):
                 parse_mode="Markdown"
             )
             await mark_reminder_sent(appt_id, "2h")
-        except Exception:
-            pass
+            print(f"[REMINDER-2H] ✅ Отправлено клиенту {client_name} (tg={client_tg_id}), запись #{appt_id}")
+        except Exception as e:
+            print(f"[REMINDER-2H] ❌ Ошибка отправки клиенту {client_name} (tg={client_tg_id}), запись #{appt_id}: {e}")
 
 
 async def send_correction_reminders(bot: Bot):
