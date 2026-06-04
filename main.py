@@ -2363,7 +2363,9 @@ async def admin_test_reminders(
 async def admin_check_appointments(days: int = 7):
     """Показывает ближайшие записи и есть ли у клиентов Telegram. Ничего не отправляет."""
     from database import get_pool
-    from scheduler import now_msk
+    from datetime import date, timedelta
+    date_from = date.today().isoformat()
+    date_to = (date.today() + timedelta(days=days)).isoformat()
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
@@ -2372,10 +2374,10 @@ async def admin_check_appointments(days: int = 7):
                    a.reminder_24h_sent, a.reminder_2h_sent
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
-            WHERE a.appointment_date BETWEEN CURRENT_DATE AND CURRENT_DATE + ($1 * INTERVAL '1 day')
+            WHERE a.appointment_date BETWEEN $1 AND $2
               AND a.status != 'cancelled'
             ORDER BY a.appointment_date, a.time
-        """, days)
+        """, date_from, date_to)
     result = []
     for r in rows:
         result.append({
