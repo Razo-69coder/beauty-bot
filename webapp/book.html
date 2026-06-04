@@ -1018,8 +1018,12 @@
 
       <div class="form-fields">
         <div class="field-group">
-          <label class="field-label">Имя</label>
-          <input class="field-input" id="inp-name" type="text" placeholder="Как к вам обращаться?" oninput="validateStep4()">
+          <label class="field-label">Имя *</label>
+          <input class="field-input" id="inp-name" type="text" placeholder="Имя" oninput="validateStep4()">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Фамилия *</label>
+          <input class="field-input" id="inp-lastname" type="text" placeholder="Фамилия" oninput="validateStep4()">
         </div>
         <div class="field-group">
           <label class="field-label">Телефон</label>
@@ -1419,8 +1423,9 @@ function formatBday(el) {
 
 function validateStep4() {
   const name = (document.getElementById('inp-name').value || '').trim();
+  const lastname = (document.getElementById('inp-lastname').value || '').trim();
   const phone = (document.getElementById('inp-phone').value || '').replace(/\D/g,'');
-  const ok = name.length >= 2 && phone.length === 11;
+  const ok = name.length >= 2 && lastname.length >= 2 && phone.length === 11;
   document.getElementById('btn-step4').disabled = !ok;
 }
 
@@ -1431,7 +1436,7 @@ async function submitBooking() {
   const totalDuration = selected.reduce((sum, s) => sum + s.durationNum, 0);
   const firstService = selected[0];
   const d = state.date;
-  const name = document.getElementById('inp-name').value.trim();
+  const name = document.getElementById('inp-name').value.trim() + ' ' + document.getElementById('inp-lastname').value.trim();
   const phone = document.getElementById('inp-phone').value.replace(/\D/g,'');
   const phoneFormatted = '+' + phone;
   const bdayRaw = (document.getElementById('inp-bday').value || '').replace(/\D/g,'');
@@ -1524,9 +1529,11 @@ function resetBooking() {
   const dd = document.getElementById('selected-date-display');
   if (dd) dd.style.display = 'none';
   const nm = document.getElementById('inp-name');
+  const ln = document.getElementById('inp-lastname');
   const ph = document.getElementById('inp-phone');
   const bd = document.getElementById('inp-bday');
   if (nm) nm.value = '';
+  if (ln) ln.value = '';
   if (ph) ph.value = '';
   if (bd) bd.value = '';
   renderCalendar();
