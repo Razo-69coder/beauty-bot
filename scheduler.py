@@ -159,7 +159,7 @@ async def send_review_requests(bot: Bot):
     """
     now = now_msk()
     
-    appointments = await get_appointments_for_review_request(now.isoformat())
+    appointments = await get_appointments_for_review_request(now)
     
     for appt in appointments:
         custom_template, enabled = await get_reminder_template_with_enabled(appt['master_id'], "review")

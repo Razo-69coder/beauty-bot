@@ -701,7 +701,7 @@ async def update_appointment_service_done(appointment_id: int):
         """, appointment_id)
 
 
-async def get_appointments_for_review_request(target_time: str) -> list:
+async def get_appointments_for_review_request(target_time) -> list:
     """Получает записи, где пора просить отзыв (service_done_at есть, review_requested_at <= now, review ещё не запрошен)."""
     pool = await get_pool()
     async with pool.acquire() as conn:
