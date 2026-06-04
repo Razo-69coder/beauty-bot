@@ -2372,7 +2372,7 @@ async def admin_check_appointments(days: int = 7):
                    a.reminder_24h_sent, a.reminder_2h_sent
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
-            WHERE a.appointment_date BETWEEN CURRENT_DATE AND CURRENT_DATE + $1
+            WHERE a.appointment_date BETWEEN CURRENT_DATE AND CURRENT_DATE + ($1 * INTERVAL '1 day')
               AND a.status != 'cancelled'
             ORDER BY a.appointment_date, a.time
         """, days)
