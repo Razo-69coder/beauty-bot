@@ -55,7 +55,14 @@ async def send_client_reminders_24h(bot: Bot):
     appointments = await get_appointments_for_reminder_24h(tomorrow)
     print(f"[REMINDER-24H] Найдено записей: {len(appointments)}")
 
-    for appt_id, client_tg_id, client_name, master_tg_id, date, time, procedure in appointments:
+    for appt_id, client_tg_id, client_name, master_tg_id, date, time, procedure, tz_offset in appointments:
+        tz_offset = tz_offset or 3
+        local_now = now_msk() + timedelta(hours=(tz_offset - 3))
+        local_tomorrow = local_now + timedelta(days=1)
+        appt_datetime = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M") if time else datetime.strptime(date, "%Y-%m-%d")
+        if appt_datetime.date() != local_tomorrow.date():
+            continue
+
         print(f"[REMINDER-24H] Обработка записи #{appt_id}: клиент {client_name} (tg={client_tg_id}), {date} {time}")
         date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
         from database import get_master_id_by_tg
@@ -86,19 +93,28 @@ async def send_client_reminders_24h(bot: Bot):
 
 
 async def send_client_reminders_2h(bot: Bot):
-    """Каждые 30 минут — напоминает клиентам о записи через ~2 часа"""
+    """Каждые 30 минут — напоминает клиентам о записи через ~2 часа (с учётом часового пояса мастера)"""
     now = now_msk()
-    target = now + timedelta(hours=2)
-    target_date = target.strftime("%Y-%m-%d")
-    time_from = (target - timedelta(minutes=15)).strftime("%H:%M")
-    time_to = (target + timedelta(minutes=15)).strftime("%H:%M")
-    print(f"[REMINDER-2H] Запуск {now.strftime('%H:%M:%S')} MSK, окно {time_from}-{time_to} на {target_date}")
+    print(f"[REMINDER-2H] Запуск {now.strftime('%H:%M:%S')} MSK")
 
-    appointments = await get_appointments_for_reminder_2h(target_date, time_from, time_to)
+    # Берём все записи на сегодня и завтра, фильтруем по локальному времени каждого мастера
+    today = now.strftime("%Y-%m-%d")
+    tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+    appointments = await get_appointments_for_reminder_2h(today, "00:00", "23:59") + await get_appointments_for_reminder_2h(tomorrow, "00:00", "23:59")
     if appointments:
-        print(f"[REMINDER-2H] Найдено записей: {len(appointments)}")
+        print(f"[REMINDER-2H] Найдено записей до фильтрации: {len(appointments)}")
 
-    for appt_id, client_tg_id, client_name, master_tg_id, date, time, procedure in appointments:
+    for appt_id, client_tg_id, client_name, master_tg_id, date, time, procedure, tz_offset in appointments:
+        tz_offset = tz_offset or 3
+        local_now = now + timedelta(hours=(tz_offset - 3))
+        target = local_now + timedelta(hours=2)
+        target_date = target.strftime("%Y-%m-%d")
+        time_from = (target - timedelta(minutes=15)).strftime("%H:%M")
+        time_to = (target + timedelta(minutes=15)).strftime("%H:%M")
+
+        if date != target_date or not (time_from <= time <= time_to):
+            continue
+
         date_fmt = datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
         from database import get_master_id_by_tg
         from database import get_reminder_template

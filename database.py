@@ -162,6 +162,7 @@ async def init_db():
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS loyalty_discount_type TEXT DEFAULT 'percent'",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS loyalty_discount_rub INTEGER DEFAULT 0",
             "ALTER TABLE masters ADD COLUMN IF NOT EXISTS paid_until TIMESTAMP",
+            "ALTER TABLE masters ADD COLUMN IF NOT EXISTS timezone_offset INTEGER DEFAULT 3",
         ]:
             try:
                 await conn.execute(sql)
@@ -246,6 +247,16 @@ async def init_db():
                 time TEXT NOT NULL DEFAULT '09:00',
                 text TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS payment_history (
+                id SERIAL PRIMARY KEY,
+                master_id INTEGER REFERENCES masters(id),
+                plan TEXT,
+                amount NUMERIC,
+                status TEXT DEFAULT 'succeeded',
+                paid_at TIMESTAMP DEFAULT NOW()
             )
         """)
         # Welcome-уведомление для всех мастеров (только один раз)
@@ -858,7 +869,8 @@ async def get_appointments_for_reminder_24h(target_date: str) -> list:
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT a.id, c.telegram_id, c.name, m.telegram_id,
-                   a.appointment_date, a.time, a.procedure
+                   a.appointment_date, a.time, a.procedure,
+                   COALESCE(m.timezone_offset, 3) as timezone_offset
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
             JOIN masters m ON m.id = a.master_id
@@ -867,7 +879,7 @@ async def get_appointments_for_reminder_24h(target_date: str) -> list:
               AND a.reminder_24h_sent = 0
               AND c.telegram_id IS NOT NULL
         """, target_date)
-    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
+    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]) for r in rows]
 
 
 async def get_appointments_for_reminder_2h(target_date: str, target_time_from: str, target_time_to: str) -> list:
@@ -875,7 +887,8 @@ async def get_appointments_for_reminder_2h(target_date: str, target_time_from: s
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT a.id, c.telegram_id, c.name, m.telegram_id,
-                   a.appointment_date, a.time, a.procedure
+                   a.appointment_date, a.time, a.procedure,
+                   COALESCE(m.timezone_offset, 3) as timezone_offset
             FROM appointments a
             JOIN clients c ON c.id = a.client_id
             JOIN masters m ON m.id = a.master_id
@@ -885,7 +898,7 @@ async def get_appointments_for_reminder_2h(target_date: str, target_time_from: s
               AND a.reminder_2h_sent = 0
               AND c.telegram_id IS NOT NULL
         """, target_date, target_time_from, target_time_to)
-    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in rows]
+    return [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]) for r in rows]
 
 
 async def mark_reminder_sent(appointment_id: int, reminder_type: str):

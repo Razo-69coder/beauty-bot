@@ -1390,6 +1390,45 @@ async def v1_update_profile(body: _V1ProfileUpdate, master_id: int = Depends(get
         )
     return {"ok": True}
 
+class _TimezoneOffsetUpdate(BaseModel):
+    timezone_offset: int
+
+@app.put("/api/v1/masters/me/timezone")
+async def v1_update_timezone(body: _TimezoneOffsetUpdate, master_id: int = Depends(get_jwt_master_id)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE masters SET timezone_offset=$1 WHERE id=$2",
+            body.timezone_offset, master_id
+        )
+    return {"ok": True}
+
+@app.delete("/api/v1/masters/me")
+async def v1_delete_account(master_id: int = Depends(get_jwt_master_id)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM expenses WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM notifications WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM personal_notes WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM blocked_days WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM custom_slots WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM device_tokens WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM reminder_templates WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM waitlist WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM telegram_link_tokens WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM payment_history WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM reviews WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM appointments WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM services WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM subscriptions WHERE master_id=$1", master_id)
+        clients = await conn.fetch("SELECT id FROM clients WHERE master_id=$1", master_id)
+        for c in clients:
+            await conn.execute("DELETE FROM subscriptions WHERE client_id=$1", c['id'])
+            await conn.execute("DELETE FROM appointments WHERE client_id=$1", c['id'])
+        await conn.execute("DELETE FROM clients WHERE master_id=$1", master_id)
+        await conn.execute("DELETE FROM masters WHERE id=$1", master_id)
+    return {"ok": True}
+
 @app.put("/api/v1/masters/me/payment")
 async def v1_update_payment(body: _V1PaymentUpdate, master_id: int = Depends(get_jwt_master_id)):
     await update_master_payment(master_id, body.payment_card, body.payment_phone, body.payment_banks)
@@ -2484,6 +2523,49 @@ class WebPaymentRequest(BaseModel):
     plan: str = "pro_1m"
 
 
+class _AccountWebInfo(BaseModel):
+    email: str
+    password: str
+
+@app.post("/api/v1/account/web-info")
+async def account_web_info(body: _AccountWebInfo):
+    master = await get_master_by_email(body.email)
+    if not master:
+        raise HTTPException(401, "Неверный email или пароль")
+    stored = master.get("password_hash") or ""
+    try:
+        ok = bcrypt.checkpw(body.password.encode(), stored.encode())
+    except ValueError:
+        ok = stored == hashlib.sha256(body.password.encode()).hexdigest()
+    if not ok:
+        raise HTTPException(401, "Неверный email или пароль")
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT is_active, paid_until, trial_end_date, name FROM masters WHERE id=$1",
+            master["id"]
+        )
+        payments = await conn.fetch(
+            "SELECT plan, amount, status, paid_at FROM payment_history WHERE master_id=$1 ORDER BY paid_at DESC LIMIT 20",
+            master["id"]
+        )
+    return {
+        "name": row["name"] or "",
+        "is_active": bool(row["is_active"]) if row["is_active"] is not None else False,
+        "paid_until": str(row["paid_until"]) if row["paid_until"] else None,
+        "trial_end_date": str(row["trial_end_date"]) if row["trial_end_date"] else None,
+        "payments": [
+            {
+                "plan": p["plan"],
+                "amount": float(p["amount"]) if p["amount"] else 0,
+                "status": p["status"],
+                "paid_at": str(p["paid_at"]) if p["paid_at"] else None,
+            }
+            for p in payments
+        ]
+    }
+
 @app.post("/api/v1/payment/create-web")
 async def create_payment_web(body: WebPaymentRequest):
     master = await get_master_by_email(body.email)
@@ -2521,6 +2603,7 @@ async def payment_webhook(request: Request):
         meta = obj.get("metadata", {})
         master_id = int(meta.get("master_id", 0))
         days = int(meta.get("days", 30))
+        plan = meta.get("plan", "pro_1m")
         if master_id:
             pool = await get_pool()
             async with pool.acquire() as conn:
@@ -2529,6 +2612,11 @@ async def payment_webhook(request: Request):
                     "UPDATE masters SET is_active = 1, trial_end_date = NULL, paid_until = $1 WHERE id = $2",
                     datetime.utcnow() + timedelta(days=days),
                     master_id,
+                )
+                amount = obj.get("amount", {}).get("value", "0")
+                await conn.execute(
+                    "INSERT INTO payment_history (master_id, plan, amount, paid_at) VALUES ($1, $2, $3, NOW())",
+                    master_id, plan, amount
                 )
                 name = await conn.fetchval("SELECT name FROM masters WHERE id=$1", master_id)
             await send_telegram(
