@@ -64,6 +64,7 @@ from database import (
     create_notification, get_notifications, get_unread_count,
     mark_notification_read, mark_all_notifications_read, broadcast_notification,
     get_personal_notes, create_personal_note, delete_personal_note,
+    save_password_reset_code, verify_password_reset_code,
 )
 
 from scheduler import setup_scheduler
@@ -71,6 +72,7 @@ from handlers import start, clients, appointments, settings, stats, services
 from handlers import booking, schedule, subscriptions, templates, reviews, deposit, fallback
 
 
+import random
 import time as _time
 
 async def send_push_detailed(device_token: str, title: str, body_text: str) -> dict:
@@ -1862,7 +1864,50 @@ async def v1_delete_service(svc_id: int, master_id: int = Depends(get_jwt_master
 
 @app.post("/api/v1/auth/forgot-password")
 async def v1_forgot_password(body: dict):
-    return {"ok": True, "message": "Если email найден, инструкции отправлены"}
+    email = body.get("email", "")
+    if not email:
+        return {"ok": True, "telegram_connected": False}
+    master = await get_master_by_email(email)
+    if not master:
+        return {"ok": True, "telegram_connected": False}
+    tg_id = master.get("telegram_id") or 0
+    if tg_id <= 0:
+        return {"ok": True, "telegram_connected": False}
+    code = str(random.randint(100000, 999999))
+    expires_at = _dt.utcnow() + _td(minutes=15)
+    await save_password_reset_code(master["id"], code, expires_at)
+    try:
+        await bot.send_message(
+            tg_id,
+            f"🔐 Код для сброса пароля Solvo Beauty: {code}\n\nКод действителен 15 минут. Если вы не запрашивали сброс — проигнорируйте сообщение.",
+            parse_mode="Markdown"
+        )
+    except Exception:
+        pass
+    return {"ok": True, "telegram_connected": True}
+
+
+@app.post("/api/v1/auth/reset-password")
+async def v1_reset_password(body: dict):
+    email = body.get("email", "")
+    code = body.get("code", "")
+    new_password = body.get("new_password", "")
+    if not email or not code or not new_password:
+        raise HTTPException(400, "Неверный или просроченный код")
+    master = await get_master_by_email(email)
+    if not master:
+        raise HTTPException(400, "Неверный или просроченный код")
+    ok = await verify_password_reset_code(master["id"], code)
+    if not ok:
+        raise HTTPException(400, "Неверный или просроченный код")
+    password_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE masters SET password_hash=$1 WHERE id=$2",
+            password_hash, master["id"]
+        )
+    return {"ok": True}
 
 
 # ── API: Дашборд — неактивные клиенты ────────────────────────────────

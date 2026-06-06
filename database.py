@@ -259,6 +259,15 @@ async def init_db():
                 paid_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS password_reset_codes (
+                id SERIAL PRIMARY KEY,
+                master_id INTEGER REFERENCES masters(id),
+                code TEXT NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                used BOOLEAN DEFAULT FALSE
+            )
+        """)
         # Welcome-уведомление для всех мастеров (только один раз)
         existing = await conn.fetchval(
             "SELECT COUNT(*) FROM notifications WHERE type='broadcast'"
@@ -327,7 +336,7 @@ async def get_master_by_email(email: str) -> dict | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT id, name, email, work_start, work_end, slot_duration, "
+            "SELECT id, telegram_id, name, email, work_start, work_end, slot_duration, "
             "reminder_days, payment_card, payment_phone, payment_banks, "
             "theme, password_hash "
             "FROM masters WHERE email=$1",
@@ -336,7 +345,7 @@ async def get_master_by_email(email: str) -> dict | None:
     if not row:
         return None
     return {
-        "id": row['id'], "name": row['name'] or "", "email": row['email'] or "",
+        "id": row['id'], "telegram_id": row['telegram_id'], "name": row['name'] or "", "email": row['email'] or "",
         "work_start": row['work_start'] or 9, "work_end": row['work_end'] or 20,
         "slot_duration": row['slot_duration'] or 60, "timezone": "Europe/Moscow",
         "reminder_days": row['reminder_days'] or 30,
@@ -1047,6 +1056,30 @@ async def verify_login_code_by_code(code: str) -> int | None:
             return None
         await conn.execute("UPDATE login_codes SET used=1 WHERE id=$1", row['id'])
     return row['telegram_id']
+
+
+# ── Сброс пароля ─────────────────────────────────────────────────────
+
+async def save_password_reset_code(master_id: int, code: str, expires_at) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO password_reset_codes (master_id, code, expires_at) VALUES ($1, $2, $3)",
+            master_id, code, expires_at
+        )
+
+
+async def verify_password_reset_code(master_id: int, code: str) -> bool:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id FROM password_reset_codes WHERE master_id=$1 AND code=$2 AND expires_at > NOW() AND used=FALSE ORDER BY id DESC LIMIT 1",
+            master_id, code
+        )
+        if not row:
+            return False
+        await conn.execute("UPDATE password_reset_codes SET used=TRUE WHERE id=$1", row['id'])
+    return True
 
 
 # ── Веб-панель: настройки мастера ─────────────────────────────────────
