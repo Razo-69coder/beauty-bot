@@ -1341,7 +1341,8 @@ async def v1_master_me(master_id: int = Depends(get_jwt_master_id)):
             "COALESCE(loyalty_discount_enabled,false) as loyalty_discount_enabled, "
             "COALESCE(loyalty_discount_percent,10) as loyalty_discount_percent, "
             "COALESCE(loyalty_discount_type,'percent') as loyalty_discount_type, "
-            "COALESCE(loyalty_discount_rub,0) as loyalty_discount_rub "
+            "COALESCE(loyalty_discount_rub,0) as loyalty_discount_rub, "
+            "COALESCE(timezone_offset,3) as timezone_offset "
             "FROM masters WHERE id=$1", master_id
         )
     if not row:
@@ -1364,6 +1365,7 @@ async def v1_master_me(master_id: int = Depends(get_jwt_master_id)):
         "loyalty_discount_percent": row['loyalty_discount_percent'] or 10,
         "loyalty_discount_type": row['loyalty_discount_type'] or "percent",
         "loyalty_discount_rub": row['loyalty_discount_rub'] or 0,
+        "timezone_offset": row['timezone_offset'],
     }
 
 
