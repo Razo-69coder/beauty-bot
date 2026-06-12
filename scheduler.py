@@ -441,19 +441,37 @@ async def send_trial_expiry_reminder(bot: Bot):
     from database import get_pool
     pool = await get_pool()
     async with pool.acquire() as conn:
-        rows = await conn.fetch("""
+        rows_2d = await conn.fetch("""
             SELECT id, telegram_id, name FROM masters
             WHERE trial_end_date::date = (NOW() + INTERVAL '2 days')::date
               AND is_active = 1
         """)
-    for row in rows:
+        rows_today = await conn.fetch("""
+            SELECT id, telegram_id, name FROM masters
+            WHERE trial_end_date::date = NOW()::date
+              AND is_active = 1
+        """)
+
+    for row in rows_2d:
         try:
             await bot.send_message(
                 row["telegram_id"],
-                "⏰ Пробный период Solvo Beauty заканчивается через 2 дня.\n"
-                "Чтобы продолжить работу, оформите подписку в приложении.\n"
-                "Pro — всего 690 ₽/мес 💅"
+                f"⏰ {row['name']}, пробный период Solvo Beauty заканчивается через 2 дня.\n\n"
+                "Чтобы не потерять доступ к расписанию и клиентам — войдите в личный кабинет:\n"
+                "👉 https://solvobeauty.vercel.app/account.html"
             )
-            print(f"[TRIAL] Sent expiry reminder to master #{row['id']}")
+            print(f"[TRIAL] Sent 2-day reminder to master #{row['id']}")
         except Exception as e:
-            print(f"[TRIAL] Failed to send to #{row['id']}: {e}")
+            print(f"[TRIAL] Failed to send 2-day reminder to #{row['id']}: {e}")
+
+    for row in rows_today:
+        try:
+            await bot.send_message(
+                row["telegram_id"],
+                f"🔒 {row['name']}, пробный период Solvo Beauty завершился сегодня.\n\n"
+                "Ваши данные в сохранности. Чтобы продолжить работу — зайдите в личный кабинет:\n"
+                "👉 https://solvobeauty.vercel.app/account.html"
+            )
+            print(f"[TRIAL] Sent end-of-trial message to master #{row['id']}")
+        except Exception as e:
+            print(f"[TRIAL] Failed to send end-of-trial message to #{row['id']}: {e}")
