@@ -2404,6 +2404,26 @@ async def admin_toggle_active(master_id: int):
     return {"ok": True, "is_active": bool(new_state)}
 
 
+@app.post("/api/admin/master/{master_id}/extend-trial", dependencies=[Depends(_verify_admin_token)])
+async def admin_extend_trial(master_id: int, days: int = 90):
+    from database import get_pool
+    from datetime import datetime, timedelta
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT name, trial_end_date, paid_until FROM masters WHERE id=$1", master_id)
+        if not row:
+            raise HTTPException(404, "Мастер не найден")
+        current_end = row["paid_until"] or row["trial_end_date"] or datetime.utcnow()
+        if current_end < datetime.utcnow():
+            current_end = datetime.utcnow()
+        new_end = current_end + timedelta(days=days)
+        await conn.execute(
+            "UPDATE masters SET is_active=1, trial_end_date=$1 WHERE id=$2",
+            new_end, master_id
+        )
+    return {"ok": True, "name": row["name"], "new_trial_end": new_end.isoformat()}
+
+
 @app.post("/api/v1/device/token")
 async def register_device_token_beauty(
     token: str = Form(...),
