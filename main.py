@@ -339,13 +339,14 @@ async def get_jwt_master_id(
             return master_id
     
     master_id = int(payload["mid"])
-    
-    # Проверка подписки (is_active)
+
+    # Ручная блокировка доступа (is_active) — выставляется только вручную из админки,
+    # не автоматикой по истечении триала. Универсальное сообщение, без упоминания оплаты.
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT is_active FROM masters WHERE id=$1", master_id)
         if row and row['is_active'] == 0:
-            raise HTTPException(status_code=403, detail="subscription_required")
+            raise HTTPException(status_code=403, detail="Доступ запрещён")
     
     return master_id
 
