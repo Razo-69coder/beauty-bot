@@ -2354,7 +2354,14 @@ async def admin_list_masters():
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT id, name, email, phone, booking_link, is_active FROM masters ORDER BY name"
+            """
+            SELECT
+                m.id, m.name, m.email, m.phone, m.booking_link, m.is_active,
+                (SELECT COUNT(*) FROM clients c WHERE c.master_id = m.id) AS clients_count,
+                (SELECT COUNT(*) FROM appointments a WHERE a.master_id = m.id) AS appointments_count
+            FROM masters m
+            ORDER BY m.name
+            """
         )
     masters = [
         {
@@ -2364,6 +2371,8 @@ async def admin_list_masters():
             "phone": r["phone"] or "",
             "booking_link": r["booking_link"] or "",
             "is_active": bool(r["is_active"]) if r["is_active"] is not None else True,
+            "clients_count": r["clients_count"],
+            "appointments_count": r["appointments_count"],
         }
         for r in rows
     ]
@@ -2376,11 +2385,45 @@ async def admin_master_data(master_id: int):
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT id, name, email, phone, booking_link, is_active FROM masters WHERE id=$1",
+            """
+            SELECT id, name, email, phone, booking_link, is_active,
+                   theme, payment_card, payment_phone, payment_banks
+            FROM masters WHERE id=$1
+            """,
             master_id
         )
-    if not row:
-        raise HTTPException(404, "Мастер не найден")
+        if not row:
+            raise HTTPException(404, "Мастер не найден")
+
+        total_clients = await conn.fetchval(
+            "SELECT COUNT(*) FROM clients WHERE master_id=$1", master_id
+        )
+        total_appointments = await conn.fetchval(
+            "SELECT COUNT(*) FROM appointments WHERE master_id=$1", master_id
+        )
+        total_earnings = await conn.fetchval(
+            "SELECT COALESCE(SUM(price),0) FROM appointments WHERE master_id=$1 AND status != 'cancelled'",
+            master_id
+        )
+        month_earnings = await conn.fetchval(
+            """
+            SELECT COALESCE(SUM(price),0) FROM appointments
+            WHERE master_id=$1 AND status != 'cancelled'
+              AND appointment_date >= to_char(date_trunc('month', CURRENT_DATE), 'YYYY-MM-DD')
+            """,
+            master_id
+        )
+        clients_rows = await conn.fetch(
+            """
+            SELECT c.name, c.phone,
+                   (SELECT MAX(a.appointment_date) FROM appointments a WHERE a.client_id = c.id) AS last_visit
+            FROM clients c
+            WHERE c.master_id=$1
+            ORDER BY c.name
+            """,
+            master_id
+        )
+
     master = {
         "id": row["id"],
         "name": row["name"] or "",
@@ -2388,8 +2431,54 @@ async def admin_master_data(master_id: int):
         "phone": row["phone"] or "",
         "booking_link": row["booking_link"] or "",
         "is_active": bool(row["is_active"]) if row["is_active"] is not None else True,
+        "theme": row["theme"] or "pink",
+        "payment_card": row["payment_card"] or "",
+        "payment_phone": row["payment_phone"] or "",
+        "payment_banks": row["payment_banks"] or "",
     }
-    return {"master": master, "stats": {}, "clients": [], "total_clients": 0}
+    stats = {
+        "total_clients": total_clients,
+        "total_appointments": total_appointments,
+        "total_earnings": total_earnings,
+        "month_earnings": month_earnings,
+    }
+    clients = [
+        {"name": c["name"] or "-", "phone": c["phone"] or "", "last_visit": c["last_visit"] or ""}
+        for c in clients_rows
+    ]
+    return {"master": master, "stats": stats, "clients": clients, "total_clients": total_clients}
+
+
+@app.delete("/api/admin/master/{master_id}", dependencies=[Depends(_verify_admin_token)])
+async def admin_delete_master(master_id: int):
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT id, name, email FROM masters WHERE id=$1", master_id)
+        if not row:
+            raise HTTPException(404, "Мастер не найден")
+        async with conn.transaction():
+            await conn.execute("DELETE FROM expenses WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM notifications WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM personal_notes WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM blocked_days WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM custom_slots WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM device_tokens WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM reminder_templates WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM waitlist WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM telegram_link_tokens WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM payment_history WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM reviews WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM appointments WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM services WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM subscriptions WHERE master_id=$1", master_id)
+            client_ids = await conn.fetch("SELECT id FROM clients WHERE master_id=$1", master_id)
+            for c in client_ids:
+                await conn.execute("DELETE FROM subscriptions WHERE client_id=$1", c["id"])
+                await conn.execute("DELETE FROM appointments WHERE client_id=$1", c["id"])
+            await conn.execute("DELETE FROM clients WHERE master_id=$1", master_id)
+            await conn.execute("DELETE FROM masters WHERE id=$1", master_id)
+    return {"ok": True, "deleted_id": master_id, "name": row["name"], "email": row["email"]}
 
 
 @app.post("/api/admin/master/{master_id}/toggle-active", dependencies=[Depends(_verify_admin_token)])

@@ -211,6 +211,9 @@ async function loadMaster(id) {
         <button class="btn-primary" style="margin-top:16px" onclick="toggleActive(${m.id}, ${m.is_active})">
             ${m.is_active ? '🔴 Заблокировать' : '✅ Активировать'}
         </button>
+        <button class="btn-primary" style="margin-top:12px;background:#ff2d2d" onclick="deleteMaster(${m.id}, '${(m.email || '').replace(/'/g, "\\'")}', '${(m.name || '').replace(/'/g, "\\'")}')">
+            🗑️ Удалить аккаунт
+        </button>
     `;
 }
 
@@ -220,6 +223,22 @@ async function toggleActive(id, currentState) {
     const data = await apiFetch(`/api/admin/master/${id}/toggle-active`, { method: 'POST' });
     if (data && data.ok) {
         loadMaster(id);
+    }
+}
+
+async function deleteMaster(id, email, name) {
+    const typed = prompt(`⚠️ БЕЗВОЗВРАТНОЕ удаление аккаунта "${name}" (${email || 'без email'}) и ВСЕХ его данных (клиенты, записи, история).\n\nЧтобы подтвердить, введите email этого мастера:`);
+    if (typed === null) return;
+    if (typed.trim().toLowerCase() !== (email || '').trim().toLowerCase()) {
+        alert('Email не совпадает — удаление отменено.');
+        return;
+    }
+    const data = await apiFetch(`/api/admin/master/${id}`, { method: 'DELETE' });
+    if (data && data.ok) {
+        alert(`Аккаунт "${data.name}" удалён.`);
+        loadMasters();
+    } else {
+        alert('Ошибка удаления: ' + (data && data.detail || 'неизвестно'));
     }
 }
 
