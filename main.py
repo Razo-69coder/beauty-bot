@@ -2466,7 +2466,6 @@ async def admin_delete_master(master_id: int):
                 await conn.execute("DELETE FROM custom_slots WHERE master_id=$1", master_id)
                 await conn.execute("DELETE FROM device_tokens WHERE master_id=$1", master_id)
                 await conn.execute("DELETE FROM reminder_templates WHERE master_id=$1", master_id)
-                await conn.execute("DELETE FROM waitlist WHERE master_id=$1", master_id)
                 await conn.execute("DELETE FROM telegram_link_tokens WHERE master_id=$1", master_id)
                 await conn.execute("DELETE FROM payment_history WHERE master_id=$1", master_id)
                 await conn.execute("DELETE FROM password_reset_codes WHERE master_id=$1", master_id)
