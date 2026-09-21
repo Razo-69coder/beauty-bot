@@ -2457,27 +2457,31 @@ async def admin_delete_master(master_id: int):
         row = await conn.fetchrow("SELECT id, name, email FROM masters WHERE id=$1", master_id)
         if not row:
             raise HTTPException(404, "Мастер не найден")
-        async with conn.transaction():
-            await conn.execute("DELETE FROM expenses WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM notifications WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM personal_notes WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM blocked_days WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM custom_slots WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM device_tokens WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM reminder_templates WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM waitlist WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM telegram_link_tokens WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM payment_history WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM reviews WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM appointments WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM services WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM subscriptions WHERE master_id=$1", master_id)
-            client_ids = await conn.fetch("SELECT id FROM clients WHERE master_id=$1", master_id)
-            for c in client_ids:
-                await conn.execute("DELETE FROM subscriptions WHERE client_id=$1", c["id"])
-                await conn.execute("DELETE FROM appointments WHERE client_id=$1", c["id"])
-            await conn.execute("DELETE FROM clients WHERE master_id=$1", master_id)
-            await conn.execute("DELETE FROM masters WHERE id=$1", master_id)
+        try:
+            async with conn.transaction():
+                await conn.execute("DELETE FROM expenses WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM notifications WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM personal_notes WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM blocked_days WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM custom_slots WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM device_tokens WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM reminder_templates WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM waitlist WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM telegram_link_tokens WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM payment_history WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM password_reset_codes WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM reviews WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM appointments WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM services WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM subscriptions WHERE master_id=$1", master_id)
+                client_ids = await conn.fetch("SELECT id FROM clients WHERE master_id=$1", master_id)
+                for c in client_ids:
+                    await conn.execute("DELETE FROM subscriptions WHERE client_id=$1", c["id"])
+                    await conn.execute("DELETE FROM appointments WHERE client_id=$1", c["id"])
+                await conn.execute("DELETE FROM clients WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM masters WHERE id=$1", master_id)
+        except Exception as e:
+            raise HTTPException(500, f"Ошибка удаления: {e}")
     return {"ok": True, "deleted_id": master_id, "name": row["name"], "email": row["email"]}
 
 
