@@ -227,18 +227,21 @@ async function toggleActive(id, currentState) {
 }
 
 async function deleteMaster(id, email, name) {
-    const typed = prompt(`⚠️ БЕЗВОЗВРАТНОЕ удаление аккаунта "${name}" (${email || 'без email'}) и ВСЕХ его данных (клиенты, записи, история).\n\nЧтобы подтвердить, введите email этого мастера:`);
-    if (typed === null) return;
-    if (typed.trim().toLowerCase() !== (email || '').trim().toLowerCase()) {
-        alert('Email не совпадает — удаление отменено.');
-        return;
-    }
-    const data = await apiFetch(`/api/admin/master/${id}`, { method: 'DELETE' });
-    if (data && data.ok) {
-        alert(`Аккаунт "${data.name}" удалён.`);
-        loadMasters();
-    } else {
-        alert('Ошибка удаления: ' + (data && data.detail || 'неизвестно'));
+    if (!confirm(`Удалить аккаунт "${name}" (${email || 'без email'}) и все его данные (клиенты, записи)? Это необратимо.`)) return;
+    try {
+        const res = await fetch(`/api/admin/master/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+            alert(`Аккаунт "${data.name}" удалён.`);
+            loadMasters();
+        } else {
+            alert('Ошибка удаления: ' + (data.detail || res.status));
+        }
+    } catch (e) {
+        alert('Ошибка сети: ' + e.message);
     }
 }
 
