@@ -1100,8 +1100,20 @@ async def get_master_full(master_id: int) -> dict | None:
         )
     if not row:
         return None
+    async with pool.acquire() as conn:
+        has_data = await conn.fetchval(
+            """
+            SELECT EXISTS(
+                SELECT 1 FROM clients WHERE master_id=$1
+                UNION ALL
+                SELECT 1 FROM appointments WHERE master_id=$1
+            )
+            """,
+            master_id
+        )
     return {
         "id": row['id'], "telegram_id": row['telegram_id'], "name": row['name'],
+        "has_data": bool(has_data),
         "reminder_days": row['reminder_days'] or 40,
         "work_start": row['work_start'] or 10, "work_end": row['work_end'] or 20,
         "slot_duration": row['slot_duration'] or 60,

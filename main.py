@@ -774,10 +774,22 @@ async def login(request: Request, body: EmailLoginRequest):
         raise HTTPException(401, "Неверный email или пароль")
     
     token = _generate_jwt(master["id"])
-    
-    from database import get_master_trial_status
+
+    from database import get_master_trial_status, get_pool
     trial = await get_master_trial_status(master["id"])
-    
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        has_data = await conn.fetchval(
+            """
+            SELECT EXISTS(
+                SELECT 1 FROM clients WHERE master_id=$1
+                UNION ALL
+                SELECT 1 FROM appointments WHERE master_id=$1
+            )
+            """,
+            master["id"]
+        )
+
     return {"token": token, "trial": trial, "master": {
         "id": master["id"], "name": master["name"], "email": master["email"],
         "work_start": master["work_start"], "work_end": master["work_end"],
@@ -785,7 +797,7 @@ async def login(request: Request, body: EmailLoginRequest):
         "reminder_days": master["reminder_days"], "payment_card": master["payment_card"],
         "payment_phone": master["payment_phone"], "payment_banks": master["payment_banks"],
         "deposit_enabled": False, "deposit_percent": 30,
-        "theme": master["theme"],
+        "theme": master["theme"], "has_data": bool(has_data),
     }}
 
 
