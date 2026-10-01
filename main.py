@@ -1604,7 +1604,8 @@ async def v1_merge_clients(master_id: int = Depends(get_jwt_master_id)):
 @app.post("/api/v1/clients", status_code=201)
 async def v1_create_client(body: _V1ClientCreate, master_id: int = Depends(get_jwt_master_id)):
     client_id = await add_client(master_id, body.name, body.phone, body.notes)
-    return {"id": client_id}
+    # iOS читает ответ как MessageResponse — поле ok обязательно
+    return {"ok": True, "id": client_id}
 
 
 @app.put("/api/v1/clients/{client_id}")
