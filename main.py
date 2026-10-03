@@ -152,6 +152,7 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE clients ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) DEFAULT 'Europe/Moscow'",
                 "ALTER TABLE masters ALTER COLUMN telegram_id DROP NOT NULL",
                 "ALTER TABLE masters ADD COLUMN IF NOT EXISTS trial_end_date TIMESTAMP",
+                "ALTER TABLE masters ADD COLUMN IF NOT EXISTS early_price BOOLEAN DEFAULT FALSE",
             ]:
                 try:
                     await conn.execute(sql)
@@ -2654,7 +2655,38 @@ PLANS = {
     "biz_6m":  {"price": "4990.00", "days": 180, "label": "Бизнес 6 месяцев"},
     "biz_1y":  {"price": "7990.00","days": 365, "label": "Бизнес 12 месяцев"},
     "biz_2y":  {"price": "13990.00","days": 730, "label": "Бизнес 24 месяца"},
+    # Цена первых мастеров: навсегда для первых EARLY_LIMIT оплативших
+    "early_1m": {"price": "299.00",  "days": 30,  "label": "Первые мастера · 1 месяц"},
+    "early_1y": {"price": "2990.00", "days": 365, "label": "Первые мастера · 12 месяцев"},
 }
+
+EARLY_LIMIT = 100
+
+
+async def _early_seats_left(conn) -> int:
+    taken = await conn.fetchval("SELECT COUNT(*) FROM masters WHERE early_price = TRUE")
+    return max(EARLY_LIMIT - int(taken or 0), 0)
+
+
+async def _check_early_allowed(master_id: int, plan_key: str):
+    """Тариф первых мастеров доступен, если мастер уже его получил или ещё есть места."""
+    if not plan_key.startswith("early_"):
+        return
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        is_member = await conn.fetchval("SELECT COALESCE(early_price, FALSE) FROM masters WHERE id=$1", master_id)
+        if is_member:
+            return
+        if await _early_seats_left(conn) <= 0:
+            raise HTTPException(409, "Места по цене первых мастеров закончились")
+
+
+@app.get("/api/v1/early/seats")
+async def early_seats():
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        left = await _early_seats_left(conn)
+    return {"limit": EARLY_LIMIT, "left": left}
 
 
 class CreatePaymentRequest(BaseModel):
@@ -2673,6 +2705,7 @@ Configuration.secret_key = config.YUKASSA_SECRET_KEY
 async def create_payment(body: CreatePaymentRequest, master_id: int = Depends(get_jwt_master_id_any)):
     if not config.YUKASSA_SHOP_ID or not config.YUKASSA_SECRET_KEY:
         raise HTTPException(503, "Платёжная система не настроена")
+    await _check_early_allowed(master_id, body.plan)
     plan = PLANS.get(body.plan, PLANS["pro_1m"])
     payment = Payment.create({
         "amount": {"value": plan["price"], "currency": "RUB"},
@@ -2753,6 +2786,7 @@ async def create_payment_web(body: WebPaymentRequest):
         raise HTTPException(401, "Неверный email или пароль")
     if not config.YUKASSA_SHOP_ID or not config.YUKASSA_SECRET_KEY:
         raise HTTPException(503, "Платёжная система не настроена")
+    await _check_early_allowed(master["id"], body.plan)
     plan = PLANS.get(body.plan, PLANS["pro_1m"])
     payment = Payment.create({
         "amount": {"value": plan["price"], "currency": "RUB"},
@@ -2773,6 +2807,15 @@ async def payment_webhook(request: Request):
     event = body.get("event")
     obj = body.get("object", {})
     if event == "payment.succeeded":
+        # Не доверяем телу запроса: перепроверяем платёж напрямую в ЮКассе
+        try:
+            real = Payment.find_one(obj.get("id", ""))
+            if real.status != "succeeded":
+                return {"status": "ignored"}
+            obj = {"metadata": dict(real.metadata or {}), "amount": {"value": real.amount.value}}
+        except Exception as e:
+            print(f"[PAYMENT] verify error: {e}")
+            raise HTTPException(400, "Платёж не подтверждён")
         meta = obj.get("metadata", {})
         master_id = int(meta.get("master_id", 0))
         days = int(meta.get("days", 30))
@@ -2781,11 +2824,16 @@ async def payment_webhook(request: Request):
             pool = await get_pool()
             async with pool.acquire() as conn:
                 from datetime import timedelta, datetime
+                # продлеваем от текущей даты окончания, если она ещё в будущем
+                cur = await conn.fetchval("SELECT paid_until FROM masters WHERE id=$1", master_id)
+                start = cur if cur and cur > datetime.utcnow() else datetime.utcnow()
                 await conn.execute(
                     "UPDATE masters SET is_active = 1, trial_end_date = NULL, paid_until = $1 WHERE id = $2",
-                    datetime.utcnow() + timedelta(days=days),
+                    start + timedelta(days=days),
                     master_id,
                 )
+                if plan.startswith("early_"):
+                    await conn.execute("UPDATE masters SET early_price = TRUE WHERE id=$1", master_id)
                 amount = obj.get("amount", {}).get("value", "0")
                 await conn.execute(
                     "INSERT INTO payment_history (master_id, plan, amount, paid_at) VALUES ($1, $2, $3, NOW())",
