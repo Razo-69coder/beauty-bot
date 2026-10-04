@@ -3112,6 +3112,19 @@ async def v1_wallet_settings_update(body: _WalletSettings, master_id: int = Depe
     return {"ok": True}
 
 
+@app.get("/api/v1/clients/{client_id}/wallet-link")
+async def v1_client_wallet_link(client_id: int, master_id: int = Depends(get_jwt_master_id)):
+    """Ссылка на карту Apple Wallet для постоянной клиентки — мастер отправляет её сама."""
+    if not wallet.enabled():
+        raise HTTPException(503, "Apple Wallet пока недоступен")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        ok = await conn.fetchval("SELECT 1 FROM clients WHERE id=$1 AND master_id=$2", client_id, master_id)
+    if not ok:
+        raise HTTPException(404, "Клиентка не найдена")
+    return {"url": await wallet.pass_link(master_id, client_id)}
+
+
 # ── Волна 4: лист ожидания клиенток ──────────────────────────────────
 
 class _WaitlistJoin(BaseModel):
