@@ -173,6 +173,7 @@ async def lifespan(app: FastAPI):
                     created_at TIMESTAMP DEFAULT NOW())""",
                 "CREATE INDEX IF NOT EXISTS idx_client_waitlist_md ON client_waitlist (master_id, date, status)",
                 *wallet.MIGRATIONS,
+                "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS auto_completed BOOLEAN DEFAULT FALSE",
             ]:
                 try:
                     await conn.execute(sql)

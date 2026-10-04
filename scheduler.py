@@ -404,6 +404,7 @@ async def send_loyalty_notifications(bot: Bot):
             AND m.loyalty_discount_enabled = TRUE
             GROUP BY c.id, c.name, c.telegram_id, m.name, m.loyalty_threshold, m.loyalty_discount_percent
             HAVING COUNT(a.id) > 0 AND COUNT(a.id) % COALESCE(m.loyalty_threshold, 10) = 0
+               AND MAX(a.appointment_date) >= to_char(NOW() - INTERVAL '2 days', 'YYYY-MM-DD')
         """)
 
     for telegram_id, name, master_name, visit_count, threshold, discount_percent in rows:
@@ -464,6 +465,31 @@ def _plural(n: int, one: str, few: str, many: str) -> str:
     return many
 
 
+async def auto_complete_past_visits(bot: Bot):
+    """Визит прошёл, мастер не отметила «не пришла» → со следующего дня (по её часовому поясу) он «выполнен».
+    Только статус: отзыв не запрашиваем (service_done_at не трогаем), чтобы не слать клиенткам старое.
+    auto_completed = TRUE — чтобы всегда было видно, что отметил сервер, а не мастер."""
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """UPDATE appointments a SET status = 'completed', auto_completed = TRUE
+               FROM masters m
+               WHERE a.master_id = m.id AND a.status IN ('confirmed', 'pending')
+                 AND a.appointment_date < to_char(NOW() + make_interval(hours => COALESCE(m.timezone_offset, 3)), 'YYYY-MM-DD')
+               RETURNING a.id, a.master_id, a.client_id""")
+    if not rows:
+        return
+    print(f"[AUTO-DONE] засчитано визитов: {len(rows)}")
+    # Карты Wallet: штамп за визит
+    try:
+        import wallet
+        for mid, cid in {(r["master_id"], r["client_id"]) for r in rows}:
+            await wallet.touch(mid, cid)
+    except Exception as e:
+        print(f"[AUTO-DONE] wallet error: {e}")
+
+
 def setup_scheduler(bot: Bot):
     # Напоминание мастеру о неактивных клиентах
     scheduler.add_job(send_inactive_reminders, "cron", hour=10, minute=0, args=[bot])
@@ -494,6 +520,10 @@ def setup_scheduler(bot: Bot):
 
     # Trial expiry reminder at 10:00 MSK
     scheduler.add_job(send_trial_expiry_reminder, "cron", hour=10, minute=0, args=[bot])
+
+    # Прошедшие визиты без отметки «не пришла» → «выполнено» (каждый час, первый раз — сразу после запуска)
+    from datetime import datetime as _now_dt
+    scheduler.add_job(auto_complete_past_visits, "interval", hours=1, args=[bot], next_run_time=_now_dt.now())
 
     # Лист ожидания: просроченные предложения → следующей клиентке
     import waitlist
