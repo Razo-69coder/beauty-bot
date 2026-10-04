@@ -1040,6 +1040,11 @@
         <input type="checkbox" id="agree-pd" onchange="validateStep4()" style="width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--pink);">
         <span>Даю согласие на обработку моих персональных данных (имя, телефон, дата рождения) для записи и напоминаний о визите. <a href="/privacy" target="_blank" rel="noopener" style="color:var(--pink);">Политика конфиденциальности</a></span>
       </label>
+      <!-- Необязательное согласие на акции и свободные окошки (закон о рекламе) -->
+      <label for="agree-mk" style="display:flex;gap:12px;align-items:flex-start;margin:0 16px 4px;padding:12px 14px;border-radius:14px;font-size:13px;line-height:1.45;color:var(--muted);cursor:pointer;">
+        <input type="checkbox" id="agree-mk" style="width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--pink);">
+        <span>Хочу получать в Telegram свободные окошки и акции мастера (необязательно)</span>
+      </label>
 
       <button class="btn-back" onclick="goToStep(3)" style="justify-content:center">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 11L5 7L9 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1475,6 +1480,7 @@ async function submitBooking() {
         date: dateStr,
         time: state.time,
         birthday: birthday,
+        marketing_consent: !!(document.getElementById('agree-mk') || {}).checked,
       }),
     });
     if (!r.ok) {
@@ -1548,6 +1554,8 @@ function resetBooking() {
   if (bd) bd.value = '';
   const ag = document.getElementById('agree-pd');
   if (ag) ag.checked = false;
+  const mk = document.getElementById('agree-mk');
+  if (mk) mk.checked = false;
   renderCalendar();
   goToStep(1);
 }

@@ -112,3 +112,36 @@ async def cb_client_cancel(callback: CallbackQuery):
             print(f"[RC-CANCEL] notification error: {e}")
     await callback.message.edit_text("❌ Запись отменена. Мастер получил уведомление.")
     await callback.answer()
+
+
+# ── Согласие на акции и свободные окошки ──────────────────────────────
+
+async def _set_marketing(callback: CallbackQuery, value: bool) -> bool:
+    """Меняет согласие, только если кнопку нажала сама клиентка."""
+    client_id = int(callback.data.split(":")[1])
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        res = await conn.execute(
+            "UPDATE clients SET marketing_consent = $1 WHERE id = $2 AND telegram_id = $3",
+            value, client_id, callback.from_user.id,
+        )
+    return not res.endswith(" 0")
+
+
+@router.callback_query(F.data.startswith("mk_yes:"))
+async def cb_marketing_yes(callback: CallbackQuery):
+    if not await _set_marketing(callback, True):
+        await callback.answer("Не получилось, попробуйте позже", show_alert=True)
+        return
+    await callback.message.edit_text("Отлично! Будем присылать свободные окошки и акции 💅\nОтписаться можно в любой момент кнопкой под сообщением.")
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("mk_off:"))
+async def cb_marketing_off(callback: CallbackQuery):
+    if not await _set_marketing(callback, False):
+        await callback.answer("Не получилось, попробуйте позже", show_alert=True)
+        return
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.message.answer("Хорошо, акции больше присылать не будем. Напоминания о записи продолжат приходить.")
+    await callback.answer()

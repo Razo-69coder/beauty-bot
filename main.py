@@ -157,6 +157,9 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE masters ADD COLUMN IF NOT EXISTS early_price BOOLEAN DEFAULT FALSE",
                 "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS client_confirmed_at TIMESTAMP",
                 "ALTER TABLE services ADD COLUMN IF NOT EXISTS correction_days INTEGER",
+                "ALTER TABLE clients ADD COLUMN IF NOT EXISTS marketing_consent BOOLEAN",
+                "ALTER TABLE clients ADD COLUMN IF NOT EXISTS marketing_asked_at TIMESTAMP",
+                "CREATE TABLE IF NOT EXISTS broadcasts (id SERIAL PRIMARY KEY, master_id INTEGER, created_at TIMESTAMP DEFAULT NOW(), text TEXT, total INTEGER DEFAULT 0, delivered INTEGER DEFAULT 0)",
             ]:
                 try:
                     await conn.execute(sql)
@@ -399,6 +402,7 @@ class PublicBookingRequest(BaseModel):
     birthday: str = ""
     price: int = 0
     duration: int = 0
+    marketing_consent: bool = False  # необязательная галочка «Получать акции и свободные окошки»
 
 
 class LoyaltySettingsRequest(BaseModel):
@@ -939,6 +943,10 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
         procedure = "Запись"
     # add_client нормализует номер и сам проверяет дубли
     client_id = await add_client(master["id"], body.client_name, body.client_phone, birthday=body.birthday)
+    if body.marketing_consent:
+        _pool = await get_pool()
+        async with _pool.acquire() as _conn:
+            await _conn.execute("UPDATE clients SET marketing_consent = TRUE WHERE id = $1", client_id)
     appt_id = await add_appointment(
         client_id=client_id,
         master_id=master["id"],
@@ -2673,6 +2681,181 @@ async def contacts_page():
 async def payment_success():
     with open("webapp/payment_success.html", "r", encoding="utf-8") as f:
         return f.read()
+
+
+# ── Волна 2: свободные окна и рассылки клиенткам ──────────────────────
+
+_RU_WD = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+_RU_MON_GEN = ["января", "февраля", "марта", "апреля", "мая", "июня",
+               "июля", "августа", "сентября", "октября", "ноября", "декабря"]
+_BOOK_URL = "https://beauty-bot-44ou.onrender.com/book/{slug}"
+
+
+async def _master_slug_tz(master_id: int):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT booking_link, COALESCE(timezone_offset, 3) AS tz, name FROM masters WHERE id=$1", master_id)
+    return (row["booking_link"] or "", row["tz"], row["name"] or "") if row else ("", 3, "")
+
+
+@app.get("/api/v1/free-windows")
+async def v1_free_windows(date_from: str, date_to: str, duration: int = 0,
+                          master_id: int = Depends(get_jwt_master_id)):
+    """Свободные окна мастера по дням + готовый текст для Telegram-канала."""
+    slug, tz, _ = await _master_slug_tz(master_id)
+    if not slug:
+        raise HTTPException(400, "Сначала задайте ссылку для записи в настройках")
+    try:
+        d_from = _dt.strptime(date_from, "%Y-%m-%d").date()
+        d_to = _dt.strptime(date_to, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(400, "Неверный формат даты")
+    if d_to < d_from or (d_to - d_from).days > 13:
+        raise HTTPException(400, "Период — от 1 до 14 дней")
+    from datetime import timedelta as _td
+    local_now = _dt.utcnow() + _td(hours=tz)
+    days = []
+    d = d_from
+    while d <= d_to:
+        ds = d.strftime("%Y-%m-%d")
+        slots = (await v1_public_slots(slug, ds, duration))["slots"]
+        if d == local_now.date():  # сегодня — только время, которое ещё не прошло (+30 мин запаса)
+            cutoff = (local_now + _td(minutes=30)).strftime("%H:%M")
+            slots = [s for s in slots if s >= cutoff]
+        if d >= local_now.date() and slots:
+            days.append({"date": ds, "slots": slots})
+        d += _td(days=1)
+    url = _BOOK_URL.format(slug=slug)
+    lines = []
+    for day in days:
+        dt = _dt.strptime(day["date"], "%Y-%m-%d")
+        shown = day["slots"][:8]
+        tail = " …" if len(day["slots"]) > 8 else ""
+        lines.append(f"{_RU_WD[dt.weekday()]}, {dt.day} {_RU_MON_GEN[dt.month - 1]} — {', '.join(shown)}{tail}")
+    text = ("💅 Свободные окошки\n\n" + "\n".join(lines) + f"\n\nЗаписаться: {url}") if lines else ""
+    return {"days": days, "booking_url": url, "text": text}
+
+
+class _BroadcastIds(BaseModel):
+    client_ids: list[int]
+
+
+class _BroadcastSend(BaseModel):
+    client_ids: list[int]
+    text: str
+
+
+async def _broadcast_recipients(master_id: int, ids: list[int]):
+    """Делит выбранных клиенток: получат / без Telegram / без согласия / ещё не спрашивали."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, telegram_id, marketing_consent FROM clients WHERE master_id=$1 AND id = ANY($2::int[])",
+            master_id, ids)
+    receive = [r for r in rows if r["telegram_id"] and r["marketing_consent"] is True]
+    no_tg = [r for r in rows if not r["telegram_id"]]
+    no_consent = [r for r in rows if r["telegram_id"] and r["marketing_consent"] is not True]
+    not_asked = [r for r in no_consent if r["marketing_consent"] is None]
+    return rows, receive, no_tg, no_consent, not_asked
+
+
+@app.post("/api/v1/broadcasts/preview")
+async def v1_broadcast_preview(body: _BroadcastIds, master_id: int = Depends(get_jwt_master_id)):
+    rows, receive, no_tg, no_consent, not_asked = await _broadcast_recipients(master_id, body.client_ids)
+    return {"selected": len(rows), "will_receive": len(receive), "no_telegram": len(no_tg),
+            "no_consent": len(no_consent), "not_asked": len(not_asked)}
+
+
+def _mk_keyboard(slug: str, client_id: int):
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    rows = []
+    if slug:
+        rows.append([InlineKeyboardButton(text="💅 Записаться", url=_BOOK_URL.format(slug=slug))])
+    rows.append([InlineKeyboardButton(text="Не присылать акции", callback_data=f"mk_off:{client_id}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def _send_broadcast(broadcast_id: int, slug: str, recipients: list, text: str):
+    delivered = 0
+    for r in recipients:
+        try:
+            await bot.send_message(r["telegram_id"], text, reply_markup=_mk_keyboard(slug, r["id"]))
+            delivered += 1
+        except Exception as e:
+            print(f"[BROADCAST #{broadcast_id}] client {r['id']}: {e}")
+        await asyncio.sleep(0.05)  # бережём лимиты Telegram
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE broadcasts SET delivered=$1 WHERE id=$2", delivered, broadcast_id)
+
+
+@app.post("/api/v1/broadcasts")
+async def v1_broadcast_send(body: _BroadcastSend, master_id: int = Depends(get_jwt_master_id)):
+    text = (body.text or "").strip()
+    if not (1 <= len(text) <= 1500):
+        raise HTTPException(400, "Текст рассылки — от 1 до 1500 символов")
+    slug, tz, _ = await _master_slug_tz(master_id)
+    from datetime import timedelta as _td
+    local_today = (_dt.utcnow() + _td(hours=tz)).strftime("%Y-%m-%d")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        sent_today = await conn.fetchval(
+            "SELECT COUNT(*) FROM broadcasts WHERE master_id=$1 AND to_char(created_at + make_interval(hours => $2), 'YYYY-MM-DD') = $3",
+            master_id, tz, local_today)
+    if sent_today:
+        raise HTTPException(429, "Сегодня рассылка уже была — следующую можно отправить завтра")
+    _, receive, _, _, _ = await _broadcast_recipients(master_id, body.client_ids)
+    if not receive:
+        raise HTTPException(400, "Никто из выбранных клиенток не согласился получать акции")
+    async with pool.acquire() as conn:
+        bid = await conn.fetchval(
+            "INSERT INTO broadcasts (master_id, text, total) VALUES ($1, $2, $3) RETURNING id",
+            master_id, text, len(receive))
+    asyncio.create_task(_send_broadcast(bid, slug, [dict(r) for r in receive], text))
+    return {"ok": True, "id": bid, "will_receive": len(receive)}
+
+
+@app.get("/api/v1/broadcasts")
+async def v1_broadcast_history(master_id: int = Depends(get_jwt_master_id)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, created_at, text, total, delivered FROM broadcasts WHERE master_id=$1 ORDER BY created_at DESC LIMIT 20",
+            master_id)
+    return {"broadcasts": [{"id": r["id"], "created_at": r["created_at"].isoformat(), "text": r["text"],
+                            "total": r["total"], "delivered": r["delivered"]} for r in rows]}
+
+
+async def _send_consent_asks(master_name: str, recipients: list):
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    for r in recipients:
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="Да, присылайте", callback_data=f"mk_yes:{r['id']}"),
+            InlineKeyboardButton(text="Нет", callback_data=f"mk_off:{r['id']}"),
+        ]])
+        try:
+            await bot.send_message(
+                r["telegram_id"],
+                f"Здравствуйте! {master_name} хочет иногда присылать вам свободные окошки и акции. Получать такие сообщения?",
+                reply_markup=kb)
+        except Exception as e:
+            print(f"[CONSENT-ASK] client {r['id']}: {e}")
+        await asyncio.sleep(0.05)
+
+
+@app.post("/api/v1/broadcasts/ask-consent")
+async def v1_broadcast_ask_consent(master_id: int = Depends(get_jwt_master_id)):
+    """Один раз спрашивает согласие у клиенток с Telegram, которых ещё не спрашивали."""
+    _, _, master_name = await _master_slug_tz(master_id)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """UPDATE clients SET marketing_asked_at = NOW()
+               WHERE master_id=$1 AND telegram_id IS NOT NULL AND marketing_consent IS NULL AND marketing_asked_at IS NULL
+               RETURNING id, telegram_id""", master_id)
+    asyncio.create_task(_send_consent_asks(master_name or "Ваш мастер", [dict(r) for r in rows]))
+    return {"ok": True, "asked": len(rows)}
 
 
 # ── ЮКасса — платёжные эндпоинты ──────────────────────────────────────
