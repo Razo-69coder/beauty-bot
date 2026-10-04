@@ -16,6 +16,18 @@ from database import get_reminder_template, get_reminder_template_with_enabled
 
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
+
+async def _reminder_kb(master_id, appt_id):
+    """Кнопки «Подтверждаю / Отменить / Перенести» под напоминанием клиентке."""
+    from handlers.client_reminder import client_reminder_keyboard
+    from database import get_pool
+    slug = None
+    if master_id:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            slug = await conn.fetchval("SELECT booking_link FROM masters WHERE id=$1", master_id)
+    return client_reminder_keyboard(appt_id, slug or None)
+
 # Московское время (UTC+3)
 MSK = timezone(timedelta(hours=3))
 
@@ -84,7 +96,8 @@ async def send_client_reminders_24h(bot: Bot):
             await bot.send_message(
                 client_tg_id,
                 message_text,
-                parse_mode="Markdown"
+                parse_mode="Markdown",
+                reply_markup=await _reminder_kb(master_id, appt_id),
             )
             await mark_reminder_sent(appt_id, "24h")
             print(f"[REMINDER-24H] ✅ Отправлено клиенту {client_name} (tg={client_tg_id}), запись #{appt_id}")
@@ -135,7 +148,8 @@ async def send_client_reminders_2h(bot: Bot):
             await bot.send_message(
                 client_tg_id,
                 message_text,
-                parse_mode="Markdown"
+                parse_mode="Markdown",
+                reply_markup=await _reminder_kb(master_id, appt_id),
             )
             await mark_reminder_sent(appt_id, "2h")
             print(f"[REMINDER-2H] ✅ Отправлено клиенту {client_name} (tg={client_tg_id}), запись #{appt_id}")
@@ -144,27 +158,49 @@ async def send_client_reminders_2h(bot: Bot):
 
 
 async def send_correction_reminders(bot: Bot):
-    """Ежедневно в 12:00 — напоминает клиентам о коррекции через 3 недели после визита"""
-    three_weeks_ago = (now_msk() - timedelta(days=21)).strftime("%Y-%m-%d")
-    appointments = await get_appointments_for_correction_reminder(three_weeks_ago)
+    """Ежедневно в 12:00 — «пора на коррекцию» со сроком по каждой услуге мастера.
+    Не пишем, если клиентка уже записалась снова. Срок: самый короткий из услуг визита; 0 у всех — не напоминаем."""
+    from database import get_correction_candidates, get_service_correction_map, default_correction_days
+    today = now_msk().date()
+    candidates = await get_correction_candidates(today.strftime("%Y-%m-%d"))
+    maps = {}
+    for appt_id, client_tg_id, client_name, master_name, procedure, master_id, visit_date in candidates:
+        if master_id not in maps:
+            maps[master_id] = await get_service_correction_map(master_id)
+        proc = (procedure or "").lower()
+        matched = [days for name, days in maps[master_id] if name and name in proc]
+        if matched:
+            active = [d for d in matched if d and d > 0]
+            if not active:  # мастер выключила напоминание для этих услуг
+                await mark_correction_reminder_sent(appt_id)
+                continue
+            days = min(active)
+        else:
+            days = default_correction_days(procedure)
+        due = datetime.strptime(visit_date, "%Y-%m-%d").date() + timedelta(days=days)
+        if due > today:
+            continue  # ещё рано
+        if (today - due).days > 3:  # сильно просрочено (например, после первого запуска) — не шлём старое
+            await mark_correction_reminder_sent(appt_id)
+            continue
 
-    for appt_id, client_tg_id, client_name, master_name, procedure, master_id in appointments:
         custom_template, enabled = await get_reminder_template_with_enabled(master_id, "correction")
         if not enabled:
             continue
+        first = (client_name or "").split()[0] if client_name else ""
         if custom_template:
-            message_text = custom_template.format(name=client_name.split()[0], master_name=master_name, procedure=procedure)
+            message_text = custom_template.format(name=first, master_name=master_name, procedure=procedure)
         else:
             message_text = (
-                f"💅 *Привет, {client_name.split()[0]}!*\n\n"
-                f"Прошло 3 недели после визита — самое время на коррекцию!\n\n"
+                f"💅 *Привет, {first}!*\n\n"
+                f"Самое время записаться снова — с прошлого визита прошло {days} дн.\n\n"
                 f"Запишитесь к мастеру {master_name} заранее 🗓"
             )
         try:
             await bot.send_message(client_tg_id, message_text, parse_mode="Markdown")
             await mark_correction_reminder_sent(appt_id)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[CORRECTION] ❌ запись #{appt_id}: {e}")
 
 
 async def send_review_requests(bot: Bot):
@@ -383,6 +419,51 @@ async def send_loyalty_notifications(bot: Bot):
             pass
 
 
+async def send_master_evening_summary(bot: Bot):
+    """В 21:00 по местному времени мастера — сводка на завтра: сколько записей и сколько клиенток подтвердили."""
+    from database import get_pool
+    now = now_msk()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        masters = await conn.fetch("SELECT id, telegram_id, COALESCE(timezone_offset, 3) AS tz FROM masters WHERE is_active = 1")
+        for m in masters:
+            local_now = now + timedelta(hours=(m["tz"] - 3))
+            if local_now.hour != 21:
+                continue
+            tomorrow = (local_now + timedelta(days=1)).strftime("%Y-%m-%d")
+            rows = await conn.fetch(
+                """SELECT a.time, a.client_confirmed_at, c.name
+                   FROM appointments a JOIN clients c ON c.id = a.client_id
+                   WHERE a.master_id = $1 AND a.appointment_date = $2 AND a.status <> 'cancelled'
+                   ORDER BY a.time""",
+                m["id"], tomorrow,
+            )
+            if not rows:
+                continue
+            confirmed = sum(1 for r in rows if r["client_confirmed_at"])
+            first = rows[0]
+            title = f"Завтра {len(rows)} {_plural(len(rows), 'запись', 'записи', 'записей')}"
+            body = f"Подтвердили {confirmed} из {len(rows)}. Первая — {first['time']}, {first['name']}"
+            try:
+                if m["telegram_id"]:
+                    lines = "\n".join(f"{'✅' if r['client_confirmed_at'] else '▫️'} {r['time']} — {r['name']}" for r in rows)
+                    # без Markdown: имена клиенток могут содержать символы разметки
+                    await bot.send_message(m["telegram_id"], f"🌙 {title}\n\n{lines}\n\n{body.split('.')[0]}.")
+                else:
+                    from main import push_to_master  # ленивый импорт: main уже загружен uvicorn'ом
+                    await push_to_master(m["id"], f"🌙 {title}", body)
+            except Exception as e:
+                print(f"[SUMMARY] мастер #{m['id']}: {e}")
+
+
+def _plural(n: int, one: str, few: str, many: str) -> str:
+    if n % 10 == 1 and n % 100 != 11:
+        return one
+    if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
+        return few
+    return many
+
+
 def setup_scheduler(bot: Bot):
     # Напоминание мастеру о неактивных клиентах
     scheduler.add_job(send_inactive_reminders, "cron", hour=10, minute=0, args=[bot])
@@ -413,6 +494,9 @@ def setup_scheduler(bot: Bot):
 
     # Trial expiry reminder at 10:00 MSK
     scheduler.add_job(send_trial_expiry_reminder, "cron", hour=10, minute=0, args=[bot])
+
+    # Вечерняя сводка мастеру на завтра — каждый час, отправляем тем, у кого сейчас 21:00 по местному времени
+    scheduler.add_job(send_master_evening_summary, "cron", minute=0, args=[bot])
 
     scheduler.start()
 

@@ -933,6 +933,51 @@ async def get_appointments_for_correction_reminder(three_weeks_ago: str) -> list
     return [(r[0], r[1], r[2], r[3], r[4], r[5]) for r in rows]
 
 
+def default_correction_days(service_name: str) -> int:
+    """Срок «пора на коррекцию» по умолчанию — по названию услуги."""
+    n = (service_name or "").lower()
+    if "педикюр" in n:
+        return 30
+    if "бров" in n:
+        return 28
+    if "ресниц" in n or "lash" in n:
+        return 18
+    return 21
+
+
+async def get_service_correction_map(master_id: int) -> list:
+    """[(название в нижнем регистре, срок в днях: 0 — не напоминать)] для услуг мастера."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT name, correction_days FROM services WHERE master_id=$1", master_id)
+    return [((r["name"] or "").lower(), r["correction_days"] if r["correction_days"] is not None else default_correction_days(r["name"]))
+            for r in rows if r["name"]]
+
+
+async def get_correction_candidates(today: str) -> list:
+    """Визиты за последние 120 дней без отправленной «коррекции», после которых клиентка ещё не записалась снова."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT a.id, c.telegram_id, c.name, m.name, a.procedure, m.id, a.appointment_date
+            FROM appointments a
+            JOIN clients c ON c.id = a.client_id
+            JOIN masters m ON m.id = a.master_id
+            WHERE a.status IN ('confirmed', 'done')
+              AND a.correction_reminder_sent = 0
+              AND c.telegram_id IS NOT NULL
+              AND a.appointment_date < $1
+              AND a.appointment_date >= ($1::date - INTERVAL '120 days')::date::text
+              AND NOT EXISTS (
+                  SELECT 1 FROM appointments b
+                  WHERE b.client_id = a.client_id AND b.master_id = a.master_id
+                    AND b.id <> a.id AND b.status <> 'cancelled'
+                    AND b.appointment_date > a.appointment_date
+              )
+        """, today)
+    return [(r[0], r[1], r[2], r[3], r[4], r[5], str(r[6])[:10]) for r in rows]
+
+
 async def mark_correction_reminder_sent(appointment_id: int):
     pool = await get_pool()
     async with pool.acquire() as conn:

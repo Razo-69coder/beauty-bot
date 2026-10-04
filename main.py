@@ -131,6 +131,8 @@ def build_dispatcher() -> Dispatcher:
     dp.include_router(templates.router)
     dp.include_router(reviews.router)
     dp.include_router(deposit.router)
+    from handlers import client_reminder
+    dp.include_router(client_reminder.router)
     dp.include_router(fallback.router)  # всегда последним
     return dp
 
@@ -153,6 +155,8 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE masters ALTER COLUMN telegram_id DROP NOT NULL",
                 "ALTER TABLE masters ADD COLUMN IF NOT EXISTS trial_end_date TIMESTAMP",
                 "ALTER TABLE masters ADD COLUMN IF NOT EXISTS early_price BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS client_confirmed_at TIMESTAMP",
+                "ALTER TABLE services ADD COLUMN IF NOT EXISTS correction_days INTEGER",
             ]:
                 try:
                     await conn.execute(sql)
@@ -1643,6 +1647,7 @@ def _fmt_appt(r) -> dict:
         "client_phone": r.get('client_phone') or "",
         "service_done_at": str(r['service_done_at']) if r.get('service_done_at') else None,
         "duration": r.get('duration_min') or 0,
+        "client_confirmed": bool(r.get('client_confirmed_at')),
     }
 
 
@@ -1667,7 +1672,8 @@ async def v1_appointments(
             SELECT a.id, a.client_id, a.master_id, a.procedure,
                    a.appointment_date, a.time, a.price, a.notes, a.status,
                    a.deposit_status, a.deposit_amount, a.service_done_at,
-                   a.duration_min, c.name as client_name, c.phone as client_phone
+                   a.duration_min, a.client_confirmed_at,
+                   c.name as client_name, c.phone as client_phone
             FROM appointments a JOIN clients c ON c.id=a.client_id
             WHERE {where}
             ORDER BY a.appointment_date DESC, a.time
@@ -1851,10 +1857,35 @@ async def v1_remove_custom_slot(body: _CustomSlotBody, master_id: int = Depends(
 @app.get("/api/v1/services")
 async def v1_services(master_id: int = Depends(get_jwt_master_id)):
     rows = await get_services(master_id)
+    # Срок «пора на коррекцию»: null — по умолчанию, 0 — не напоминать
+    from database import default_correction_days
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        corr = {r["id"]: r["correction_days"] for r in await conn.fetch(
+            "SELECT id, correction_days FROM services WHERE master_id=$1", master_id)}
     return {"services": [
-        {"id": r[0], "name": r[1], "price_default": r[2], "duration_min": r[3], "category": r[4]}
+        {"id": r[0], "name": r[1], "price_default": r[2], "duration_min": r[3], "category": r[4],
+         "correction_days": corr.get(r[0]),
+         "correction_days_effective": corr.get(r[0]) if corr.get(r[0]) is not None else default_correction_days(r[1])}
         for r in rows
     ]}
+
+
+class _V1ServiceCorrection(BaseModel):
+    days: Optional[int] = None  # null — вернуть срок по умолчанию, 0 — не напоминать
+
+
+@app.patch("/api/v1/services/{svc_id}/correction")
+async def v1_service_correction(svc_id: int, body: _V1ServiceCorrection, master_id: int = Depends(get_jwt_master_id)):
+    if body.days is not None and not (0 <= body.days <= 365):
+        raise HTTPException(400, "Срок должен быть от 0 до 365 дней")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        res = await conn.execute(
+            "UPDATE services SET correction_days=$1 WHERE id=$2 AND master_id=$3", body.days, svc_id, master_id)
+    if res.endswith(" 0"):
+        raise HTTPException(404, "Услуга не найдена")
+    return {"ok": True}
 
 
 @app.post("/api/v1/services", status_code=201)
