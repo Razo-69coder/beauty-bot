@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from urllib.parse import unquote
 
 import config
-from fastapi import FastAPI, Request, Header, HTTPException, Depends, Form
+from fastapi import FastAPI, Request, Header, HTTPException, Depends, Form, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -2873,6 +2873,179 @@ async def v1_broadcast_ask_consent(master_id: int = Depends(get_jwt_master_id)):
                RETURNING id, telegram_id""", master_id)
     asyncio.create_task(_send_consent_asks(master_name or "Ваш мастер", [dict(r) for r in rows]))
     return {"ok": True, "asked": len(rows)}
+
+
+# ── Импорт клиенток (текст и файлы Excel/CSV) ────────────────────────
+# Раньше обработчик был только в старом api/main.py, который не запускается, —
+# поэтому импорт из приложения не работал (сервер отвечал 405).
+
+class _ImportItem(BaseModel):
+    name: str
+    phone: str
+    notes: str = ""
+    birthday: str = ""  # "MM-DD", как при записи по ссылке
+
+
+class _ImportRequest(BaseModel):
+    clients: list[_ImportItem]
+
+
+@app.post("/api/v1/clients/import", status_code=201)
+async def v1_import_clients(body: _ImportRequest, master_id: int = Depends(get_jwt_master_id)):
+    if len(body.clients) > 5000:
+        raise HTTPException(400, "За один раз — не больше 5000 клиенток")
+    imported = skipped = 0
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        existing = {"".join(ch for ch in (r["phone"] or "") if ch.isdigit())[-10:]
+                    for r in await conn.fetch("SELECT phone FROM clients WHERE master_id=$1", master_id)}
+    for c in body.clients:
+        name = (c.name or "").strip()
+        digits = "".join(ch for ch in c.phone if ch.isdigit())
+        if len(digits) == 10:
+            digits = "7" + digits
+        if len(digits) == 11 and digits[0] == "8":
+            digits = "7" + digits[1:]
+        if not name or len(digits) != 11 or digits[-10:] in existing:
+            skipped += 1
+            continue
+        await add_client(master_id, name[:100], "+" + digits, notes=(c.notes or "")[:500], birthday=c.birthday or "")
+        existing.add(digits[-10:])
+        imported += 1
+    return {"imported": imported, "skipped": skipped}
+
+
+_IMP_NAME = ("фио", "имя", "клиент", "name", "client", "full name", "фамилия имя")
+_IMP_LAST = ("фамилия", "last name", "surname")
+_IMP_FIRST = ("имя", "first name")
+_IMP_PHONE = ("телефон", "тел", "phone", "мобильный", "номер", "mobile")
+_IMP_BDAY = ("день рождения", "дата рождения", "birthday", "др", "birth")
+_IMP_NOTES = ("комментар", "заметк", "примечан", "notes", "comment", "описание")
+
+
+def _imp_cell(v) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)
+    if hasattr(v, "strftime"):
+        return v.strftime("%d.%m.%Y")
+    return str(v).strip()
+
+
+def _imp_bday(v: str) -> str:
+    """«15.03.1995», «15.03», «1995-03-15» → «03-15»."""
+    import re
+    v = v.strip()
+    m = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})", v)
+    if m:
+        return f"{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+    m = re.match(r"^(\d{1,2})[./-](\d{1,2})", v)
+    if m and 1 <= int(m.group(1)) <= 31 and 1 <= int(m.group(2)) <= 12:
+        return f"{int(m.group(2)):02d}-{int(m.group(1)):02d}"
+    return ""
+
+
+def _imp_rows(filename: str, data: bytes) -> list[list[str]]:
+    name = (filename or "").lower()
+    if name.endswith((".xlsx", ".xlsm")):
+        import io
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+        ws = wb.worksheets[0]
+        return [[_imp_cell(v) for v in row] for row in ws.iter_rows(values_only=True)]
+    if name.endswith(".xls"):
+        raise HTTPException(400, "Старый формат .xls не поддерживается — сохраните файл как .xlsx или .csv")
+    import csv, io
+    text = None
+    for enc in ("utf-8-sig", "cp1251"):
+        try:
+            text = data.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if text is None:
+        raise HTTPException(400, "Не удалось прочитать файл")
+    try:
+        dialect = csv.Sniffer().sniff(text[:4000], delimiters=",;\t")
+    except csv.Error:
+        class dialect(csv.excel):  # свой класс, чтобы не менять общий csv.excel
+            delimiter = ";" if text[:4000].count(";") > text[:4000].count(",") else ","
+    return [[c.strip() for c in row] for row in csv.reader(io.StringIO(text), dialect)]
+
+
+def _imp_find(header: list[str], keys: tuple) -> int:
+    for i, h in enumerate(header):
+        hl = h.lower()
+        if any(k == hl or (len(k) > 3 and k in hl) for k in keys):
+            return i
+    return -1
+
+
+@app.post("/api/v1/clients/import-file")
+async def v1_import_clients_file(file: UploadFile = File(...), master_id: int = Depends(get_jwt_master_id)):
+    """Разбирает файл Excel/CSV и возвращает список клиенток для предпросмотра. В базу НЕ пишет —
+    мастер смотрит предпросмотр и подтверждает обычным /clients/import."""
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(400, "Файл больше 5 МБ")
+    rows = [r for r in _imp_rows(file.filename, data) if any(c for c in r)]
+    if not rows:
+        raise HTTPException(400, "Файл пустой")
+
+    header = [c.lower() for c in rows[0]]
+    i_phone = _imp_find(header, _IMP_PHONE)
+    has_header = i_phone >= 0
+    if has_header:
+        i_last = _imp_find(header, _IMP_LAST)
+        i_first = _imp_find([h if j != i_last else "" for j, h in enumerate(header)], _IMP_FIRST)
+        i_name = _imp_find([h if j not in (i_last, i_first) else "" for j, h in enumerate(header)], _IMP_NAME)
+        i_bday = _imp_find(header, _IMP_BDAY)
+        i_notes = _imp_find(header, _IMP_NOTES)
+        body_rows = rows[1:]
+    else:
+        # Без заголовка: телефон — столбец, где больше всего «похожих на номер» значений, имя — первый текстовый
+        def phone_like(v):
+            d = "".join(ch for ch in v if ch.isdigit())
+            return 10 <= len(d) <= 12
+        cols = max(len(r) for r in rows)
+        score = [sum(1 for r in rows[:50] if j < len(r) and phone_like(r[j])) for j in range(cols)]
+        i_phone = max(range(cols), key=lambda j: score[j])
+        if score[i_phone] == 0:
+            raise HTTPException(400, "Не нашли столбец с телефонами. Добавьте заголовки «Имя» и «Телефон»")
+        i_name = next((j for j in range(cols) if j != i_phone and score[j] == 0), -1)
+        i_last = i_first = i_bday = i_notes = -1
+        body_rows = rows
+
+    def col(r, i):
+        return r[i] if 0 <= i < len(r) else ""
+
+    out, bad = [], 0
+    for r in body_rows[:5000]:
+        if i_first >= 0 or i_last >= 0:
+            name = " ".join(x for x in (col(r, i_first), col(r, i_last)) if x)
+            if not name:
+                name = col(r, i_name)
+        else:
+            name = col(r, i_name)
+        digits = "".join(ch for ch in col(r, i_phone) if ch.isdigit())
+        if len(digits) == 10:
+            digits = "7" + digits
+        if len(digits) == 11 and digits[0] == "8":
+            digits = "7" + digits[1:]
+        if not name.strip() or len(digits) != 11:
+            bad += 1
+            continue
+        out.append({"name": name.strip()[:100], "phone": "+" + digits,
+                    "birthday": _imp_bday(col(r, i_bday)), "notes": col(r, i_notes)[:500]})
+    # Отмечаем, кто уже есть в базе мастера
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        existing = {"".join(ch for ch in (x["phone"] or "") if ch.isdigit())[-10:]
+                    for x in await conn.fetch("SELECT phone FROM clients WHERE master_id=$1", master_id)}
+    for c in out:
+        c["exists"] = c["phone"][-10:] in existing
+    return {"clients": out, "invalid": bad, "total_rows": len(body_rows)}
 
 
 # ── Волна 4: лист ожидания клиенток ──────────────────────────────────
