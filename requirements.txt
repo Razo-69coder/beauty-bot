@@ -18,3 +18,4 @@ bcrypt==4.2.1
 slowapi==0.1.9
 limits==3.7.0
 yookassa==3.3.0
+Pillow==10.4.0

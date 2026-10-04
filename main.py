@@ -34,6 +34,7 @@ import jwt
 import httpx
 from datetime import datetime as _dt, timedelta as _td
 import waitlist
+import wallet
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -171,6 +172,7 @@ async def lifespan(app: FastAPI):
                     offer_chat_id BIGINT, offer_msg_id BIGINT, appointment_id INTEGER,
                     created_at TIMESTAMP DEFAULT NOW())""",
                 "CREATE INDEX IF NOT EXISTS idx_client_waitlist_md ON client_waitlist (master_id, date, status)",
+                *wallet.MIGRATIONS,
             ]:
                 try:
                     await conn.execute(sql)
@@ -204,6 +206,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(wallet.router)  # Apple Wallet: скачивание карты и веб-сервис PassKit
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 limiter = Limiter(key_func=get_remote_address)
@@ -1001,7 +1004,14 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
     except Exception as e:
         print(f"[NOTIFY] booking create_notification error: {e}")
 
-    return {"ok": True, "appointment_id": appt_id, "client_id": client_id, "bot_username": config.BOT_USERNAME}
+    wallet_url = ""
+    if wallet.enabled():
+        try:
+            wallet_url = await wallet.pass_link(master["id"], client_id)
+        except Exception as e:
+            print(f"[WALLET] link error: {e}")
+    return {"ok": True, "appointment_id": appt_id, "client_id": client_id, "bot_username": config.BOT_USERNAME,
+            "wallet_url": wallet_url}
 
 
 # ── Управление записью клиентом (отмена/перенос) ─────────────────────
@@ -1084,6 +1094,7 @@ async def my_cancel(slug: str, body: ClientLookupRequest, appointment_id: int):
             raise HTTPException(404, "Запись не найдена")
         await conn.execute("UPDATE appointments SET status='cancelled' WHERE id=$1", appt["id"])
     waitlist.slot_freed(master["id"], appt["appointment_date"])
+    wallet.touch_appointment(appt["id"])
     date_fmt = _dt.strptime(str(appt["appointment_date"])[:10], "%Y-%m-%d").strftime("%d.%m.%Y")
     try:
         if master.get("telegram_id"):
@@ -1501,6 +1512,7 @@ async def v1_update_loyalty_settings(body: LoyaltySettingsRequest, master_id: in
         body.loyalty_discount_percent, body.birthday_enabled, body.birthday_discount_percent,
         body.loyalty_discount_type, body.loyalty_discount_rub
     )
+    await wallet.touch(master_id)
     return {"ok": True}
 
 
@@ -1763,6 +1775,7 @@ async def v1_update_appointment(appt_id: int, body: _V1AppointmentUpdate, master
     if (str(appt["appointment_date"])[:10] != body.appointment_date or appt["time"] != body.time
             or body.status == "cancelled"):
         waitlist.slot_freed(master_id, appt["appointment_date"])
+    wallet.touch_appointment(appt_id)
     return {"ok": True}
 
 
@@ -3046,6 +3059,57 @@ async def v1_import_clients_file(file: UploadFile = File(...), master_id: int = 
     for c in out:
         c["exists"] = c["phone"][-10:] in existing
     return {"clients": out, "invalid": bad, "total_rows": len(body_rows)}
+
+
+# ── Apple Wallet: настройки карты мастера ────────────────────────────
+
+class _WalletSettings(BaseModel):
+    color: str = "berry"
+    show_price: bool = True
+    show_stamps: bool = True
+    rules: str = ""
+    address: str = ""
+
+
+@app.get("/api/v1/wallet-settings")
+async def v1_wallet_settings(master_id: int = Depends(get_jwt_master_id)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        r = await conn.fetchrow(
+            """SELECT COALESCE(wallet_color,'berry') AS color, COALESCE(wallet_show_price,TRUE) AS show_price,
+                      COALESCE(wallet_show_stamps,TRUE) AS show_stamps, COALESCE(wallet_rules,'') AS rules,
+                      COALESCE(wallet_address,'') AS address, COALESCE(name,'') AS name,
+                      COALESCE(loyalty_discount_enabled,FALSE) AS loy_on, COALESCE(loyalty_threshold,10) AS loy_n,
+                      COALESCE(loyalty_discount_type,'percent') AS loy_type,
+                      COALESCE(loyalty_discount_percent,10) AS loy_pct, COALESCE(loyalty_discount_rub,0) AS loy_rub
+               FROM masters WHERE id=$1""", master_id)
+        cards = await conn.fetchval("SELECT COUNT(*) FROM wallet_passes WHERE master_id=$1", master_id)
+    gift = f"−{r['loy_pct']}%" if r["loy_type"] != "rub" else f"−{r['loy_rub']} ₽"
+    return {"color": r["color"], "show_price": r["show_price"], "show_stamps": r["show_stamps"],
+            "rules": r["rules"], "address": r["address"], "master_name": r["name"],
+            "colors": [{"key": k, "name": v["name"],
+                        "bg": "#%02X%02X%02X" % v["bg"], "fg": "#%02X%02X%02X" % v["fg"],
+                        "label": "#%02X%02X%02X" % v["label"], "strip": "#%02X%02X%02X" % v["strip"],
+                        "d1": "#%02X%02X%02X" % v["d1"], "d2": "#%02X%02X%02X" % v["d2"]}
+                       for k, v in wallet.PALETTES.items()],
+            "loyalty_enabled": r["loy_on"], "loyalty_threshold": r["loy_n"], "loyalty_gift": gift,
+            "cards_issued": cards or 0, "wallet_available": wallet.enabled()}
+
+
+@app.put("/api/v1/wallet-settings")
+async def v1_wallet_settings_update(body: _WalletSettings, master_id: int = Depends(get_jwt_master_id)):
+    if body.color not in wallet.PALETTES:
+        raise HTTPException(400, "Неизвестный цвет")
+    if len(body.rules) > 500 or len(body.address) > 150:
+        raise HTTPException(400, "Слишком длинный текст")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """UPDATE masters SET wallet_color=$2, wallet_show_price=$3, wallet_show_stamps=$4,
+                                  wallet_rules=$5, wallet_address=$6 WHERE id=$1""",
+            master_id, body.color, body.show_price, body.show_stamps, body.rules.strip(), body.address.strip())
+    await wallet.touch(master_id)  # карты у клиенток обновятся сами
+    return {"ok": True}
 
 
 # ── Волна 4: лист ожидания клиенток ──────────────────────────────────

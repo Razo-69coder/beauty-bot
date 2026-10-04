@@ -685,6 +685,8 @@ async def add_appointment(
             (client_id, master_id, procedure, appointment_date, price, notes, photo_id, time, status, duration_min)
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id
         """, client_id, master_id, procedure, appointment_date, price, notes, photo_id, time, status, duration_min)
+    import wallet  # карта клиентки в Wallet обновится сама
+    wallet.touch_appointment(row['id'])
     return row['id']
 
 
@@ -711,6 +713,8 @@ async def update_appointment_status(appointment_id: int, status: str):
         # Окно освободилось — предлагаем его клиенткам из листа ожидания
         import waitlist
         waitlist.slot_freed(row["master_id"], row["appointment_date"])
+    import wallet
+    wallet.touch_appointment(appointment_id)
 
 
 async def update_appointment_service_done(appointment_id: int):
@@ -724,6 +728,8 @@ async def update_appointment_service_done(appointment_id: int):
                 status = 'completed'
             WHERE id = $1
         """, appointment_id)
+    import wallet  # штамп за визит появится на карте
+    wallet.touch_appointment(appointment_id)
 
 
 async def get_appointments_for_review_request(target_time) -> list:

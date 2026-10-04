@@ -56,6 +56,8 @@ async def cb_client_confirm(callback: CallbackQuery):
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute("UPDATE appointments SET client_confirmed_at = NOW() WHERE id = $1", appt_id)
+    import wallet
+    wallet.touch_appointment(appt_id)
     # Оставляем только «Перенести», чтобы клиентка могла передумать
     kb = callback.message.reply_markup
     keep = [r for r in (kb.inline_keyboard if kb else []) if any(b.url for b in r)]
@@ -97,6 +99,8 @@ async def cb_client_cancel(callback: CallbackQuery):
             await conn.execute("UPDATE appointments SET status = 'cancelled' WHERE id = $1", appt_id)
         import waitlist
         waitlist.slot_freed(row["master_id"], row["appointment_date"])
+        import wallet
+        wallet.touch_appointment(appt_id)
         text = f"{row['client_name']} · {_when(row)} · {row['procedure']}"
         try:
             if row["master_tg"]:

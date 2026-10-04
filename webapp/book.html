@@ -850,6 +850,9 @@
     margin: 16px 24px;
     opacity: 0.3;
   }
+  .btn-wallet { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; max-width:440px;
+    box-sizing:border-box; margin:10px auto 0; min-height:52px; border-radius:16px; background:#000; color:#fff;
+    font-weight:600; font-size:15px; text-decoration:none; border:1px solid rgba(255,255,255,0.18); }
 </style>
 </head>
 <body>
@@ -1089,6 +1092,12 @@
       <a href="https://t.me/Beauty6699_bot" target="_blank" class="btn-telegram" id="telegram-link">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M17.5 3L2.5 8.5L8 10.5L10 17L12.5 12L17.5 3Z" fill="white"/><path d="M8 10.5L11.5 9" stroke="#1B7BC4" stroke-width="1" stroke-linecap="round"/></svg>
         🔔 Получить напоминания в Telegram
+      </a>
+
+      <!-- Apple Wallet: карта записи, которая потом обновляется сама -->
+      <a href="#" class="btn-wallet" id="wallet-link" style="display:none" rel="noopener">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="4" width="15" height="12" rx="2.5" stroke="white" stroke-width="1.6"/><path d="M2.5 8h15" stroke="white" stroke-width="1.6"/><rect x="11.5" y="10.5" width="4" height="2.5" rx="1" fill="white"/></svg>
+        Добавить в Apple Wallet
       </a>
 
       <button class="btn-cta" style="background:var(--surface);background-image:none;animation:none;box-shadow:none;border:1px solid var(--border);color:var(--muted);font-weight:500" onclick="resetBooking()">
@@ -1489,6 +1498,18 @@ async function submitBooking() {
       btn.textContent = 'Записаться ✦';
       alert(err.detail || 'Ошибка записи. Попробуйте другое время.');
       return;
+    }
+    const bookRes = await r.json().catch(() => ({}));
+    const walletEl = document.getElementById('wallet-link');
+    const isApple = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (walletEl) {
+      if (bookRes.wallet_url && isApple) {
+        walletEl.href = bookRes.wallet_url;
+        walletEl.style.display = 'flex';
+      } else {
+        walletEl.style.display = 'none';
+      }
     }
     document.getElementById('suc-service').textContent = escHtml(procedure);
     document.getElementById('suc-date').textContent = d.getDate() + ' ' + RU_MONTHS_GEN[d.getMonth()] + ' ' + d.getFullYear();
