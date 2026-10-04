@@ -1020,21 +1020,29 @@
       <div class="section-sub">Для подтверждения записи</div>
 
       <div class="form-fields">
+        <!-- Сначала номер: если клиентка уже записывалась, остальное не нужно -->
         <div class="field-group">
-          <label class="field-label">Имя *</label>
-          <input class="field-input" id="inp-name" type="text" placeholder="Имя" oninput="validateStep4()">
+          <label class="field-label">Телефон *</label>
+          <input class="field-input" id="inp-phone" type="tel" placeholder="+7 (___) ___-__-__" autocomplete="tel" oninput="formatPhone(this); onPhoneInput()">
         </div>
-        <div class="field-group">
-          <label class="field-label">Фамилия *</label>
-          <input class="field-input" id="inp-lastname" type="text" placeholder="Фамилия" oninput="validateStep4()">
+        <div id="known-client" style="display:none;margin:2px 0 6px;padding:14px 16px;border-radius:16px;background:var(--surface);border:1px solid var(--border)">
+          <div style="font-size:15px;color:#F5F0EB">Вы <b id="known-name"></b>? 👋</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:4px">Мы вас помним — заполнять данные не нужно.</div>
+          <button type="button" onclick="notKnownClient()" style="margin-top:10px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);font:inherit;font-size:13px;cursor:pointer">Нет, это не я</button>
         </div>
-        <div class="field-group">
-          <label class="field-label">Телефон</label>
-          <input class="field-input" id="inp-phone" type="tel" placeholder="+7 (___) ___-__-__" oninput="formatPhone(this); validateStep4()">
-        </div>
-        <div class="field-group">
-          <label class="field-label">День рождения</label>
-          <input class="field-input" id="inp-bday" type="text" placeholder="ДД.ММ.ГГГГ" oninput="formatBday(this); validateStep4()" maxlength="10">
+        <div id="new-client-fields" style="display:none">
+          <div class="field-group">
+            <label class="field-label">Имя *</label>
+            <input class="field-input" id="inp-name" type="text" placeholder="Имя" autocomplete="given-name" oninput="validateStep4()">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Фамилия *</label>
+            <input class="field-input" id="inp-lastname" type="text" placeholder="Фамилия" autocomplete="family-name" oninput="validateStep4()">
+          </div>
+          <div class="field-group">
+            <label class="field-label">День рождения</label>
+            <input class="field-input" id="inp-bday" type="text" placeholder="ДД.ММ.ГГГГ" oninput="formatBday(this); validateStep4()" maxlength="10">
+          </div>
         </div>
       </div>
 
@@ -1444,14 +1452,63 @@ function formatBday(el) {
   el.value = v;
 }
 
+// ── Запись по номеру: 'unknown' — ещё не проверяли, 'known' — узнали, 'new' — нужны данные
+let clientState = 'unknown';
+let lookupSeq = 0;
+
+function phoneDigits() {
+  return (document.getElementById('inp-phone').value || '').replace(/\D/g,'');
+}
+
+function showClientState(state, name) {
+  clientState = state;
+  document.getElementById('known-client').style.display = state === 'known' ? 'block' : 'none';
+  document.getElementById('new-client-fields').style.display = state === 'new' ? 'block' : 'none';
+  if (state === 'known') document.getElementById('known-name').textContent = name || '';
+  validateStep4();
+}
+
+async function onPhoneInput() {
+  const d = phoneDigits();
+  if (d.length !== 11) { showClientState('unknown'); return; }
+  const seq = ++lookupSeq;
+  try {
+    const r = await fetch(API + '/api/v1/book/' + slug + '/lookup', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({phone: '+' + d}),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (seq !== lookupSeq) return;  // пока ждали — номер уже поменяли
+    if (r.ok && data.found) showClientState('known', data.name);
+    else showClientState('new');
+  } catch (e) {
+    if (seq === lookupSeq) showClientState('new');
+  }
+}
+
+function notKnownClient() {
+  showClientState('new');
+  const n = document.getElementById('inp-name');
+  if (n) n.focus();
+}
+
 function validateStep4() {
   const name = (document.getElementById('inp-name').value || '').trim();
   const lastname = (document.getElementById('inp-lastname').value || '').trim();
-  const phone = (document.getElementById('inp-phone').value || '').replace(/\D/g,'');
+  const phone = phoneDigits();
   const agree = document.getElementById('agree-pd');
-  const ok = name.length >= 2 && lastname.length >= 2 && phone.length === 11 && (!agree || agree.checked);
+  const dataOk = clientState === 'known' || (clientState === 'new' && name.length >= 2 && lastname.length >= 2);
+  const ok = phone.length === 11 && dataOk && (!agree || agree.checked);
   document.getElementById('btn-step4').disabled = !ok;
 }
+
+// Номер с прошлой записи на этом телефоне — подставляем сами
+(function prefillPhone() {
+  try {
+    const saved = localStorage.getItem('sb_phone_' + slug);
+    const inp = document.getElementById('inp-phone');
+    if (saved && inp && !inp.value) { inp.value = saved; formatPhone(inp); onPhoneInput(); }
+  } catch (e) {}
+})();
 
 async function submitBooking() {
   const selected = state.services.map(i => SERVICES[i]);
@@ -1460,7 +1517,8 @@ async function submitBooking() {
   const totalDuration = selected.reduce((sum, s) => sum + s.durationNum, 0);
   const firstService = selected[0];
   const d = state.date;
-  const name = document.getElementById('inp-name').value.trim() + ' ' + document.getElementById('inp-lastname').value.trim();
+  const name = clientState === 'known' ? '' :
+    (document.getElementById('inp-name').value.trim() + ' ' + document.getElementById('inp-lastname').value.trim());
   const phone = document.getElementById('inp-phone').value.replace(/\D/g,'');
   const phoneFormatted = '+' + phone;
   const bdayRaw = (document.getElementById('inp-bday').value || '').replace(/\D/g,'');
@@ -1500,6 +1558,7 @@ async function submitBooking() {
       return;
     }
     const bookRes = await r.json().catch(() => ({}));
+    try { localStorage.setItem('sb_phone_' + slug, phone); } catch (e) {}
     const walletEl = document.getElementById('wallet-link');
     const isApple = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -1575,6 +1634,7 @@ function resetBooking() {
   if (bd) bd.value = '';
   const ag = document.getElementById('agree-pd');
   if (ag) ag.checked = false;
+  if (typeof showClientState === 'function') showClientState('unknown');
   const mk = document.getElementById('agree-mk');
   if (mk) mk.checked = false;
   renderCalendar();

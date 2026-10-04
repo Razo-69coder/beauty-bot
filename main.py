@@ -911,6 +911,36 @@ async def v1_public_slots(link: str, date: str, duration: int = 0):
     return {"slots": slots}
 
 
+class _PhoneLookup(BaseModel):
+    phone: str
+
+
+@app.post("/api/v1/book/{link}/lookup")
+@limiter.limit("20/minute")
+async def v1_public_lookup(request: Request, link: str, body: _PhoneLookup):
+    """Страница записи: клиентка ввела номер — узнаём её, чтобы не заполнять данные заново.
+    Показываем только имя и первую букву фамилии — посторонний по чужому номеру ничего лишнего не увидит."""
+    master = await get_master_by_booking_link(link)
+    if not master:
+        raise HTTPException(404, "Мастер не найден")
+    digits = "".join(ch for ch in body.phone if ch.isdigit())
+    if len(digits) == 11 and digits[0] == "8":
+        digits = "7" + digits[1:]
+    if len(digits) != 11:
+        return {"found": False}
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """SELECT name FROM clients WHERE master_id=$1
+               AND right(regexp_replace(COALESCE(phone,''),'[^0-9]','','g'), 10) = $2
+               ORDER BY id LIMIT 1""", master["id"], digits[-10:])
+    if not row or not (row["name"] or "").strip():
+        return {"found": False}
+    parts = row["name"].split()
+    short = parts[0] + (f" {parts[1][0].upper()}." if len(parts) > 1 and parts[1] else "")
+    return {"found": True, "name": short}
+
+
 @app.post("/api/v1/book/{link}", status_code=201)
 async def v1_public_book(link: str, body: PublicBookingRequest):
     master = await get_master_by_booking_link(link)
@@ -956,6 +986,20 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
     if not procedure:
         procedure = "Запись"
     # add_client нормализует номер и сам проверяет дубли
+    if not body.client_name.strip():
+        # Клиентку узнали по номеру — берём имя из её карточки
+        _digits = "".join(ch for ch in body.client_phone if ch.isdigit())
+        if len(_digits) == 11 and _digits[0] == "8":
+            _digits = "7" + _digits[1:]
+        _pool = await get_pool()
+        async with _pool.acquire() as _conn:
+            _known = await _conn.fetchval(
+                """SELECT name FROM clients WHERE master_id=$1
+                   AND right(regexp_replace(COALESCE(phone,''),'[^0-9]','','g'), 10) = $2
+                   ORDER BY id LIMIT 1""", master["id"], _digits[-10:])
+        if not _known:
+            raise HTTPException(400, "Укажите имя и фамилию")
+        body.client_name = _known
     client_id = await add_client(master["id"], body.client_name, body.client_phone, birthday=body.birthday)
     if body.marketing_consent:
         _pool = await get_pool()
