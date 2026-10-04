@@ -33,6 +33,7 @@ from config import BOT_TOKEN, WEBHOOK_URL, WEBHOOK_SECRET
 import jwt
 import httpx
 from datetime import datetime as _dt, timedelta as _td
+import waitlist
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -133,6 +134,8 @@ def build_dispatcher() -> Dispatcher:
     dp.include_router(deposit.router)
     from handlers import client_reminder
     dp.include_router(client_reminder.router)
+    from handlers import waitlist as waitlist_handlers
+    dp.include_router(waitlist_handlers.router)
     dp.include_router(fallback.router)  # всегда последним
     return dp
 
@@ -160,6 +163,14 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE clients ADD COLUMN IF NOT EXISTS marketing_consent BOOLEAN",
                 "ALTER TABLE clients ADD COLUMN IF NOT EXISTS marketing_asked_at TIMESTAMP",
                 "CREATE TABLE IF NOT EXISTS broadcasts (id SERIAL PRIMARY KEY, master_id INTEGER, created_at TIMESTAMP DEFAULT NOW(), text TEXT, total INTEGER DEFAULT 0, delivered INTEGER DEFAULT 0)",
+                # Лист ожидания клиенток (волна 4)
+                """CREATE TABLE IF NOT EXISTS client_waitlist (
+                    id SERIAL PRIMARY KEY, master_id INTEGER, client_id INTEGER, date TEXT,
+                    service_id INTEGER, procedure TEXT, duration_min INTEGER DEFAULT 0, price INTEGER DEFAULT 0,
+                    pref TEXT DEFAULT 'any', status TEXT DEFAULT 'waiting', offered_time TEXT, offered_at TIMESTAMP,
+                    offer_chat_id BIGINT, offer_msg_id BIGINT, appointment_id INTEGER,
+                    created_at TIMESTAMP DEFAULT NOW())""",
+                "CREATE INDEX IF NOT EXISTS idx_client_waitlist_md ON client_waitlist (master_id, date, status)",
             ]:
                 try:
                     await conn.execute(sql)
@@ -1072,6 +1083,7 @@ async def my_cancel(slug: str, body: ClientLookupRequest, appointment_id: int):
         if not appt:
             raise HTTPException(404, "Запись не найдена")
         await conn.execute("UPDATE appointments SET status='cancelled' WHERE id=$1", appt["id"])
+    waitlist.slot_freed(master["id"], appt["appointment_date"])
     date_fmt = _dt.strptime(str(appt["appointment_date"])[:10], "%Y-%m-%d").strftime("%d.%m.%Y")
     try:
         if master.get("telegram_id"):
@@ -1140,6 +1152,7 @@ async def my_reschedule(slug: str, body: ClientRescheduleRequest):
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute("UPDATE appointments SET status='cancelled' WHERE id=$1", appt["id"])
+    waitlist.slot_freed(master["id"], appt["appointment_date"])
     new_appt_id = await add_appointment(
         client_id=client["id"],
         master_id=master["id"],
@@ -1739,13 +1752,17 @@ async def v1_create_appointment(body: _V1AppointmentCreate, master_id: int = Dep
 async def v1_update_appointment(appt_id: int, body: _V1AppointmentUpdate, master_id: int = Depends(get_jwt_master_id)):
     pool = await get_pool()
     async with pool.acquire() as conn:
-        appt = await conn.fetchrow("SELECT id, master_id FROM appointments WHERE id=$1", appt_id)
+        appt = await conn.fetchrow("SELECT id, master_id, appointment_date, time FROM appointments WHERE id=$1", appt_id)
         if not appt or appt["master_id"] != master_id:
             raise HTTPException(404, "Запись не найдена")
         await conn.execute(
             "UPDATE appointments SET procedure=$1, appointment_date=$2, time=$3, price=$4, status=$5 WHERE id=$6",
             body.procedure, body.appointment_date, body.time, body.price, body.status, appt_id
         )
+    # Перенесли на другое время или отменили — старое окно освободилось
+    if (str(appt["appointment_date"])[:10] != body.appointment_date or appt["time"] != body.time
+            or body.status == "cancelled"):
+        waitlist.slot_freed(master_id, appt["appointment_date"])
     return {"ok": True}
 
 
@@ -2856,6 +2873,221 @@ async def v1_broadcast_ask_consent(master_id: int = Depends(get_jwt_master_id)):
                RETURNING id, telegram_id""", master_id)
     asyncio.create_task(_send_consent_asks(master_name or "Ваш мастер", [dict(r) for r in rows]))
     return {"ok": True, "asked": len(rows)}
+
+
+# ── Волна 4: лист ожидания клиенток ──────────────────────────────────
+
+class _WaitlistJoin(BaseModel):
+    client_name: str
+    client_phone: str
+    date: str
+    service_id: int | None = None
+    procedure: str = ""
+    duration: int = 0
+    price: int = 0
+    pref: str = "any"
+    marketing_consent: bool = False
+
+
+@app.post("/api/v1/book/{link}/waitlist", status_code=201)
+async def v1_public_waitlist_join(link: str, body: _WaitlistJoin):
+    """Клиентка встаёт в лист ожидания на занятый день (страница записи)."""
+    master = await get_master_by_booking_link(link)
+    if not master:
+        raise HTTPException(404, "Мастер не найден")
+    try:
+        day = _dt.strptime(body.date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(400, "Неверная дата")
+    _, tz, _ = await _master_slug_tz(master["id"])
+    local_today = (_dt.utcnow() + _td(hours=tz)).date()
+    if day.date() < local_today or (day.date() - local_today).days > 60:
+        raise HTTPException(400, "Выберите дату в ближайшие 2 месяца")
+    if body.date in await get_blocked_days(master["id"]):
+        raise HTTPException(409, "В этот день мастер не работает")
+    name = (body.client_name or "").strip()
+    digits = "".join(ch for ch in body.client_phone if ch.isdigit())
+    if len(name) < 2 or len(digits) != 11:
+        raise HTTPException(400, "Укажите имя и телефон")
+    pref = body.pref if body.pref in waitlist.PREFS else "any"
+
+    procedure, price, duration = body.procedure, body.price, body.duration
+    if body.service_id:
+        for s in await get_services(master["id"]):
+            if s[0] == body.service_id:
+                procedure = procedure or s[1]
+                price = price or (s[2] or 0)
+                duration = duration or (s[3] if len(s) > 3 else 0)
+                break
+    procedure = procedure or "Запись"
+
+    # Если подходящее окно уже есть — лист ожидания не нужен, пусть запишется сразу
+    lo, hi = waitlist.PREFS[pref]
+    if any(lo <= waitlist._to_min(x) < hi for x in await waitlist.free_slots(link, body.date, duration)):
+        raise HTTPException(409, "На этот день есть свободное время — выберите его")
+
+    client_id = await add_client(master["id"], name, body.client_phone)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        if body.marketing_consent:
+            await conn.execute("UPDATE clients SET marketing_consent = TRUE WHERE id = $1", client_id)
+        has_tg = bool(await conn.fetchval("SELECT telegram_id FROM clients WHERE id=$1", client_id))
+        exists = await conn.fetchval(
+            """SELECT id FROM client_waitlist WHERE master_id=$1 AND client_id=$2 AND date=$3
+               AND status IN ('waiting','offered','master_notified')""", master["id"], client_id, body.date)
+        if exists:
+            return {"ok": True, "already": True, "has_telegram": has_tg, "bot_username": config.BOT_USERNAME}
+        await conn.execute(
+            """INSERT INTO client_waitlist (master_id, client_id, date, service_id, procedure, duration_min, price, pref)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8)""",
+            master["id"], client_id, body.date, body.service_id, procedure, duration or 0, price or 0, pref)
+    when = waitlist.human_date(body.date)
+    text = f"{name} · {when} · {waitlist.PREF_LABELS[pref]} · {procedure}"
+    try:
+        await create_notification(master["id"], "waitlist", "🕐 Новая клиентка в листе ожидания", text)
+        await push_to_master(master["id"], "Лист ожидания", text)
+    except Exception as e:
+        print(f"[WAITLIST] join notify error: {e}")
+    return {"ok": True, "already": False, "has_telegram": has_tg, "bot_username": config.BOT_USERNAME}
+
+
+@app.get("/api/v1/waitlist-clients")
+async def v1_waitlist_list(date_from: str = "", date_to: str = "", master_id: int = Depends(get_jwt_master_id)):
+    """Очередь мастера: кто ждёт окна и на какой день."""
+    _, tz, _ = await _master_slug_tz(master_id)
+    today = (_dt.utcnow() + _td(hours=tz)).strftime("%Y-%m-%d")
+    d_from = date_from or today
+    d_to = date_to or "9999-12-31"
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT w.id, w.date, w.pref, w.procedure, w.status, w.offered_time, w.created_at,
+                      c.id AS client_id, c.name, c.phone, c.telegram_id
+               FROM client_waitlist w JOIN clients c ON c.id = w.client_id
+               WHERE w.master_id=$1 AND w.date BETWEEN $2 AND $3
+                 AND w.status IN ('waiting','offered','master_notified')
+               ORDER BY w.date, w.created_at""", master_id, d_from, d_to)
+    return {"entries": [{
+        "id": r["id"], "date": r["date"], "pref": r["pref"], "pref_label": waitlist.PREF_LABELS.get(r["pref"], ""),
+        "procedure": r["procedure"], "status": r["status"], "offered_time": r["offered_time"],
+        "client_id": r["client_id"], "client_name": r["name"], "client_phone": r["phone"],
+        "has_telegram": bool(r["telegram_id"]), "created_at": r["created_at"].isoformat(),
+    } for r in rows]}
+
+
+@app.delete("/api/v1/waitlist-clients/{entry_id}")
+async def v1_waitlist_remove(entry_id: int, master_id: int = Depends(get_jwt_master_id)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        res = await conn.execute(
+            "UPDATE client_waitlist SET status='removed' WHERE id=$1 AND master_id=$2", entry_id, master_id)
+    if res.endswith(" 0"):
+        raise HTTPException(404, "Не найдено")
+    return {"ok": True}
+
+
+# ── Волна 4: абонементы (раньше были только в Telegram-боте) ─────────
+
+class _PassCreate(BaseModel):
+    name: str
+    total: int
+    price: int = 0
+
+
+def _pass_json(r) -> dict:
+    total, used = r["total_sessions"] or 0, r["used_sessions"] or 0
+    return {"id": r["id"], "client_id": r["client_id"], "name": r["name"], "total": total, "used": used,
+            "remaining": max(total - used, 0), "price": r["price"] or 0,
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None}
+
+
+async def _own_client(conn, client_id: int, master_id: int):
+    row = await conn.fetchrow("SELECT id, name, telegram_id FROM clients WHERE id=$1 AND master_id=$2", client_id, master_id)
+    if not row:
+        raise HTTPException(404, "Клиентка не найдена")
+    return row
+
+
+@app.get("/api/v1/clients/{client_id}/passes")
+async def v1_client_passes(client_id: int, master_id: int = Depends(get_jwt_master_id)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await _own_client(conn, client_id, master_id)
+        rows = await conn.fetch(
+            "SELECT * FROM subscriptions WHERE client_id=$1 AND master_id=$2 ORDER BY created_at DESC", client_id, master_id)
+    return {"passes": [_pass_json(r) for r in rows]}
+
+
+@app.post("/api/v1/clients/{client_id}/passes", status_code=201)
+async def v1_client_pass_create(client_id: int, body: _PassCreate, master_id: int = Depends(get_jwt_master_id)):
+    name = (body.name or "").strip()
+    if not name or len(name) > 80:
+        raise HTTPException(400, "Название — от 1 до 80 символов")
+    if not (1 <= body.total <= 100) or not (0 <= body.price <= 1_000_000):
+        raise HTTPException(400, "Сеансов — от 1 до 100")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await _own_client(conn, client_id, master_id)
+        row = await conn.fetchrow(
+            "INSERT INTO subscriptions (master_id, client_id, name, total_sessions, price) VALUES ($1,$2,$3,$4,$5) RETURNING *",
+            master_id, client_id, name, body.total, body.price)
+    return _pass_json(row)
+
+
+async def _change_pass(pass_id: int, master_id: int, delta: int):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        if delta > 0:
+            row = await conn.fetchrow(
+                """UPDATE subscriptions SET used_sessions = used_sessions + 1
+                   WHERE id=$1 AND master_id=$2 AND used_sessions < total_sessions RETURNING *""", pass_id, master_id)
+        else:
+            row = await conn.fetchrow(
+                """UPDATE subscriptions SET used_sessions = used_sessions - 1
+                   WHERE id=$1 AND master_id=$2 AND used_sessions > 0 RETURNING *""", pass_id, master_id)
+        if not row:
+            exists = await conn.fetchval("SELECT 1 FROM subscriptions WHERE id=$1 AND master_id=$2", pass_id, master_id)
+            if not exists:
+                raise HTTPException(404, "Абонемент не найден")
+            raise HTTPException(409, "Сеансы закончились" if delta > 0 else "Нечего возвращать")
+        client = await conn.fetchrow("SELECT telegram_id FROM clients WHERE id=$1", row["client_id"])
+    return row, (client["telegram_id"] if client else None)
+
+
+@app.post("/api/v1/passes/{pass_id}/use")
+async def v1_pass_use(pass_id: int, master_id: int = Depends(get_jwt_master_id)):
+    """Списать сеанс. Клиентке в Telegram — сколько осталось."""
+    row, tg = await _change_pass(pass_id, master_id, +1)
+    p = _pass_json(row)
+    if tg:
+        if p["remaining"] == 0:
+            tail = "Это был последний сеанс 🙌"
+        elif p["remaining"] == 1:
+            tail = "Остался последний сеанс."
+        else:
+            tail = f"Осталось {p['remaining']} из {p['total']}."
+        try:
+            await bot.send_message(tg, f"📦 Абонемент «{p['name']}»: списан 1 сеанс. {tail}")
+        except Exception as e:
+            print(f"[PASS] client notify error: {e}")
+    return p
+
+
+@app.post("/api/v1/passes/{pass_id}/undo")
+async def v1_pass_undo(pass_id: int, master_id: int = Depends(get_jwt_master_id)):
+    """Вернуть ошибочно списанный сеанс."""
+    row, _ = await _change_pass(pass_id, master_id, -1)
+    return _pass_json(row)
+
+
+@app.delete("/api/v1/passes/{pass_id}")
+async def v1_pass_delete(pass_id: int, master_id: int = Depends(get_jwt_master_id)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        res = await conn.execute("DELETE FROM subscriptions WHERE id=$1 AND master_id=$2", pass_id, master_id)
+    if res.endswith(" 0"):
+        raise HTTPException(404, "Абонемент не найден")
+    return {"ok": True}
 
 
 # ── ЮКасса — платёжные эндпоинты ──────────────────────────────────────

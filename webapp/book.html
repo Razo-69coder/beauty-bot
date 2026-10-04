@@ -1328,7 +1328,7 @@ async function loadSlotsPreview() {
     const slots = data.slots || [];
     grid.innerHTML = '';
     if (slots.length === 0) {
-      grid.innerHTML = '<span class="slots-preview-empty">Нет свободного времени</span>';
+      grid.innerHTML = '<span class="slots-preview-empty">Нет свободного времени</span>' + waitlistCTA();
       return;
     }
     slots.forEach(slot => {
@@ -1375,7 +1375,7 @@ async function loadTimeSlots() {
     const slots = data.slots || [];
     grid.innerHTML = '';
     if (slots.length === 0) {
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:rgba(245,240,235,0.4);padding:20px">Нет свободного времени</div>';
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:rgba(245,240,235,0.4);padding:20px">Нет свободного времени</div>' + waitlistCTA();
       return;
     }
     slots.forEach(slot => {
@@ -1563,5 +1563,162 @@ function resetBooking() {
 init();
 </script>
 <div style="padding:20px 16px;text-align:center;font-size:12px;color:rgba(245,240,235,0.35);">© 2026 Solvo Beauty · <a href="/oferta" style="color:rgba(245,240,235,0.35);text-decoration:none;">Оферта</a> · <a href="/privacy" style="color:rgba(245,240,235,0.35);text-decoration:none;">Конфиденциальность</a> · <a href="/contacts" style="color:rgba(245,240,235,0.35);text-decoration:none;">Контакты</a></div>
+<!-- ═══ Лист ожидания (волна 4): если на день нет окон ═══ -->
+<style>
+  .wl-cta { display:flex; flex-direction:column; align-items:center; gap:8px; grid-column:1/-1; padding:4px 0 8px; }
+  .wl-cta button { min-height:44px; padding:0 18px; border-radius:14px; border:1px solid var(--pink); background:transparent;
+    color:var(--pink); font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+  .wl-cta small { font-size:12px; color:rgba(245,240,235,0.5); text-align:center; }
+  .wl-modal { position:fixed; inset:0; background:rgba(5,3,8,0.7); display:flex; align-items:flex-end; justify-content:center; z-index:1000; }
+  .wl-modal[hidden] { display:none; }
+  .wl-sheet { width:100%; max-width:480px; background:#14101A; border-radius:24px 24px 0 0; padding:22px 18px calc(22px + env(safe-area-inset-bottom,0px));
+    display:flex; flex-direction:column; gap:12px; max-height:92vh; overflow:auto; }
+  .wl-title { font-size:20px; font-weight:700; color:#F5F0EB; }
+  .wl-sub { font-size:14px; color:rgba(245,240,235,0.6); line-height:1.4; }
+  .wl-label { font-size:13px; color:rgba(245,240,235,0.6); margin-top:4px; }
+  .wl-prefs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+  .wl-prefs button { min-height:44px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background:var(--surface);
+    color:#F5F0EB; font:inherit; font-size:13px; cursor:pointer; }
+  .wl-prefs button.on { background:var(--pink); border-color:var(--pink); color:#fff; font-weight:600; }
+  .wl-input { width:100%; box-sizing:border-box; min-height:48px; border-radius:14px; border:1px solid rgba(255,255,255,0.1);
+    background:var(--surface); color:#F5F0EB; padding:0 14px; font:inherit; font-size:15px; }
+  .wl-agree { display:flex; gap:10px; align-items:flex-start; font-size:13px; line-height:1.45; color:rgba(245,240,235,0.6); }
+  .wl-agree input { width:20px; height:20px; flex:none; margin-top:1px; accent-color:var(--pink); }
+  .wl-agree a { color:var(--pink); }
+  .wl-btn { min-height:50px; border-radius:16px; border:0; background:var(--pink); color:#fff; font:inherit; font-size:16px; font-weight:700; cursor:pointer; }
+  .wl-btn:disabled { opacity:0.4; cursor:default; }
+  .wl-cancel { min-height:44px; border:0; background:transparent; color:rgba(245,240,235,0.6); font:inherit; font-size:14px; cursor:pointer; }
+  .wl-tg { display:flex; align-items:center; justify-content:center; min-height:50px; border-radius:16px; background:#2AABEE; color:#fff;
+    font-weight:700; text-decoration:none; font-size:15px; }
+  .wl-err { font-size:13px; color:#FF8A8A; }
+</style>
+
+<div class="wl-modal" id="wl-modal" hidden>
+  <div class="wl-sheet" role="dialog" aria-modal="true" aria-labelledby="wl-title">
+    <div id="wl-form" style="display:flex;flex-direction:column;gap:12px">
+      <div class="wl-title" id="wl-title">Лист ожидания</div>
+      <div class="wl-sub" id="wl-sub"></div>
+      <div class="wl-label">Когда вам удобно</div>
+      <div class="wl-prefs">
+        <button type="button" data-pref="any" class="on">Любое</button>
+        <button type="button" data-pref="morning">Утро</button>
+        <button type="button" data-pref="day">День</button>
+        <button type="button" data-pref="evening">Вечер</button>
+      </div>
+      <input class="wl-input" id="wl-name" placeholder="Имя и фамилия" autocomplete="name" oninput="wlValidate()">
+      <input class="wl-input" id="wl-phone" type="tel" placeholder="+7 (___) ___-__-__" autocomplete="tel" oninput="formatPhone(this); wlValidate()">
+      <label class="wl-agree"><input type="checkbox" id="wl-agree" onchange="wlValidate()">
+        <span>Даю согласие на обработку моих персональных данных (имя, телефон) для записи и сообщений о свободном времени. <a href="/privacy" target="_blank" rel="noopener">Политика конфиденциальности</a></span></label>
+      <div class="wl-err" id="wl-err" hidden></div>
+      <button class="wl-btn" id="wl-submit" onclick="submitWaitlist()" disabled>Встать в очередь</button>
+      <button class="wl-cancel" onclick="closeWaitlist()">Отмена</button>
+    </div>
+    <div id="wl-done" style="display:none;flex-direction:column;gap:12px;text-align:center">
+      <div style="font-size:40px">🕐</div>
+      <div class="wl-title">Вы в листе ожидания</div>
+      <div class="wl-sub" id="wl-done-sub"></div>
+      <a class="wl-tg" id="wl-tg" href="#" target="_blank" rel="noopener">Получать сообщения в Telegram</a>
+      <button class="wl-cancel" onclick="closeWaitlist()">Готово</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Лист ожидания: показывается, когда на выбранный день нет свободного времени ──
+let wlPref = 'any';
+
+function waitlistCTA() {
+  return '<div class="wl-cta"><button type="button" onclick="openWaitlist()">🕐 Встать в лист ожидания</button>' +
+         '<small>Если кто-то отменит запись — сразу предложим вам это время</small></div>';
+}
+
+function wlDateStr() {
+  const d = state.date;
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function openWaitlist() {
+  if (!state.date) return;
+  const d = state.date;
+  const dow = d.getDay();
+  const names = state.services.map(i => SERVICES[i].name).join(' + ');
+  document.getElementById('wl-sub').textContent =
+    RU_DAYS[dow === 0 ? 6 : dow - 1] + ', ' + d.getDate() + ' ' + RU_MONTHS_GEN[d.getMonth()] + (names ? ' · ' + names : '');
+  // Подставляем то, что клиентка уже ввела на шаге с данными
+  const n = (document.getElementById('inp-name') || {}).value || '';
+  const l = (document.getElementById('inp-lastname') || {}).value || '';
+  const p = (document.getElementById('inp-phone') || {}).value || '';
+  if (!document.getElementById('wl-name').value) document.getElementById('wl-name').value = (n + ' ' + l).trim();
+  if (!document.getElementById('wl-phone').value) document.getElementById('wl-phone').value = p;
+  document.getElementById('wl-form').style.display = 'flex';
+  document.getElementById('wl-done').style.display = 'none';
+  document.getElementById('wl-err').hidden = true;
+  document.getElementById('wl-modal').hidden = false;
+  wlValidate();
+}
+
+function closeWaitlist() {
+  document.getElementById('wl-modal').hidden = true;
+}
+
+function wlValidate() {
+  const name = document.getElementById('wl-name').value.trim();
+  const phone = document.getElementById('wl-phone').value.replace(/\D/g, '');
+  const ok = name.length >= 2 && phone.length === 11 && document.getElementById('wl-agree').checked;
+  document.getElementById('wl-submit').disabled = !ok;
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('.wl-prefs button');
+  if (!b) return;
+  wlPref = b.dataset.pref;
+  document.querySelectorAll('.wl-prefs button').forEach(x => x.classList.toggle('on', x === b));
+});
+
+async function submitWaitlist() {
+  const selected = state.services.map(i => SERVICES[i]);
+  const btn = document.getElementById('wl-submit');
+  const err = document.getElementById('wl-err');
+  const phone = document.getElementById('wl-phone').value.replace(/\D/g, '');
+  btn.disabled = true; btn.textContent = 'Отправляем...'; err.hidden = true;
+  try {
+    const r = await fetch(API + '/api/v1/book/' + slug + '/waitlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_name: document.getElementById('wl-name').value.trim(),
+        client_phone: '+' + phone,
+        date: wlDateStr(),
+        service_id: selected.length ? selected[0].id : null,
+        procedure: selected.map(s => s.name).join(' + '),
+        price: selected.reduce((sum, s) => sum + s.priceNum, 0),
+        duration: selected.reduce((sum, s) => sum + s.durationNum, 0),
+        pref: wlPref,
+      }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      err.textContent = data.detail || 'Не получилось, попробуйте ещё раз';
+      err.hidden = false;
+      return;
+    }
+    document.getElementById('wl-form').style.display = 'none';
+    document.getElementById('wl-done').style.display = 'flex';
+    document.getElementById('wl-done-sub').textContent = data.has_telegram
+      ? 'Если освободится время, бот сразу напишет вам в Telegram — останется нажать «Записаться».'
+      : 'Чтобы мы сразу сообщили о свободном времени, подключите Telegram — это 1 нажатие.';
+    const tg = document.getElementById('wl-tg');
+    tg.href = 'https://t.me/' + (data.bot_username || 'Beauty6699_bot') + '?start=PHONE_' + phone;
+    tg.style.display = data.has_telegram ? 'none' : 'flex';
+  } catch (e) {
+    err.textContent = 'Ошибка соединения';
+    err.hidden = false;
+  } finally {
+    btn.textContent = 'Встать в очередь';
+    wlValidate();
+  }
+}
+</script>
+
 </body>
 </html>

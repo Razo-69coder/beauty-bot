@@ -495,6 +495,10 @@ def setup_scheduler(bot: Bot):
     # Trial expiry reminder at 10:00 MSK
     scheduler.add_job(send_trial_expiry_reminder, "cron", hour=10, minute=0, args=[bot])
 
+    # Лист ожидания: просроченные предложения → следующей клиентке
+    import waitlist
+    scheduler.add_job(waitlist.expire_offers, "interval", minutes=5)
+
     # Вечерняя сводка мастеру на завтра — каждый час, отправляем тем, у кого сейчас 21:00 по местному времени
     scheduler.add_job(send_master_evening_summary, "cron", minute=0, args=[bot])
 

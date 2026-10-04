@@ -703,9 +703,14 @@ async def get_client_history(client_id: int) -> list:
 async def update_appointment_status(appointment_id: int, status: str):
     pool = await get_pool()
     async with pool.acquire() as conn:
-        await conn.execute(
-            "UPDATE appointments SET status=$1 WHERE id=$2", status, appointment_id
+        row = await conn.fetchrow(
+            "UPDATE appointments SET status=$1 WHERE id=$2 RETURNING master_id, appointment_date",
+            status, appointment_id
         )
+    if status == "cancelled" and row:
+        # Окно освободилось — предлагаем его клиенткам из листа ожидания
+        import waitlist
+        waitlist.slot_freed(row["master_id"], row["appointment_date"])
 
 
 async def update_appointment_service_done(appointment_id: int):

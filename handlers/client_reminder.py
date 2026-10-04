@@ -95,6 +95,8 @@ async def cb_client_cancel(callback: CallbackQuery):
         pool = await get_pool()
         async with pool.acquire() as conn:
             await conn.execute("UPDATE appointments SET status = 'cancelled' WHERE id = $1", appt_id)
+        import waitlist
+        waitlist.slot_freed(row["master_id"], row["appointment_date"])
         text = f"{row['client_name']} · {_when(row)} · {row['procedure']}"
         try:
             if row["master_tg"]:
