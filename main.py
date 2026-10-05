@@ -883,6 +883,19 @@ async def _get_busy_min(master_id: int, date: str, default_dur: int) -> list[tup
     ]
 
 
+async def _slot_in_past(master_id: int, date: str, time: str, margin_min: int = 30) -> bool:
+    """Время уже прошло (по поясу мастера) или до него меньше margin_min минут."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        tz = await conn.fetchval("SELECT COALESCE(timezone_offset, 3) FROM masters WHERE id=$1", master_id)
+    local_now = _dt.utcnow() + _td(hours=tz or 3)
+    try:
+        slot_dt = _dt.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        return False
+    return slot_dt < local_now + _td(minutes=margin_min)
+
+
 @app.get("/api/v1/book/{link}/slots")
 async def v1_public_slots(link: str, date: str, duration: int = 0):
     master = await get_master_by_booking_link(link)
@@ -899,6 +912,7 @@ async def v1_public_slots(link: str, date: str, duration: int = 0):
             master["id"], date,
             master["work_start"], master["work_end"], master["slot_duration"]
         )
+    slots = [x for x in slots if not await _slot_in_past(master["id"], date, x)]
     total_dur = duration if duration > master["slot_duration"] else 0
     if total_dur > 0:
         busy = await _get_busy_min(master["id"], date, master["slot_duration"])
@@ -961,6 +975,8 @@ async def v1_public_book(link: str, body: PublicBookingRequest):
         )
     if body.time not in slots:
         raise HTTPException(409, "Этот слот уже занят")
+    if await _slot_in_past(master["id"], body.date, body.time, margin_min=0):
+        raise HTTPException(409, "Это время уже прошло — выберите другое")
     procedure = body.procedure
     price = 0
     service_duration = 0
@@ -1199,6 +1215,8 @@ async def my_reschedule(slug: str, body: ClientRescheduleRequest):
     )
     if body.new_time not in slots:
         raise HTTPException(409, "Выбранное время уже занято")
+    if await _slot_in_past(master["id"], body.new_date, body.new_time, margin_min=0):
+        raise HTTPException(409, "Это время уже прошло — выберите другое")
     total_dur = body.duration or appt["duration_min"] or master["slot_duration"]
     if total_dur > master["slot_duration"]:
         busy = await _get_busy_min(master["id"], body.new_date, master["slot_duration"])
@@ -1505,28 +1523,40 @@ async def v1_update_timezone(body: _TimezoneOffsetUpdate, master_id: int = Depen
 
 @app.delete("/api/v1/masters/me")
 async def v1_delete_account(master_id: int = Depends(get_jwt_master_id)):
+    """Полное удаление аккаунта мастера и всех его данных (требование Apple 5.1.1(v)).
+    Одна транзакция: либо удаляется всё, либо ничего. Порядок — сначала зависимые таблицы."""
+    ordered = [
+        "notifications", "reviews", "client_waitlist", "client_merge_dismissed", "broadcasts",
+        "subscriptions", "appointments", "expenses", "personal_notes", "blocked_days", "custom_slots",
+        "device_tokens", "reminder_templates", "telegram_link_tokens", "payment_history",
+        "password_reset_codes", "services",
+    ]
     pool = await get_pool()
     async with pool.acquire() as conn:
-        await conn.execute("DELETE FROM expenses WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM notifications WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM personal_notes WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM blocked_days WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM custom_slots WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM device_tokens WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM reminder_templates WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM waitlist WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM telegram_link_tokens WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM payment_history WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM reviews WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM appointments WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM services WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM subscriptions WHERE master_id=$1", master_id)
-        clients = await conn.fetch("SELECT id FROM clients WHERE master_id=$1", master_id)
-        for c in clients:
-            await conn.execute("DELETE FROM subscriptions WHERE client_id=$1", c['id'])
-            await conn.execute("DELETE FROM appointments WHERE client_id=$1", c['id'])
-        await conn.execute("DELETE FROM clients WHERE master_id=$1", master_id)
-        await conn.execute("DELETE FROM masters WHERE id=$1", master_id)
+        with_master = {r["table_name"] for r in await conn.fetch(
+            """SELECT table_name FROM information_schema.columns
+               WHERE table_schema='public' AND column_name='master_id'""")}
+        try:
+            async with conn.transaction():
+                # Карты Wallet клиенток мастера и их регистрации на устройствах
+                if "wallet_passes" in with_master:
+                    await conn.execute(
+                        """DELETE FROM wallet_registrations WHERE serial IN
+                           (SELECT serial FROM wallet_passes WHERE master_id=$1)""", master_id)
+                    await conn.execute("DELETE FROM wallet_passes WHERE master_id=$1", master_id)
+                for t in ordered:
+                    if t in with_master:
+                        await conn.execute(f"DELETE FROM {t} WHERE master_id=$1", master_id)
+                # Всё, что появится в будущем с полем master_id (кроме клиенток и самого мастера)
+                for t in sorted(with_master - set(ordered) - {"clients", "masters", "wallet_passes"}):
+                    await conn.execute(f"DELETE FROM {t} WHERE master_id=$1", master_id)
+                await conn.execute("DELETE FROM clients WHERE master_id=$1", master_id)
+                res = await conn.execute("DELETE FROM masters WHERE id=$1", master_id)
+        except Exception as e:
+            print(f"[DELETE ACCOUNT] master {master_id}: {e}")
+            raise HTTPException(500, "Не получилось удалить аккаунт, напишите в поддержку")
+    if res.endswith(" 0"):
+        raise HTTPException(404, "Аккаунт не найден")
     return {"ok": True}
 
 @app.put("/api/v1/masters/me/payment")
