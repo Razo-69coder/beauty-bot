@@ -783,20 +783,44 @@ async def register(request: Request, body: EmailRegisterRequest):
 @app.post("/api/v1/auth/login")
 @limiter.limit("5/minute")
 async def login(request: Request, body: EmailLoginRequest):
-    master = await get_master_by_email(body.email)
-    if not master:
-        raise HTTPException(401, "Неверный email или пароль")
-    stored = master.get("password_hash") or ""
-    # Быстрый путь для demo-аккаунта (Apple Review)
-    if body.email == "test@solvobeauty.com" and body.password == "TestSolvo123!":
-        ok = True
-    else:
+    def _pw_ok(m) -> bool:
+        stored = m.get("password_hash") or ""
+        if not stored:
+            return False
         try:
-            ok = bcrypt.checkpw(body.password.encode(), stored.encode())
+            return bcrypt.checkpw(body.password.encode(), stored.encode())
         except ValueError:
-            ok = stored == hashlib.sha256(body.password.encode()).hexdigest()
-    if not ok:
-        raise HTTPException(401, "Неверный email или пароль")
+            return stored == hashlib.sha256(body.password.encode()).hexdigest()
+
+    ident = (body.email or "").strip()
+    master = None
+    ok = False
+    if "@" in ident:
+        master = await get_master_by_email(ident)
+        # Быстрый путь для demo-аккаунта (Apple Review)
+        if master and ident.lower() == "test@solvobeauty.com" and body.password == "TestSolvo123!":
+            ok = True
+        elif master:
+            ok = _pw_ok(master)
+    else:
+        # Вход по номеру телефона: ищем аккаунты с этим номером и проверяем пароль
+        digits = "".join(ch for ch in ident if ch.isdigit())
+        if len(digits) == 11 and digits[0] == "8":
+            digits = "7" + digits[1:]
+        if len(digits) >= 10:
+            pool = await get_pool()
+            async with pool.acquire() as conn:
+                emails = [r["email"] for r in await conn.fetch(
+                    """SELECT email FROM masters WHERE email IS NOT NULL
+                       AND right(regexp_replace(COALESCE(phone,''),'[^0-9]','','g'), 10) = $1
+                       ORDER BY id""", digits[-10:])]
+            for em in emails:
+                cand = await get_master_by_email(em)
+                if cand and _pw_ok(cand):
+                    master, ok = cand, True
+                    break
+    if not master or not ok:
+        raise HTTPException(401, "Неверный email, телефон или пароль")
     
     token = _generate_jwt(master["id"])
 
