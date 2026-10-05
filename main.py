@@ -824,7 +824,7 @@ async def login(request: Request, body: EmailLoginRequest):
     
     token = _generate_jwt(master["id"])
 
-    from database import get_master_trial_status, get_pool
+    from database import get_master_trial_status
     trial = await get_master_trial_status(master["id"])
     pool = await get_pool()
     async with pool.acquire() as conn:
