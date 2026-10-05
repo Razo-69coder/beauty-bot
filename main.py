@@ -173,6 +173,7 @@ async def lifespan(app: FastAPI):
                     created_at TIMESTAMP DEFAULT NOW())""",
                 "CREATE INDEX IF NOT EXISTS idx_client_waitlist_md ON client_waitlist (master_id, date, status)",
                 *wallet.MIGRATIONS,
+                "CREATE TABLE IF NOT EXISTS client_merge_dismissed (master_id INTEGER, a_id INTEGER, b_id INTEGER, created_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY (master_id, a_id, b_id))",
                 "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS auto_completed BOOLEAN DEFAULT FALSE",
             ]:
                 try:
@@ -1658,6 +1659,168 @@ async def v1_clients(page: int = 0, search: str = "", master_id: int = Depends(g
         for r in paged
     ]
     return {"clients": clients, "total": total, "page": page}
+
+
+# ── Похожие карточки клиенток и объединение ──────────────────────────
+# Дубли появляются, когда номер вводят с опечаткой или при переносе базы ставили номер-заглушку.
+# Сервер подсказывает пары, мастер объединяет в одно нажатие (визиты, абонементы, отзывы переносятся).
+
+def _sim_name(n: str) -> str:
+    """«Ёлкина  анна» → «анна елкина» (порядок слов не важен)."""
+    words = (n or "").lower().replace("ё", "е").split()
+    return " ".join(sorted(words))
+
+
+def _sim_digits(p: str) -> str:
+    d = "".join(ch for ch in (p or "") if ch.isdigit())
+    if len(d) == 11 and d[0] == "8":
+        d = "7" + d[1:]
+    return d
+
+
+def _sim_placeholder(d: str) -> bool:
+    return d.startswith("7900001") or d.startswith("7000000") or len(set(d[1:])) <= 2
+
+
+@app.get("/api/v1/clients/similar")
+async def v1_clients_similar(master_id: int = Depends(get_jwt_master_id)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT c.id, c.name, c.phone, c.telegram_id IS NOT NULL AS tg,
+                      COUNT(a.id) FILTER (WHERE a.status <> 'cancelled') AS visits,
+                      MAX(a.appointment_date) FILTER (WHERE a.status <> 'cancelled') AS last_visit
+               FROM clients c LEFT JOIN appointments a ON a.client_id = c.id
+               WHERE c.master_id=$1 GROUP BY c.id""", master_id)
+        dismissed = {(r["a_id"], r["b_id"]) for r in await conn.fetch(
+            "SELECT a_id, b_id FROM client_merge_dismissed WHERE master_id=$1", master_id)}
+    items = [dict(r) for r in rows]
+    for it in items:
+        it["_n"] = _sim_name(it["name"])
+        it["_d"] = _sim_digits(it["phone"])
+        it["_first"] = (it["_n"].split() or [""])[0]
+    # Union-find по найденным парам
+    parent = {it["id"]: it["id"] for it in items}
+    reason = {}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            a, b = items[i], items[j]
+            key = (min(a["id"], b["id"]), max(a["id"], b["id"]))
+            if key in dismissed:
+                continue
+            why = None
+            if a["_n"] and a["_n"] == b["_n"]:
+                why = "Одинаковое имя"
+            elif (len(a["_d"]) == 11 and len(b["_d"]) == 11
+                  and not _sim_placeholder(a["_d"]) and not _sim_placeholder(b["_d"])):
+                diff = sum(1 for x, y in zip(a["_d"], b["_d"]) if x != y)
+                same_word = bool(set(a["_n"].split()) & set(b["_n"].split()))
+                if 0 < diff <= 2 and same_word:
+                    why = f"Номер отличается на {diff} {'цифру' if diff == 1 else 'цифры'}"
+            if why:
+                ra, rb = find(a["id"]), find(b["id"])
+                if ra != rb:
+                    parent[rb] = ra
+                reason[find(a["id"])] = reason.get(find(a["id"])) or why
+    groups = {}
+    for it in items:
+        groups.setdefault(find(it["id"]), []).append(it)
+    out = []
+    for root, members in groups.items():
+        if len(members) < 2:
+            continue
+        # Предлагаем оставить карточку с настоящим номером, Telegram и большим числом визитов
+        members.sort(key=lambda m: (_sim_placeholder(m["_d"]), not m["tg"], -(m["visits"] or 0), m["id"]))
+        out.append({
+            "reason": reason.get(root) or "Похожие карточки",
+            "suggested_keep_id": members[0]["id"],
+            "clients": [{
+                "id": m["id"], "name": m["name"], "phone": m["phone"], "has_telegram": m["tg"],
+                "visits": m["visits"] or 0, "last_visit": str(m["last_visit"])[:10] if m["last_visit"] else None,
+                "placeholder_phone": _sim_placeholder(m["_d"]),
+            } for m in members],
+        })
+    return {"groups": out}
+
+
+class _MergeBody(BaseModel):
+    other_ids: list[int]
+    phone: str | None = None  # какой номер оставить (по умолчанию — номер карточки, которую оставляем)
+
+
+@app.post("/api/v1/clients/{keep_id}/merge")
+async def v1_clients_merge(keep_id: int, body: _MergeBody, master_id: int = Depends(get_jwt_master_id)):
+    others = [i for i in dict.fromkeys(body.other_ids) if i != keep_id]
+    if not others or len(others) > 10:
+        raise HTTPException(400, "Выберите карточки для объединения")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            keep = await conn.fetchrow("SELECT * FROM clients WHERE id=$1 AND master_id=$2", keep_id, master_id)
+            if not keep:
+                raise HTTPException(404, "Карточка не найдена")
+            notes_add = []
+            for oid in others:
+                o = await conn.fetchrow("SELECT * FROM clients WHERE id=$1 AND master_id=$2", oid, master_id)
+                if not o:
+                    raise HTTPException(404, "Карточка не найдена")
+                if o["telegram_id"] and not keep["telegram_id"]:
+                    await conn.execute("UPDATE clients SET telegram_id=$1 WHERE id=$2", o["telegram_id"], keep_id)
+                if o["birthday"] and not keep["birthday"]:
+                    await conn.execute("UPDATE clients SET birthday=$1 WHERE id=$2", o["birthday"], keep_id)
+                if o["marketing_consent"] is not None and keep["marketing_consent"] is None:
+                    await conn.execute("UPDATE clients SET marketing_consent=$1 WHERE id=$2", o["marketing_consent"], keep_id)
+                for t in ("appointments", "subscriptions", "reviews", "client_waitlist"):
+                    await conn.execute(f"UPDATE {t} SET client_id=$1 WHERE client_id=$2", keep_id, oid)
+                await conn.execute("DELETE FROM wallet_passes WHERE client_id=$1", oid)
+                await conn.execute("DELETE FROM client_merge_dismissed WHERE a_id=$1 OR b_id=$1", oid)
+                if (o["notes"] or "").strip():
+                    notes_add.append(o["notes"].strip())
+                notes_add.append(f"Объединено с карточкой «{o['name']}» ({o['phone']})")
+                await conn.execute("DELETE FROM clients WHERE id=$1", oid)
+            phone = keep["phone"]
+            if body.phone:
+                d = _sim_digits(body.phone)
+                if len(d) != 11:
+                    raise HTTPException(400, "Неверный номер")
+                phone = "+" + d
+            notes = "\n".join([x for x in [(keep["notes"] or "").strip(), *notes_add] if x])
+            await conn.execute("UPDATE clients SET phone=$1, notes=$2 WHERE id=$3", phone, notes[:2000], keep_id)
+    try:
+        await wallet.touch(master_id, keep_id)
+    except Exception:
+        pass
+    return {"ok": True, "merged": len(others)}
+
+
+class _DismissBody(BaseModel):
+    ids: list[int]
+
+
+@app.post("/api/v1/clients/similar/dismiss")
+async def v1_clients_similar_dismiss(body: _DismissBody, master_id: int = Depends(get_jwt_master_id)):
+    """«Это разные люди» — больше не предлагать эту группу."""
+    ids = sorted(set(body.ids))
+    if len(ids) < 2:
+        raise HTTPException(400, "Нужно минимум 2 карточки")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        n = await conn.fetchval("SELECT COUNT(*) FROM clients WHERE master_id=$1 AND id = ANY($2::int[])", master_id, ids)
+        if n != len(ids):
+            raise HTTPException(404, "Карточка не найдена")
+        for i in range(len(ids)):
+            for j in range(i + 1, len(ids)):
+                await conn.execute(
+                    """INSERT INTO client_merge_dismissed (master_id, a_id, b_id) VALUES ($1,$2,$3)
+                       ON CONFLICT DO NOTHING""", master_id, ids[i], ids[j])
+    return {"ok": True}
 
 
 @app.get("/api/v1/clients/{client_id}")
