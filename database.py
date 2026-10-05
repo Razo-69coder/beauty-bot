@@ -339,7 +339,7 @@ async def get_master_by_email(email: str) -> dict | None:
             "SELECT id, telegram_id, name, email, work_start, work_end, slot_duration, "
             "reminder_days, payment_card, payment_phone, payment_banks, "
             "theme, password_hash "
-            "FROM masters WHERE email=$1",
+            "FROM masters WHERE lower(email)=lower(trim($1))",
             email
         )
     if not row:
