@@ -157,7 +157,7 @@ def _pass_json(p, d: dict) -> dict:
         if last:
             secondary.append({"key": "last", "label": "ПОСЛЕДНИЙ ВИЗИТ", "value": _fmt_date(last["appointment_date"])})
             secondary.append({"key": "service", "label": "УСЛУГА", "value": last["procedure"] or ""})
-        auxiliary.append({"key": "hint", "label": "ЗАПИСЬ", "value": "Нажмите ⓘ → «Записаться»"})
+        auxiliary.append({"key": "hint", "label": "ЗАПИСЬ", "value": "⋯ → Данные карты → «Записаться»"})
 
     if m["loy_on"] and m["show_stamps"]:
         n = max(int(m["loy_n"] or 10), 2)
